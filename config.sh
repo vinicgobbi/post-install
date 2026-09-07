@@ -37,7 +37,7 @@ else
   # Mantém exatamente a sua lista original (GTK / Padrão)
   FLATPAKS=(
     com.getpostman.Postman com.github.tchx84.Flatseal
-    com.mattjakeman.ExtensionManager com.mikrotik.WinBox
+    com.mattjakeman.ExtensionManager 
     com.obsproject.Studio com.spotify.Client dev.vencord.Vesktop
     io.dbeaver.DBeaverCommunity io.ente.auth io.github.flattool.Ignition io.github.flattool.Warehouse
     io.missioncenter.MissionCenter md.obsidian.Obsidian
@@ -45,6 +45,8 @@ else
     org.libreoffice.LibreOffice org.onlyoffice.desktopeditors org.qbittorrent.qBittorrent
     org.remmina.Remmina org.telegram.desktop org.videolan.VLC me.iepure.devtoolbox
     com.rtosta.zapzap
+    
+    #com.mikrotik.WinBox
   )
 fi
 
