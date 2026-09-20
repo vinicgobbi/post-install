@@ -25,24 +25,28 @@ EOF
         return
     fi
 
-    info "Instalando extensão do VSCode para o Nautilus..."
+    info "Instalando extensões do VSCode e de copiar caminho para o Nautilus..."
 
     if [[ "$PKG_MGR" == "dnf" ]]; then
-        dnf install -y nautilus-python python3-gobject
+        dnf install -y nautilus-python python3-gobject wl-clipboard xclip
     elif [[ "$PKG_MGR" == "pacman" ]]; then
-        pacman -S --needed --noconfirm nautilus-python python-gobject
+        pacman -S --needed --noconfirm nautilus-python python-gobject wl-clipboard xclip
     else
-        apt install -y python3-nautilus python3-gi
+        apt install -y python3-nautilus python3-gi wl-clipboard xclip
     fi
 
     executar_como_usuario "
   rm -rf /tmp/vscode_nautilus
   git clone https://github.com/vinicgobbi/vscode_nautilus.git /tmp/vscode_nautilus
   bash /tmp/vscode_nautilus/install.sh
+
+  rm -rf /tmp/nautilus-copypath
+  git clone https://github.com/vinicgobbi/nautilus-copypath.git /tmp/nautilus-copypath
+  bash /tmp/nautilus-copypath/install.sh
 "
-    sucesso "Extensão do VSCode para o Nautilus instalada."
+    sucesso "Extensões do VSCode e de copiar caminho instaladas no Nautilus."
 }
 
 registrar_modulo "vscode_nautilus" "Extensão VSCode no gerenciador de arquivos" \
-    "Adiciona 'Abrir com o VSCode' ao menu de contexto (Nautilus no GNOME, Dolphin no Plasma)" \
+    "Adiciona 'Abrir com o VSCode' ao menu de contexto (Nautilus no GNOME, Dolphin no Plasma) e, no Nautilus, 'Copiar caminho'" \
     "instalar_vscode_gerenciador_arquivos"

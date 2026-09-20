@@ -5,7 +5,7 @@ atualização do sistema, Docker, VSCode, PHP + SQL Server, Flatpaks (incluindo
 jogos — Steam, Heroic, ProtonPlus, PrismLauncher), Tailscale + Trayscale,
 Chrome, Bitwarden, temas/ícones GNOME, o ambiente do usuário (zsh, Oh My Zsh,
 fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade), Claude Code,
-importação de perfis OpenVPN e a extensão do VSCode para o Nautilus.
+importação de perfis OpenVPN e a extensões do VSCode e de copiar caminho para o Nautilus.
 
 ## Sistemas suportados
 
@@ -116,7 +116,7 @@ modules/
   14_ambiente_usuario.sh    # fnm/Node, clona Dotfiles e roda o bootstrap.sh dele, gsettings
   15_rust_tools.sh          # rustup + compilação de eza e topgrade via cargo
   16_claude_code.sh         # instala o Claude Code (CLI da Anthropic)
-  18_vscode_nautilus.sh     # extensão "Abrir com o VSCode" no menu do Nautilus
+  18_vscode_nautilus.sh     # extensões "Abrir com o VSCode" e "Copiar caminho" no menu do Nautilus
   19_ovpn.sh                # instala plugin OpenVPN e importa perfis de ./OVPN
   20_virt_manager.sh        # QEMU/KVM, libvirt e virt-manager (módulo à parte — desmarque no menu se não quiser)
   21_limpeza.sh             # autoremove/clean do gerenciador de pacotes
