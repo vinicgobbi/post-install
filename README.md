@@ -74,7 +74,7 @@ cd post-install
 
 O `setup.sh` se reexecuta com `sudo`, baixa o binário da última release para
 `amd64` (única arquitetura suportada), confere o SHA-256 e executa
-apontando `OVPN/` e `logs/` para a pasta do repositório. Para fixar uma
+apontando `OVPN/`, `Wallpapers/` e `logs/` para a pasta do repositório. Para fixar uma
 versão: `POST_INSTALL_VERSION=v1.2.0 ./setup.sh`. Qualquer flag é repassada ao
 binário (ex.: `./setup.sh --dry-run`).
 
@@ -87,6 +87,7 @@ post-install-linux-amd64.tar.gz
 └── post-install/
     ├── post-install      # binário
     ├── OVPN/README.md    # coloque aqui os .ovpn a importar
+    ├── Wallpapers/       # papéis de parede oferecidos na TUI
     ├── logs/             # logs de cada execução
     └── README.md
 ```
@@ -97,8 +98,8 @@ cp ~/meus-perfis/*.ovpn post-install/OVPN/   # opcional
 sudo ./post-install/post-install
 ```
 
-Por padrão o binário procura `OVPN/` e grava em `logs/` **ao lado dele
-mesmo**, então funciona a partir de qualquer diretório. A release também
+Por padrão o binário procura `OVPN/` e `Wallpapers/` e grava em `logs/`
+**ao lado dele mesmo**, então funciona a partir de qualquer diretório. A release também
 traz o binário solto (`post-install-linux-amd64`, usado pelo `setup.sh`) e um
 `.sha256` para cada arquivo.
 
@@ -107,17 +108,21 @@ traz o binário solto (`post-install-linux-amd64`, usado pelo `setup.sh`) e um
 1. Mostra o sistema detectado (distro, base, desktop GNOME/GTK ou KDE).
 2. Pergunta para qual usuário do sistema configurar o ambiente (sem sugestão
    de nome; valida que o usuário existe, inclusive contas de domínio).
-3. Checklist com todos os módulos, já marcados:
+3. Pergunta qual papel de parede aplicar, entre as imagens de `Wallpapers/`
+   (com resolução e tamanho), ou "Não alterar", que desmarca o módulo
+   `papel_parede`. A tela é pulada se a pasta estiver vazia ou se vier
+   `--wallpaper`.
+4. Checklist com todos os módulos, já marcados:
    - `↑`/`↓` (ou `j`/`k`) — mover · `espaço` — marcar/desmarcar · `a` — todos
    - o painel abaixo mostra a descrição do módulo e as dependências
    - marcar um módulo marca as dependências dele; desmarcar uma dependência
      desmarca quem depende dela (com aviso na tela)
-4. Confirmação com a lista do que vai rodar.
-5. Execução: barra de progresso, status de cada módulo (✓ ok, ! com avisos,
+5. Confirmação com a lista do que vai rodar (e o papel de parede escolhido).
+6. Execução: barra de progresso, status de cada módulo (✓ ok, ! com avisos,
    ✗ falhou, ⤼ pulado) e a saída ao vivo dos comandos (`↑`/`↓`/`pgup`/`pgdn`
    para rolar, `G` para voltar a seguir). `Ctrl+C` pede confirmação e então
    interrompe o comando em andamento.
-6. Resumo final com tempo de cada módulo e o caminho dos logs (o resumo
+7. Resumo final com tempo de cada módulo e o caminho dos logs (o resumo
    também fica impresso no terminal depois que a TUI fecha).
 
 Se um módulo falha, os seguintes continuam rodando — exceto os que dependem
@@ -135,7 +140,8 @@ dele, que são pulados. Use `--fail-fast` para parar tudo no primeiro erro.
 | `--yes` | não pede confirmação (modo texto) |
 | `--fail-fast` | para no primeiro módulo que falhar |
 | `--list` | lista os módulos e sai |
-| `--ovpn-dir` / `--log-dir` | pastas de `.ovpn` e de logs (padrão: `OVPN/` e `logs/` ao lado do binário) |
+| `--wallpaper NOME` | papel de parede a aplicar (nome do arquivo, ou `none` para não alterar); sem ela, a TUI pergunta |
+| `--ovpn-dir` / `--wallpapers-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede e logs (padrão: `OVPN/`, `Wallpapers/` e `logs/` ao lado do binário) |
 | `--version` | mostra a versão |
 
 Sem terminal interativo (pipe, CI), o programa usa o modo texto
@@ -168,6 +174,7 @@ internal/
     repositorios.go         #   atualização, repositórios/Chaotic-AUR+yay, pacotes base
     apps.go                 #   Solaar, LibreOffice, Flatpaks, Tailscale, PHP, Chrome+GCM, Bitwarden
     desktop.go              #   temas/ícones, ambiente do usuário, Rust, Claude Code, Nautilus/Dolphin
+    wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
     sistema.go              #   OpenVPN, virt-manager, limpeza
   config/flatpaks.go        # listas de Flatpaks (GTK, KDE, jogos)
   tui/                      # interface Bubble Tea
@@ -222,6 +229,22 @@ no Mint) e preenche:
 - `Desktop` — `kde` se `XDG_CURRENT_DESKTOP` contém KDE ou o `plasmashell`
   está instalado (o sudo costuma limpar a variável), senão `gtk`
 
+## Papel de parede
+
+Os papéis de parede ficam em `Wallpapers/` (`.jpg`, `.jpeg`, `.png` ou
+`.webp`) — para oferecer outra imagem, basta colocá-la na pasta, sem
+recompilar. O módulo `papel_parede`, como o usuário alvo:
+
+1. copia a imagem escolhida para `~/.local/share/backgrounds/` (o mesmo lugar
+   onde o GNOME guarda as imagens escolhidas em Configurações → Plano de
+   fundo);
+2. aplica com `gsettings` (`picture-uri`, `picture-uri-dark` e
+   `picture-options 'zoom'`) — no Plasma, com `plasma-apply-wallpaperimage`.
+
+Os scripts que rodam como o usuário (`su - usuario`) usam a sessão D-Bus dele
+quando há uma sessão gráfica aberta; sem isso o `gsettings` descarta as
+alterações sem erro.
+
 ## Importação de perfis OpenVPN
 
 Antes de rodar, copie os arquivos `.ovpn` para a pasta `OVPN/` (veja
@@ -257,7 +280,7 @@ Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
    CHANGE` → major), atualizar o `CHANGELOG.md`, criar o commit `bump: ...` e a
    tag `vX.Y.Z` — sem commit `feat`/`fix`/breaking desde a última tag, para aqui;
 3. compila o binário estático (`CGO_ENABLED=0`) para `amd64`, com a
-   versão embutida, empacota o `.tar.gz` com o binário + `OVPN/` + `logs/` e
+   versão embutida, empacota o `.tar.gz` com o binário + `OVPN/` + `Wallpapers/` + `logs/` e
    sobe tudo como artefato;
 4. publica a release da tag com os binários soltos, os pacotes `.tar.gz` e os
    `.sha256`, e apaga os artefatos da action.

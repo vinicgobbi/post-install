@@ -47,6 +47,8 @@ type options struct {
 	version  bool
 	ovpnDir  string
 	logDir   string
+	wallDir  string
+	wall     string
 }
 
 func parseFlags() options {
@@ -61,6 +63,8 @@ func parseFlags() options {
 	flag.BoolVar(&o.list, "list", false, "listar os módulos disponíveis e sair")
 	flag.BoolVar(&o.version, "version", false, "mostrar a versão e sair")
 	flag.StringVar(&o.ovpnDir, "ovpn-dir", "", "pasta com os arquivos .ovpn a importar (padrão: OVPN/ ao lado do binário)")
+	flag.StringVar(&o.wallDir, "wallpapers-dir", "", "pasta com as imagens de papel de parede (padrão: Wallpapers/ ao lado do binário)")
+	flag.StringVar(&o.wall, "wallpaper", "", "papel de parede a aplicar: nome do arquivo em --wallpapers-dir, ou \"none\" para não alterar (padrão: perguntar)")
 	flag.StringVar(&o.logDir, "log-dir", "", "pasta onde os logs da execução são gravados (padrão: logs/ ao lado do binário)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Uso: sudo %s [opções]\n\nOpções:\n", os.Args[0])
@@ -68,7 +72,7 @@ func parseFlags() options {
 	}
 	flag.Parse()
 
-	// Por padrão, OVPN/ e logs/ ficam ao lado do binário (estrutura do
+	// Por padrão, OVPN/, Wallpapers/ e logs/ ficam ao lado do binário (estrutura do
 	// pacote .tar.gz da release), para funcionar de qualquer diretório.
 	base := exeDir()
 	if o.ovpnDir == "" {
@@ -77,7 +81,34 @@ func parseFlags() options {
 	if o.logDir == "" {
 		o.logDir = filepath.Join(base, "logs")
 	}
+	if o.wallDir == "" {
+		o.wallDir = filepath.Join(base, "Wallpapers")
+	}
+	// Absolutos: os scripts como usuário rodam via "su -", que muda o
+	// diretório atual para a home dele.
+	for _, d := range []*string{&o.ovpnDir, &o.wallDir, &o.logDir} {
+		if abs, err := filepath.Abs(*d); err == nil {
+			*d = abs
+		}
+	}
 	return o
+}
+
+// resolveWallpaper converte o valor de --wallpaper no caminho da imagem.
+// Devolve ok=false quando a flag não foi usada (é preciso perguntar).
+func resolveWallpaper(walls []string, name string) (path string, ok bool, err error) {
+	switch name {
+	case "":
+		return "", false, nil
+	case "none":
+		return "", true, nil
+	}
+	for _, w := range walls {
+		if filepath.Base(w) == name {
+			return w, true, nil
+		}
+	}
+	return "", false, fmt.Errorf("papel de parede %q não encontrado na pasta de papéis de parede", name)
 }
 
 // exeDir devolve a pasta do executável (ou o diretório atual, se não der
@@ -155,7 +186,13 @@ func run() int {
 	// Legível por todos: o apt instala os .deb baixados aqui como o usuário _apt.
 	os.Chmod(workDir, 0o755)
 
-	start := func(ctx context.Context, user string, mods []modules.Module, emit func(any)) []engine.Result {
+	walls := modules.ListWallpapers(o.wallDir)
+	wallpaper, wallChosen, err := resolveWallpaper(walls, o.wall)
+	if err != nil {
+		return fail("%v", err)
+	}
+
+	start := func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any)) []engine.Result {
 		log.SetSink(func(e runlog.Entry) { emit(e) })
 		log.Infof("Sistema detectado: %s", sys.Summary())
 		log.Infof("Configuração será aplicada para: %s", user)
@@ -163,23 +200,24 @@ func run() int {
 			log.Infof("Log desta execução: %s", log.CleanPath)
 		}
 		c := &modules.Ctx{
-			Runner:  &runner.Runner{Ctx: ctx, Log: log, User: user, DryRun: o.dryRun, WorkDir: workDir},
-			Sys:     sys,
-			OVPNDir: o.ovpnDir,
+			Runner:    &runner.Runner{Ctx: ctx, Log: log, User: user, DryRun: o.dryRun, WorkDir: workDir},
+			Sys:       sys,
+			OVPNDir:   o.ovpnDir,
+			Wallpaper: wallpaper,
 		}
 		return engine.Run(ctx, mods, c, engine.Options{FailFast: o.failFast}, emit)
 	}
 
 	interactive := !o.noTUI && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 	if interactive {
-		return runTUI(o, sys, all, sel, log, start)
+		return runTUI(o, sys, all, sel, walls, wallpaper, wallChosen, log, start)
 	}
-	return runPlain(o, sys, all, sel, out, start)
+	return runPlain(o, sys, all, sel, walls, wallpaper, wallChosen, out, start)
 }
 
-type startFunc func(ctx context.Context, user string, mods []modules.Module, emit func(any)) []engine.Result
+type startFunc func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any)) []engine.Result
 
-func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, log *runlog.Logger, start startFunc) int {
+func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, walls []string, wallpaper string, wallChosen bool, log *runlog.Logger, start startFunc) int {
 	m := tui.New(tui.Config{
 		Sys:          sys,
 		Version:      version,
@@ -188,9 +226,12 @@ func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, log 
 		Selected:     sel,
 		User:         o.user,
 		ValidateUser: validateUser,
+		Wallpapers:   walls,
+		Wallpaper:    wallpaper,
+		WallChosen:   wallChosen,
 		LogPaths:     []string{log.CleanPath, log.RawPath},
-		Start: func(ctx context.Context, user string, mods []modules.Module, emit func(any)) {
-			start(ctx, user, mods, emit)
+		Start: func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any)) {
+			start(ctx, user, wallpaper, mods, emit)
 		},
 	})
 	final, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
@@ -209,7 +250,7 @@ func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, log 
 	return exitCode(res.Results)
 }
 
-func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, out *plain.Printer, start startFunc) int {
+func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, walls []string, wallpaper string, wallChosen bool, out *plain.Printer, start startFunc) int {
 	stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
 	out.Info("Sistema detectado: %s", sys.Summary())
 	for _, w := range sys.Warnings {
@@ -223,6 +264,14 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, ou
 			return 1
 		}
 		user = promptUser(out)
+	}
+
+	if !wallChosen && len(walls) > 0 && isSelected(all, sel, "papel_parede") {
+		if stdinTTY {
+			wallpaper = promptWallpaper(out, walls)
+		} else {
+			out.Warn("Sem terminal interativo e sem --wallpaper: o papel de parede não será alterado.")
+		}
 	}
 
 	if o.modules == "" && !stdinTTY {
@@ -255,7 +304,7 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, ou
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var elapsed engine.FinishedEvent
-	results := start(ctx, user, mods, func(ev any) {
+	results := start(ctx, user, wallpaper, mods, func(ev any) {
 		if f, ok := ev.(engine.FinishedEvent); ok {
 			elapsed = f
 		}
@@ -345,6 +394,39 @@ func promptUser(out *plain.Printer) string {
 			continue
 		}
 		return name
+	}
+}
+
+func isSelected(all []modules.Module, sel []bool, id string) bool {
+	for i, m := range all {
+		if m.ID == id {
+			return sel[i]
+		}
+	}
+	return false
+}
+
+// promptWallpaper pergunta qual papel de parede aplicar (modo texto).
+func promptWallpaper(out *plain.Printer, walls []string) string {
+	fmt.Fprintln(out.W, "[?] Qual papel de parede deseja aplicar?")
+	for i, w := range walls {
+		fmt.Fprintf(out.W, "  %d) %s\n", i+1, filepath.Base(w))
+	}
+	fmt.Fprintln(out.W, "  0) Não alterar o papel de parede")
+	for {
+		fmt.Fprint(out.W, "[?] Número: ")
+		line, err := stdin.ReadString('\n')
+		if err != nil {
+			return ""
+		}
+		var n int
+		if _, err := fmt.Sscanf(strings.TrimSpace(line), "%d", &n); err == nil && n >= 0 && n <= len(walls) {
+			if n == 0 {
+				return ""
+			}
+			return walls[n-1]
+		}
+		out.Warn("Opção inválida.")
 	}
 }
 

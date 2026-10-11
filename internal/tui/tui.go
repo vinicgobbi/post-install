@@ -5,6 +5,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,9 +32,14 @@ type Config struct {
 	// User já validado (pula a tela de usuário quando preenchido).
 	User         string
 	ValidateUser func(string) error
+	// Wallpapers são as imagens disponíveis; Wallpaper é a escolhida (vazio
+	// = não alterar). Com WallChosen (veio de --wallpaper), não pergunta.
+	Wallpapers []string
+	Wallpaper  string
+	WallChosen bool
 	// Start roda a execução dos módulos escolhidos, enviando eventos do
 	// engine (e entradas de log) para emit. Bloqueia até terminar.
-	Start    func(ctx context.Context, user string, mods []modules.Module, emit func(any))
+	Start    func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any))
 	LogPaths []string
 }
 
@@ -41,6 +47,7 @@ type state int
 
 const (
 	stateUser state = iota
+	stateWallpaper
 	stateSelect
 	stateConfirm
 	stateRunning
@@ -56,6 +63,8 @@ type Model struct {
 
 	input   textinput.Model
 	userErr string
+
+	wallCursor int
 
 	cursor int
 	sel    []bool
@@ -108,9 +117,24 @@ func New(cfg Config) Model {
 		vp:     viewport.New(80, 10),
 	}
 	if cfg.User != "" {
-		m.state = stateSelect
+		m.state = m.afterUser()
 	}
 	return m
+}
+
+// afterUser decide a tela seguinte à do usuário: a escolha do papel de
+// parede só aparece se há imagens, o módulo está marcado e não veio
+// --wallpaper.
+func (m *Model) afterUser() state {
+	if m.cfg.WallChosen || len(m.cfg.Wallpapers) == 0 {
+		return stateSelect
+	}
+	for i, mod := range m.cfg.Modules {
+		if mod.ID == "papel_parede" && m.sel[i] {
+			return stateWallpaper
+		}
+	}
+	return stateSelect
 }
 
 func (m Model) Init() tea.Cmd {
@@ -180,6 +204,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.state {
 		case stateUser:
 			return m.updateUser(msg)
+		case stateWallpaper:
+			return m.updateWallpaper(msg)
 		case stateSelect:
 			return m.updateSelect(msg)
 		case stateConfirm:
@@ -217,7 +243,7 @@ func (m Model) updateUser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.cfg.User = nome
 		m.userErr = ""
-		m.state = stateSelect
+		m.state = m.afterUser()
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -419,6 +445,15 @@ func (m Model) viewConfirm() string {
 		b.WriteString(strings.Join(items, "\n"))
 	}
 	b.WriteString("\n\n")
+	for i, mod := range m.cfg.Modules {
+		if mod.ID == "papel_parede" && m.sel[i] {
+			nome := "não alterar"
+			if m.cfg.Wallpaper != "" {
+				nome = filepath.Base(m.cfg.Wallpaper)
+			}
+			b.WriteString(subtleStyle.Render("Papel de parede: ") + accentStyle.Render(nome) + "\n\n")
+		}
+	}
 	if m.cfg.DryRun {
 		b.WriteString(warnStyle.Render("Modo dry-run: nada será alterado no sistema, os comandos só serão listados.") + "\n\n")
 	}
@@ -446,9 +481,9 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	ch, user, mods := m.events, m.cfg.User, m.runMods
+	ch, user, wallpaper, mods := m.events, m.cfg.User, m.cfg.Wallpaper, m.runMods
 	go func() {
-		m.cfg.Start(ctx, user, mods, func(ev any) { ch <- ev })
+		m.cfg.Start(ctx, user, wallpaper, mods, func(ev any) { ch <- ev })
 		close(ch)
 	}()
 	m.resize()
@@ -760,6 +795,8 @@ func (m Model) View() string {
 	switch m.state {
 	case stateUser:
 		v = m.viewUser()
+	case stateWallpaper:
+		v = m.viewWallpaper()
 	case stateSelect:
 		v = m.viewSelect()
 	case stateConfirm:
