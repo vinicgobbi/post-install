@@ -225,6 +225,7 @@ func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, wall
 		Modules:      all,
 		Selected:     sel,
 		User:         o.user,
+		DetectedUser: detectUser(),
 		ValidateUser: validateUser,
 		Wallpapers:   walls,
 		Wallpaper:    wallpaper,
