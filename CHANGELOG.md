@@ -1,3 +1,15 @@
+## v1.2.0 (2026-10-11)
+
+### Feat
+
+- TUI oferece o usuário detectado ou outro usuário
+- detecta o usuário que executou o sudo
+- escolha e aplicação do papel de parede na TUI
+
+### Fix
+
+- scripts como usuário usam a sessão D-Bus dele
+
 ## v1.1.1 (2026-10-11)
 
 ### Fix
