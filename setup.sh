@@ -1,85 +1,58 @@
 #!/usr/bin/env bash
-set -e
+# Bootstrap do post-install: baixa o binário da release no GitHub (verificando
+# o SHA-256) e executa como root, apontando OVPN/ e logs/ para esta pasta.
+#
+#   sudo ./setup.sh                          # última release
+#   POST_INSTALL_VERSION=v1.2.0 ./setup.sh   # versão específica
+#   ./setup.sh --dry-run                     # flags são repassadas ao binário
+#
+# Se existir um ./post-install compilado localmente (go build -o post-install
+# ./cmd/post-install), ele é usado no lugar do download.
+set -euo pipefail
 
+REPO="vinicgobbi/post-install"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# --- Carrega bibliotecas, configuração e módulos ---
-source "$SCRIPT_DIR/lib/ui.sh"
-source "$SCRIPT_DIR/lib/os_detect.sh"
-source "$SCRIPT_DIR/lib/utils.sh"
-source "$SCRIPT_DIR/config.sh"
-for _modulo in "$SCRIPT_DIR"/modules/*.sh; do
-    source "$_modulo"
-done
-unset _modulo
-
-banner
-
-# --- Verificações iniciais ---
-if [ "$EUID" -ne 0 ]; then
-    erro "Execute este script como root (sudo)."
+if [[ "$EUID" -ne 0 ]]; then
+    exec sudo POST_INSTALL_VERSION="${POST_INSTALL_VERSION:-}" "$0" "$@"
 fi
 
-iniciar_log "setup"
+case "$(uname -m)" in
+    x86_64) ARCH="amd64" ;;
+    aarch64 | arm64) ARCH="arm64" ;;
+    *)
+        echo "[-] Arquitetura não suportada: $(uname -m)" >&2
+        exit 1
+        ;;
+esac
 
-export DEBIAN_FRONTEND=noninteractive
-
-trap_cancelamento
-trap_erro_inesperado
-
-# --- Identificação do sistema ---
-detectar_sistema
-mensagem_sistema_detectado
-
-# --- Usuário alvo ---
-USER_NAME=$(perguntar_usuario)
-info "Configuração será aplicada para: $USER_NAME"
-
-# --- Seleção de módulos ---
-declare -a MOD_SEL
-menu_checklist "Escolha o que deseja executar (o script já vem com tudo marcado):" \
-    MOD_IDS MOD_TITLES MOD_DESCS MOD_SEL
-
-# Alguns módulos dependem de outro ter rodado antes (ex.: "Extensões PHP"
-# precisa dos headers do driver ODBC que só "Instalar pacotes base" traz).
-# Se o usuário desmarcou uma dependência sem perceber, seleciona ela de volta
-# em vez de deixar o módulo dependente falhar no meio da execução.
-resolver_dependencias_modulos MOD_IDS MOD_DEPS MOD_TITLES MOD_SEL
-
-SELECIONADOS_FUNCS=()
-SELECIONADOS_TITULOS=()
-for ((i = 0; i < ${#MOD_IDS[@]}; i++)); do
-    if [[ "${MOD_SEL[i]}" == "1" ]]; then
-        SELECIONADOS_FUNCS+=("${MOD_FUNCS[i]}")
-        SELECIONADOS_TITULOS+=("${MOD_TITLES[i]}")
+baixar() {
+    if command -v curl &>/dev/null; then
+        curl -fL --retry 3 --progress-bar -o "$2" "$1"
+    else
+        wget -q --show-progress -O "$2" "$1"
     fi
-done
+}
 
-TOTAL="${#SELECIONADOS_FUNCS[@]}"
-if [[ "$TOTAL" -eq 0 ]]; then
-    aviso "Nenhum módulo selecionado. Nada a fazer."
-    exit 0
+BIN="$SCRIPT_DIR/post-install"
+if [[ ! -x "$BIN" ]]; then
+    ASSET="post-install-linux-$ARCH"
+    if [[ -n "${POST_INSTALL_VERSION:-}" ]]; then
+        URL="https://github.com/$REPO/releases/download/$POST_INSTALL_VERSION/$ASSET"
+    else
+        URL="https://github.com/$REPO/releases/latest/download/$ASSET"
+    fi
+
+    TMP_DIR="$(mktemp -d)"
+    echo "[*] Baixando $URL"
+    baixar "$URL" "$TMP_DIR/$ASSET"
+    baixar "$URL.sha256" "$TMP_DIR/$ASSET.sha256"
+    (cd "$TMP_DIR" && sha256sum --quiet -c "$ASSET.sha256") || {
+        echo "[-] Checksum SHA-256 não confere; abortando." >&2
+        exit 1
+    }
+    chmod +x "$TMP_DIR/$ASSET"
+    BIN="$TMP_DIR/$ASSET"
 fi
 
-echo
-info "Módulos selecionados:"
-for titulo in "${SELECIONADOS_TITULOS[@]}"; do
-    echo "  - $titulo"
-done
-echo
-
-if [[ -t 0 ]] && ! confirmar "Iniciar a configuração com os $TOTAL módulos acima?"; then
-    aviso "Operação cancelada pelo usuário."
-    exit 0
-fi
-
-# --- Execução ---
-iniciar_log_bruto
-EXECUTADOS=()
-for ((i = 0; i < TOTAL; i++)); do
-    passo "$((i + 1))" "$TOTAL" "${SELECIONADOS_TITULOS[i]}"
-    "${SELECIONADOS_FUNCS[i]}"
-    EXECUTADOS+=("${SELECIONADOS_TITULOS[i]}")
-done
-
-resumo_final EXECUTADOS
+exec "$BIN" --ovpn-dir "$SCRIPT_DIR/OVPN" --log-dir "$SCRIPT_DIR/logs" "$@"

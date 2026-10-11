@@ -1,4 +1,8 @@
 logs/
 
+# Binário compilado localmente (as releases são publicadas pela action)
+/post-install
+/dist/
+
 OVPN/*
 !OVPN/README.md
