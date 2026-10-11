@@ -15,7 +15,7 @@ OpenVPN e as extensões "Abrir com o VSCode"/"Copiar caminho" no Nautilus.
 | Fedora   | Fedora Linux                                   | `dnf`       |
 | RHEL     | AlmaLinux e derivados (`ID_LIKE=rhel/centos`)  | `dnf`       |
 | Arch     | Arch Linux puro (`ID=arch`)                    | `pacman`    |
-| Debian   | Ubuntu (bionic, focal, jammy, noble) e derivados | `apt`     |
+| Debian   | Ubuntu (bionic, focal, jammy, noble, resolute) e derivados | `apt` |
 | Debian   | Debian (bullseye, bookworm)                    | `apt`       |
 
 Se a distribuição/versão não estiver nessa lista, o programa para com uma
@@ -23,7 +23,7 @@ mensagem clara em vez de continuar em um estado incerto. No Arch isso inclui
 derivados como Manjaro/EndeavourOS/CachyOS: cada um diverge de um jeito
 diferente do Arch puro, então não são reconhecidos por `ID_LIKE` — rodar lá é
 por conta e risco, sem suporte. Ubuntus mais novos que a última LTS mapeada
-usam o repositório da Microsoft do 24.04 (compatível), com um aviso.
+usam o repositório da Microsoft do 26.04 (compatível), com um aviso.
 
 ### Arch Linux: Chaotic-AUR e yay
 
