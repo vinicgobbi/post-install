@@ -1,3 +1,10 @@
+## v1.1.1 (2026-10-11)
+
+### Fix
+
+- autostart do Solaar inicia oculto (-w hide)
+- verifica a chave da Mozilla sem depender do ~/.gnupg do root
+
 ## v1.1.0 (2026-10-11)
 
 ### Feat
