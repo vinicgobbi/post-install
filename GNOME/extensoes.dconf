@@ -1,0 +1,39 @@
+# Configurações das extensões, carregadas com:
+#   dconf load /org/gnome/shell/extensions/ < extensoes.dconf
+# Só preferências: sem estado da máquina (dispositivos Bluetooth/GSConnect
+# pareados, monitor do dock, tamanho de janela).
+
+[alphabetical-app-grid]
+folder-order-position='start'
+
+[Bluetooth-Battery-Meter]
+circle-widget-custom-colors=['#ff7800', '#ff7800', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931']
+enable-battery-level-text=true
+indicator-type=0
+level-indicator-custom-colors=['#ff7800', '#ff7800', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931', '#15c931']
+swap-icon-text=false
+
+[caffeine]
+indicator-position-max=3
+
+[copyous]
+database-backend='json'
+
+[dash-to-dock]
+background-opacity=0.80000000000000004
+dash-max-icon-size=48
+dock-fixed=false
+dock-position='BOTTOM'
+extend-height=false
+height-fraction=0.90000000000000002
+multi-monitor=true
+show-apps-at-top=true
+show-icons-notifications-counter=false
+show-mounts=false
+
+[lockkeys]
+capslock-indicator='when-active'
+numlock-indicator='when-active'
+
+[tiling-assistant]
+focus-hint-color='rgb(203,67,20)'

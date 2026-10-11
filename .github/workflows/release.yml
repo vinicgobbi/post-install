@@ -5,7 +5,7 @@
 #                (se não houver commit feat/fix/BREAKING, não há release)
 #   3. build   — compila o binário estático para amd64, empacota um
 #                .tar.gz com o binário + estrutura de pastas (OVPN/,
-#                Wallpapers/, logs/) e
+#                Wallpapers/, GNOME/, logs/) e
 #                sobe tudo como artefato
 #   4. release — publica a release da tag (binários soltos + pacotes .tar.gz)
 #                e apaga os artefatos
@@ -100,13 +100,15 @@ jobs:
           #   post-install      binário
           #   OVPN/README.md    pasta onde ficam os .ovpn a importar
           #   Wallpapers/       papéis de parede oferecidos na TUI
+          #   GNOME/            lista e configurações das extensões do GNOME
           #   logs/             logs de cada execução
           #   README.md
           pkg="pkg/post-install"
-          mkdir -p "$pkg/OVPN" "$pkg/Wallpapers" "$pkg/logs"
+          mkdir -p "$pkg/OVPN" "$pkg/Wallpapers" "$pkg/GNOME" "$pkg/logs"
           install -m 0755 "dist/post-install-linux-$GOARCH" "$pkg/post-install"
           install -m 0644 OVPN/README.md "$pkg/OVPN/README.md"
           install -m 0644 Wallpapers/* "$pkg/Wallpapers/"
+          install -m 0644 GNOME/* "$pkg/GNOME/"
           install -m 0644 README.md "$pkg/README.md"
           tar -C pkg --owner=0 --group=0 -czf "dist/post-install-linux-$GOARCH.tar.gz" post-install
           cd dist

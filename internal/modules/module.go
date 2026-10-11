@@ -27,6 +27,19 @@ type Ctx struct {
 	OVPNDir string
 	// Wallpaper é o caminho da imagem escolhida (vazio = não alterar).
 	Wallpaper string
+	// GNOMEDir guarda extensoes.txt e extensoes.dconf.
+	GNOMEDir string
+	// ForcarExtensoes são as extensões sem versão compatível que o usuário
+	// pediu para instalar mesmo assim.
+	ForcarExtensoes []string
+}
+
+// Escolhas é o que o usuário decide antes da execução (na TUI ou no modo
+// texto).
+type Escolhas struct {
+	User            string
+	Wallpaper       string
+	ForcarExtensoes []string
 }
 
 // All devolve todos os módulos, na ordem de execução.
@@ -47,6 +60,7 @@ func All() []Module {
 		temasIcones,
 		ambienteUsuario,
 		papelParede,
+		extensoesGnome,
 		rustTools,
 		claudeCode,
 		vscodeNautilus,

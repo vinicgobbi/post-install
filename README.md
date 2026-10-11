@@ -74,7 +74,7 @@ cd post-install
 
 O `setup.sh` se reexecuta com `sudo`, baixa o binário da última release para
 `amd64` (única arquitetura suportada), confere o SHA-256 e executa
-apontando `OVPN/`, `Wallpapers/` e `logs/` para a pasta do repositório. Para fixar uma
+apontando `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` para a pasta do repositório. Para fixar uma
 versão: `POST_INSTALL_VERSION=v1.2.0 ./setup.sh`. Qualquer flag é repassada ao
 binário (ex.: `./setup.sh --dry-run`).
 
@@ -88,6 +88,7 @@ post-install-linux-amd64.tar.gz
     ├── post-install      # binário
     ├── OVPN/README.md    # coloque aqui os .ovpn a importar
     ├── Wallpapers/       # papéis de parede oferecidos na TUI
+    ├── GNOME/            # lista e configurações das extensões do GNOME
     ├── logs/             # logs de cada execução
     └── README.md
 ```
@@ -116,17 +117,21 @@ traz o binário solto (`post-install-linux-amd64`, usado pelo `setup.sh`) e um
    (com resolução e tamanho), ou "Não alterar", que desmarca o módulo
    `papel_parede`. A tela é pulada se a pasta estiver vazia ou se vier
    `--wallpaper`.
-4. Checklist com todos os módulos, já marcados:
+4. Se alguma extensão do GNOME de `GNOME/extensoes.txt` não tiver versão
+   compatível com o GNOME Shell da máquina, lista essas extensões
+   (desmarcadas) para instalar mesmo assim, se quiser — veja
+   [Extensões do GNOME](#extensões-do-gnome).
+5. Checklist com todos os módulos, já marcados:
    - `↑`/`↓` (ou `j`/`k`) — mover · `espaço` — marcar/desmarcar · `a` — todos
    - o painel abaixo mostra a descrição do módulo e as dependências
    - marcar um módulo marca as dependências dele; desmarcar uma dependência
      desmarca quem depende dela (com aviso na tela)
-5. Confirmação com a lista do que vai rodar (e o papel de parede escolhido).
-6. Execução: barra de progresso, status de cada módulo (✓ ok, ! com avisos,
+6. Confirmação com a lista do que vai rodar (e o papel de parede e as extensões forçadas).
+7. Execução: barra de progresso, status de cada módulo (✓ ok, ! com avisos,
    ✗ falhou, ⤼ pulado) e a saída ao vivo dos comandos (`↑`/`↓`/`pgup`/`pgdn`
    para rolar, `G` para voltar a seguir). `Ctrl+C` pede confirmação e então
    interrompe o comando em andamento.
-7. Resumo final com tempo de cada módulo e o caminho dos logs (o resumo
+8. Resumo final com tempo de cada módulo e o caminho dos logs (o resumo
    também fica impresso no terminal depois que a TUI fecha).
 
 Se um módulo falha, os seguintes continuam rodando — exceto os que dependem
@@ -144,8 +149,9 @@ dele, que são pulados. Use `--fail-fast` para parar tudo no primeiro erro.
 | `--yes` | não pede confirmação (modo texto) |
 | `--fail-fast` | para no primeiro módulo que falhar |
 | `--list` | lista os módulos e sai |
+| `--force-extensions a,b` | extensões do GNOME sem versão compatível a instalar mesmo assim (ou `none`); sem ela, pergunta |
 | `--wallpaper NOME` | papel de parede a aplicar (nome do arquivo, ou `none` para não alterar); sem ela, a TUI pergunta |
-| `--ovpn-dir` / `--wallpapers-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede e logs (padrão: `OVPN/`, `Wallpapers/` e `logs/` ao lado do binário) |
+| `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, extensões do GNOME e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` ao lado do binário) |
 | `--version` | mostra a versão |
 
 Sem terminal interativo (pipe, CI), o programa usa o modo texto
@@ -179,6 +185,7 @@ internal/
     apps.go                 #   Solaar, LibreOffice, Flatpaks, Tailscale, PHP, Chrome+GCM, Bitwarden
     desktop.go              #   temas/ícones, ambiente do usuário, Rust, Claude Code, Nautilus/Dolphin
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
+    gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org + gsettings + dconf)
     sistema.go              #   OpenVPN, virt-manager, limpeza
   config/flatpaks.go        # listas de Flatpaks (GTK, KDE, jogos)
   tui/                      # interface Bubble Tea
@@ -249,6 +256,43 @@ Os scripts que rodam como o usuário (`su - usuario`) usam a sessão D-Bus dele
 quando há uma sessão gráfica aberta; sem isso o `gsettings` descarta as
 alterações sem erro.
 
+## Extensões do GNOME
+
+A pasta `GNOME/` define as extensões (editável sem recompilar):
+
+- `extensoes.txt` — uma extensão (UUID) por linha; `#` comenta e o prefixo
+  `-` mantém a extensão desativada (ex.: `-ding@rastersoft.com`);
+- `extensoes.dconf` — as preferências delas, no formato do `dconf dump`.
+
+O módulo `extensoes_gnome` (pulado no Plasma), como o usuário alvo:
+
+1. para cada extensão que não vem com o sistema (`/usr/share/gnome-shell/extensions`),
+   consulta o [extensions.gnome.org](https://extensions.gnome.org) pela versão
+   compatível com o GNOME Shell da máquina, baixa e instala com
+   `gnome-extensions install --force`;
+2. ativa via `gsettings` (`enabled-extensions`/`disabled-extensions`,
+   mesclando com o que já estava ativo) — no Wayland, extensões novas só
+   carregam no próximo login, por isso não usa `gnome-extensions enable`;
+3. aplica as preferências com `dconf load /org/gnome/shell/extensions/`.
+
+**Extensões sem versão compatível.** Antes de abrir a interface, o
+post-install confere a compatibilidade de cada extensão pelo
+`shell_version_map` do extensions.gnome.org (com `shell_version`, a API não
+dá erro: devolve a versão mais recente, que o GNOME não carregaria). Se
+alguma não tiver versão para o GNOME Shell da máquina, uma tela avisa que ela
+**não será instalada automaticamente** e permite marcar as que devem ser
+instaladas mesmo assim — com o aviso de que podem não funcionar
+corretamente. As marcadas recebem a versão mais recente publicada e o
+post-install liga `disable-extension-version-validation` (sem isso o GNOME
+recusa carregá-las; vale para todas as extensões do usuário). No modo texto
+a pergunta é feita por extensão (`[s/N]`); sem terminal, use
+`--force-extensions uuid1,uuid2` (ou `none`).
+
+Para atualizar as preferências a partir de uma máquina já configurada:
+`dconf dump /org/gnome/shell/extensions/ > GNOME/extensoes.dconf` — e tire
+o que for estado da máquina (dispositivos pareados, monitor, tamanho de
+janela).
+
 ## Importação de perfis OpenVPN
 
 Antes de rodar, copie os arquivos `.ovpn` para a pasta `OVPN/` (veja
@@ -284,7 +328,7 @@ Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
    CHANGE` → major), atualizar o `CHANGELOG.md`, criar o commit `bump: ...` e a
    tag `vX.Y.Z` — sem commit `feat`/`fix`/breaking desde a última tag, para aqui;
 3. compila o binário estático (`CGO_ENABLED=0`) para `amd64`, com a
-   versão embutida, empacota o `.tar.gz` com o binário + `OVPN/` + `Wallpapers/` + `logs/` e
+   versão embutida, empacota o `.tar.gz` com o binário + `OVPN/` + `Wallpapers/` + `GNOME/` + `logs/` e
    sobe tudo como artefato;
 4. publica a release da tag com os binários soltos, os pacotes `.tar.gz` e os
    `.sha256`, e apaga os artefatos da action.
