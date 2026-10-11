@@ -1,0 +1,311 @@
+// Package runner executa comandos externos, downloads e escritas de arquivo
+// em nome dos módulos, mandando toda a saída para o log.
+//
+// Em modo DryRun, tudo que altera o sistema (comandos "Run"/"Try", escrita de
+// arquivos, downloads) só é registrado no log; consultas somente-leitura
+// (Output/Probe/requisições HTTP) continuam sendo executadas de verdade, para
+// o fluxo dos módulos seguir o mesmo caminho que seguiria numa execução real.
+package runner
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/vinicgobbi/post-install/internal/runlog"
+)
+
+type Runner struct {
+	Ctx    context.Context
+	Log    *runlog.Logger
+	User   string // usuário alvo (para AsUser)
+	DryRun bool
+	// WorkDir é um diretório temporário exclusivo desta execução, removido
+	// pelo módulo de limpeza.
+	WorkDir string
+}
+
+// baseEnv é aplicado a todo comando: execução sem prompts do apt.
+var baseEnv = []string{"DEBIAN_FRONTEND=noninteractive"}
+
+func (r *Runner) command(env []string, name string, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(r.Ctx, name, args...)
+	cmd.Env = append(append(os.Environ(), baseEnv...), env...)
+	// Grupo de processos próprio: no Ctrl+C mata também os filhos (ex.: o
+	// "sh" de um instalador e o curl que ele disparou).
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+	}
+	cmd.WaitDelay = 5 * time.Second
+	return cmd
+}
+
+// describe monta a linha "$ comando args" mostrada no log. Scripts de várias
+// linhas (bash -c / su -c) viram uma linha só, separada por "; ".
+func describe(name string, args []string) string {
+	parts := []string{name}
+	for _, a := range args {
+		if strings.Contains(a, "\n") {
+			var linhas []string
+			for _, l := range strings.Split(a, "\n") {
+				if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "#") {
+					linhas = append(linhas, l)
+				}
+			}
+			a = "'" + strings.Join(linhas, "; ") + "'"
+		}
+		parts = append(parts, a)
+	}
+	return strings.Join(parts, " ")
+}
+
+// Run executa um comando que altera o sistema, transmitindo a saída para o
+// log. Falha se o comando sair com código diferente de zero.
+func (r *Runner) Run(name string, args ...string) error {
+	return r.RunEnv(nil, name, args...)
+}
+
+// RunEnv é Run com variáveis de ambiente extras (ex.: ACCEPT_EULA=Y).
+func (r *Runner) RunEnv(env []string, name string, args ...string) error {
+	desc := describe(name, args)
+	if len(env) > 0 {
+		desc = strings.Join(env, " ") + " " + desc
+	}
+	if r.DryRun {
+		r.Log.Infof("[dry-run] %s", desc)
+		return nil
+	}
+	w := r.Log.OutputWriter()
+	defer w.Close()
+	fmt.Fprintf(w, "$ %s\n", desc)
+
+	cmd := r.command(env, name, args...)
+	cmd.Stdout, cmd.Stderr = w, w
+	if err := cmd.Run(); err != nil {
+		if r.Ctx.Err() != nil {
+			return r.Ctx.Err()
+		}
+		return fmt.Errorf("%s: %w", desc, err)
+	}
+	return nil
+}
+
+// Try executa um comando que altera o sistema sem mostrar a saída na tela
+// (só no .raw.log) e devolve se deu certo. Equivale a "cmd &>/dev/null".
+func (r *Runner) Try(name string, args ...string) bool {
+	if r.DryRun {
+		r.Log.Infof("[dry-run] %s", describe(name, args))
+		return true
+	}
+	return r.quiet(name, args...) == nil
+}
+
+// Probe executa uma consulta somente-leitura (ex.: "rpm -q pacote") e devolve
+// se ela teve sucesso. Roda mesmo em DryRun.
+func (r *Runner) Probe(name string, args ...string) bool {
+	return r.quiet(name, args...) == nil
+}
+
+func (r *Runner) quiet(name string, args ...string) error {
+	cmd := r.command(nil, name, args...)
+	var buf bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &buf, &buf
+	err := cmd.Run()
+	r.Log.RawWrite(fmt.Sprintf("$ %s\n%s", describe(name, args), buf.String()))
+	return err
+}
+
+// Output executa uma consulta somente-leitura e devolve o stdout. Roda mesmo
+// em DryRun.
+func (r *Runner) Output(name string, args ...string) (string, error) {
+	cmd := r.command(nil, name, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	r.Log.RawWrite(fmt.Sprintf("$ %s\n%s%s", describe(name, args), out, stderr.String()))
+	if err != nil {
+		return string(out), fmt.Errorf("%s: %w", describe(name, args), err)
+	}
+	return string(out), nil
+}
+
+// Shell executa um trecho de shell como root (bash -c).
+func (r *Runner) Shell(script string) error {
+	return r.Run("bash", "-c", script)
+}
+
+// AsUser executa um trecho de shell como o usuário alvo, em login shell (com
+// $HOME e PATH corretos).
+func (r *Runner) AsUser(script string) error {
+	if r.User == "" {
+		return errors.New("usuário alvo não definido")
+	}
+	return r.Run("su", "-", r.User, "-c", script)
+}
+
+// Exists informa se um binário está no PATH.
+func Exists(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
+// ---- Arquivos ----
+
+func (r *Runner) WriteFile(path, content string, perm os.FileMode) error {
+	if r.DryRun {
+		r.Log.Infof("[dry-run] escrever %s (%d bytes)", path, len(content))
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(content), perm); err != nil {
+		return err
+	}
+	return os.Chmod(path, perm)
+}
+
+func (r *Runner) AppendFile(path, content string) error {
+	if r.DryRun {
+		r.Log.Infof("[dry-run] acrescentar a %s: %q", path, content)
+		return nil
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(content)
+	return err
+}
+
+func (r *Runner) MkdirAll(path string, perm os.FileMode) error {
+	if r.DryRun {
+		r.Log.Infof("[dry-run] mkdir -p %s", path)
+		return nil
+	}
+	return os.MkdirAll(path, perm)
+}
+
+func (r *Runner) Chmod(path string, perm os.FileMode) error {
+	if r.DryRun {
+		return nil
+	}
+	return os.Chmod(path, perm)
+}
+
+// Symlink equivale a "ln -sf alvo link".
+func (r *Runner) Symlink(target, link string) error {
+	if r.DryRun {
+		r.Log.Infof("[dry-run] ln -sf %s %s", target, link)
+		return nil
+	}
+	if err := os.Remove(link); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return os.Symlink(target, link)
+}
+
+func (r *Runner) RemoveAll(path string) error {
+	if r.DryRun {
+		r.Log.Infof("[dry-run] rm -rf %s", path)
+		return nil
+	}
+	return os.RemoveAll(path)
+}
+
+// ---- Rede ----
+
+var httpClient = &http.Client{Timeout: 10 * time.Minute}
+
+// Get faz uma requisição GET somente-leitura com timeout e devolve o corpo.
+// Falha em status HTTP de erro (equivale a "curl -f").
+func (r *Runner) Get(url string, timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(r.Ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "post-install")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("GET %s: HTTP %d", url, resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// Download baixa uma URL para dest com algumas tentativas antes de desistir,
+// para tolerar instabilidade de rede.
+func (r *Runner) Download(url, dest string) error {
+	if r.DryRun {
+		r.Log.Infof("[dry-run] baixar %s -> %s", url, dest)
+		return nil
+	}
+	const tentativas = 3
+	var err error
+	for i := 1; i <= tentativas; i++ {
+		if err = r.downloadOnce(url, dest); err == nil {
+			return nil
+		}
+		if r.Ctx.Err() != nil {
+			return r.Ctx.Err()
+		}
+		r.Log.Warnf("Falha ao baixar %s (tentativa %d/%d): %v", url, i, tentativas, err)
+		time.Sleep(time.Duration(i) * time.Second)
+	}
+	return fmt.Errorf("não foi possível baixar %s após %d tentativas: %w", url, tentativas, err)
+}
+
+func (r *Runner) downloadOnce(url, dest string) error {
+	req, err := http.NewRequestWithContext(r.Ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "post-install")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return err
+	}
+	tmp := dest + ".part"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp, 0o644); err != nil {
+		return err
+	}
+	r.Log.RawWrite(fmt.Sprintf("download %s -> %s\n", url, dest))
+	return os.Rename(tmp, dest)
+}
+
+// Temp devolve um caminho dentro do WorkDir.
+func (r *Runner) Temp(name string) string {
+	return filepath.Join(r.WorkDir, name)
+}

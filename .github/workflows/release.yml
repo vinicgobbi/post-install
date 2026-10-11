@@ -1,0 +1,148 @@
+# A cada push na main:
+#   1. test    — go vet + go test
+#   2. bump    — commitizen calcula a próxima versão pelos Conventional Commits,
+#                atualiza o CHANGELOG.md, cria o commit "bump: ..." e a tag vX.Y.Z
+#                (se não houver commit feat/fix/BREAKING, não há release)
+#   3. build   — compila o binário estático para amd64 e arm64, empacota um
+#                .tar.gz com o binário + estrutura de pastas (OVPN/, logs/) e
+#                sobe tudo como artefato
+#   4. release — publica a release da tag (binários soltos + pacotes .tar.gz)
+#                e apaga os artefatos
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # O commit "bump:" criado pelo próprio workflow não dispara nova release.
+    if: ${{ !startsWith(github.event.head_commit.message, 'bump:') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  bump:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.cz.outputs.version }}
+      bumped: ${{ steps.result.outputs.bumped }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: cz
+        uses: commitizen-tools/commitizen-action@0.27.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          changelog_increment_filename: release-notes.md
+      - id: result
+        env:
+          VERSION: ${{ steps.cz.outputs.version }}
+          PREVIOUS: ${{ steps.cz.outputs.previous_version }}
+        run: |
+          if [ -n "$VERSION" ] && [ "$VERSION" != "$PREVIOUS" ]; then
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "Nova versão: v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "Nenhum commit feat/fix/BREAKING desde a última versão: sem release." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.result.outputs.bumped == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: release-notes.md
+          retention-days: 1
+
+  build:
+    needs: bump
+    if: needs.bump.outputs.bumped == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.bump.outputs.version }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Compilar
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: v${{ needs.bump.outputs.version }}
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
+            -o "dist/post-install-linux-$GOARCH" ./cmd/post-install
+      - name: Empacotar binário + estrutura de pastas
+        env:
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          # post-install/
+          #   post-install      binário
+          #   OVPN/README.md    pasta onde ficam os .ovpn a importar
+          #   logs/             logs de cada execução
+          #   README.md
+          pkg="pkg/post-install"
+          mkdir -p "$pkg/OVPN" "$pkg/logs"
+          install -m 0755 "dist/post-install-linux-$GOARCH" "$pkg/post-install"
+          install -m 0644 OVPN/README.md "$pkg/OVPN/README.md"
+          install -m 0644 README.md "$pkg/README.md"
+          tar -C pkg --owner=0 --group=0 -czf "dist/post-install-linux-$GOARCH.tar.gz" post-install
+          cd dist
+          sha256sum "post-install-linux-$GOARCH" > "post-install-linux-$GOARCH.sha256"
+          sha256sum "post-install-linux-$GOARCH.tar.gz" > "post-install-linux-$GOARCH.tar.gz.sha256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: post-install-linux-${{ matrix.goarch }}
+          path: dist/
+          retention-days: 1
+
+  release:
+    needs: [bump, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write # apagar os artefatos depois de publicar
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ needs.bump.outputs.version }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --notes-file dist/release-notes.md \
+            dist/post-install-linux-*
+      - name: Apagar artefatos da action
+        uses: geekyeggo/delete-artifact@v6
+        with:
+          name: |
+            post-install-linux-*
+            release-notes

@@ -1,7 +1,7 @@
 # Perfis OpenVPN
 
 Coloque aqui dentro todos os arquivos `.ovpn` que devem ser importados pelo
-`modules/19_ovpn.sh` durante o setup.
+módulo `ovpn` (`internal/modules/sistema.go`) durante o setup.
 
 O módulo lê todo `*.ovpn` presente nesta pasta e importa cada um como uma
 conexão do NetworkManager. Se um arquivo declarar `dhcp-option DNS` e/ou
