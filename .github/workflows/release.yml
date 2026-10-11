@@ -3,7 +3,7 @@
 #   2. bump    — commitizen calcula a próxima versão pelos Conventional Commits,
 #                atualiza o CHANGELOG.md, cria o commit "bump: ..." e a tag vX.Y.Z
 #                (se não houver commit feat/fix/BREAKING, não há release)
-#   3. build   — compila o binário estático para amd64 e arm64, empacota um
+#   3. build   — compila o binário estático para amd64, empacota um
 #                .tar.gz com o binário + estrutura de pastas (OVPN/, logs/) e
 #                sobe tudo como artefato
 #   4. release — publica a release da tag (binários soltos + pacotes .tar.gz)
@@ -75,9 +75,8 @@ jobs:
     needs: bump
     if: needs.bump.outputs.bumped == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        goarch: [amd64, arm64]
+    env:
+      GOARCH: amd64
     steps:
       - uses: actions/checkout@v7
         with:
@@ -89,15 +88,12 @@ jobs:
         env:
           CGO_ENABLED: "0"
           GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
           VERSION: v${{ needs.bump.outputs.version }}
         run: |
           mkdir -p dist
           go build -trimpath -ldflags "-s -w -X main.version=$VERSION" \
             -o "dist/post-install-linux-$GOARCH" ./cmd/post-install
       - name: Empacotar binário + estrutura de pastas
-        env:
-          GOARCH: ${{ matrix.goarch }}
         run: |
           # post-install/
           #   post-install      binário
@@ -115,7 +111,7 @@ jobs:
           sha256sum "post-install-linux-$GOARCH.tar.gz" > "post-install-linux-$GOARCH.tar.gz.sha256"
       - uses: actions/upload-artifact@v7
         with:
-          name: post-install-linux-${{ matrix.goarch }}
+          name: post-install-linux-amd64
           path: dist/
           retention-days: 1
 

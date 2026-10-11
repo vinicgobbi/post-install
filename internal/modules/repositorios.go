@@ -43,7 +43,7 @@ const (
 var repositorios = Module{
 	ID:    "repositorios",
 	Title: "Configurar repositórios",
-	Desc:  "Docker/VSCode/MS SQL (Fedora/RHEL/Debian) ou Chaotic-AUR + yay (Arch)",
+	Desc:  "Docker/VSCode/MS SQL e Mozilla no Ubuntu (Fedora/RHEL/Debian) ou Chaotic-AUR + yay (Arch)",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Configurando repositórios (Docker, Microsoft)...")
 		var err error
@@ -220,6 +220,12 @@ func repositoriosAPT(c *Ctx) error {
 		c.Log.Warnf("Sem repositório oficial da Microsoft para %s %s: msodbcsql/mssql-tools serão pulados mais adiante.", s.DockerDistro, s.DistroVersion)
 	}
 
+	if usaRepoMozilla(c) {
+		if err := configurarRepoMozilla(c); err != nil {
+			return err
+		}
+	}
+
 	asc := c.Temp("microsoft.asc")
 	return step(
 		func() error { return c.Download("https://packages.microsoft.com/keys/microsoft.asc", asc) },
@@ -237,7 +243,7 @@ func repositoriosAPT(c *Ctx) error {
 var pacotesBase = Module{
 	ID:    "pacotes_base",
 	Title: "Instalar pacotes base",
-	Desc:  "Docker, VSCode, PHP, Zsh e ferramentas de SQL Server",
+	Desc:  "Docker, VSCode, PHP, Zsh, Firefox, Thunderbird e ferramentas de SQL Server (no Ubuntu, Firefox/Thunderbird em .deb da Mozilla, removendo os snaps)",
 	Deps:  []string{"repositorios"},
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando pacotes base e utilitários...")
@@ -279,6 +285,9 @@ var pacotesBase = Module{
 			}
 		}
 		if err != nil {
+			return err
+		}
+		if err := instalarFirefoxThunderbird(c); err != nil {
 			return err
 		}
 
