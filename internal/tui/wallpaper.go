@@ -85,7 +85,15 @@ func imageInfo(path string) string {
 		f.Close()
 	}
 	if st, err := os.Stat(path); err == nil {
-		parts = append(parts, strings.Replace(fmt.Sprintf("%.1f MB", float64(st.Size())/1e6), ".", ",", 1))
+		parts = append(parts, humanSize(st.Size()))
 	}
 	return strings.Join(parts, " · ")
+}
+
+// humanSize formata em KB abaixo de 1 MB (senão "0,0 MB") e em MB acima.
+func humanSize(n int64) string {
+	if n < 1e6 {
+		return fmt.Sprintf("%d KB", (n+500)/1000)
+	}
+	return strings.Replace(fmt.Sprintf("%.1f MB", float64(n)/1e6), ".", ",", 1)
 }
