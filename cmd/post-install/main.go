@@ -263,7 +263,7 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, wa
 			out.Handle(runlog.Entry{Level: runlog.Error, Text: "Sem terminal interativo: informe o usuário com --user NOME."})
 			return 1
 		}
-		user = promptUser(out)
+		user = promptUser(out, detectUser())
 	}
 
 	if !wallChosen && len(walls) > 0 && isSelected(all, sel, "papel_parede") {
@@ -377,7 +377,30 @@ func validateUser(name string) error {
 	return nil
 }
 
-func promptUser(out *plain.Printer) string {
+// detectUser descobre quem executou o programa via sudo/pkexec (ou o dono
+// da sessão, via logname), para sugerir na pergunta do usuário. Ignora root.
+func detectUser() string {
+	cands := []string{os.Getenv("SUDO_USER")}
+	if uid := os.Getenv("PKEXEC_UID"); uid != "" {
+		if out, err := exec.Command("id", "-nu", uid).Output(); err == nil {
+			cands = append(cands, strings.TrimSpace(string(out)))
+		}
+	}
+	if out, err := exec.Command("logname").Output(); err == nil {
+		cands = append(cands, strings.TrimSpace(string(out)))
+	}
+	for _, c := range cands {
+		if c != "" && c != "root" && validateUser(c) == nil {
+			return c
+		}
+	}
+	return ""
+}
+
+func promptUser(out *plain.Printer, detected string) string {
+	if detected != "" && confirmDefaultYes(fmt.Sprintf("Configurar o ambiente para o usuário '%s' (quem executou o sudo)?", detected)) {
+		return detected
+	}
 	for {
 		fmt.Fprint(out.W, "[?] Para qual usuário do sistema devo configurar o ambiente? ")
 		line, err := stdin.ReadString('\n')
@@ -428,6 +451,17 @@ func promptWallpaper(out *plain.Printer, walls []string) string {
 		}
 		out.Warn("Opção inválida.")
 	}
+}
+
+// confirmDefaultYes é como confirm, mas Enter vazio conta como "sim".
+func confirmDefaultYes(question string) bool {
+	fmt.Printf("[?] %s [S/n]: ", question)
+	line, _ := stdin.ReadString('\n')
+	switch strings.TrimSpace(strings.ToLower(line)) {
+	case "", "s", "y", "sim", "yes":
+		return true
+	}
+	return false
 }
 
 func confirm(question string) bool {
