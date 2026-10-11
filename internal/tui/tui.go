@@ -39,9 +39,17 @@ type Config struct {
 	Wallpapers []string
 	Wallpaper  string
 	WallChosen bool
+	// ExtIncompativeis são as extensões do GNOME sem versão para o
+	// GNOME Shell da máquina (ShellVersion); ForcarExtensoes, as que o
+	// usuário quer instalar mesmo assim. Com ExtChosen (veio de
+	// --force-extensions), não pergunta.
+	ShellVersion     string
+	ExtIncompativeis []modules.ExtInfo
+	ForcarExtensoes  []string
+	ExtChosen        bool
 	// Start roda a execução dos módulos escolhidos, enviando eventos do
 	// engine (e entradas de log) para emit. Bloqueia até terminar.
-	Start    func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any))
+	Start    func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any))
 	LogPaths []string
 }
 
@@ -50,6 +58,7 @@ type state int
 const (
 	stateUser state = iota
 	stateWallpaper
+	stateExtensoes
 	stateSelect
 	stateConfirm
 	stateRunning
@@ -69,6 +78,7 @@ type Model struct {
 	typing     bool // campo de texto visível
 
 	wallCursor int
+	extCursor  int
 
 	cursor int
 	sel    []bool
@@ -129,19 +139,36 @@ func New(cfg Config) Model {
 	return m
 }
 
-// afterUser decide a tela seguinte à do usuário: a escolha do papel de
-// parede só aparece se há imagens, o módulo está marcado e não veio
-// --wallpaper.
-func (m *Model) afterUser() state {
-	if m.cfg.WallChosen || len(m.cfg.Wallpapers) == 0 {
-		return stateSelect
-	}
-	for i, mod := range m.cfg.Modules {
-		if mod.ID == "papel_parede" && m.sel[i] {
-			return stateWallpaper
+// afterUser decide a tela seguinte à do usuário.
+func (m *Model) afterUser() state { return m.proxima(stateUser) }
+
+// proxima devolve a próxima pergunta depois de atual, pulando as que não se
+// aplicam, até chegar ao checklist:
+//   - papel de parede: há imagens, o módulo está marcado e não veio --wallpaper;
+//   - extensões incompatíveis: há alguma, o módulo está marcado e não veio
+//     --force-extensions.
+func (m *Model) proxima(atual state) state {
+	for _, s := range []state{stateWallpaper, stateExtensoes} {
+		if s <= atual {
+			continue
+		}
+		switch {
+		case s == stateWallpaper && !m.cfg.WallChosen && len(m.cfg.Wallpapers) > 0 && m.marcado("papel_parede"):
+			return s
+		case s == stateExtensoes && !m.cfg.ExtChosen && len(m.cfg.ExtIncompativeis) > 0 && m.marcado("extensoes_gnome"):
+			return s
 		}
 	}
 	return stateSelect
+}
+
+func (m *Model) marcado(id string) bool {
+	for i, mod := range m.cfg.Modules {
+		if mod.ID == id {
+			return m.sel[i]
+		}
+	}
+	return false
 }
 
 func (m Model) Init() tea.Cmd {
@@ -213,6 +240,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateUser(msg)
 		case stateWallpaper:
 			return m.updateWallpaper(msg)
+		case stateExtensoes:
+			return m.updateExtensoes(msg)
 		case stateSelect:
 			return m.updateSelect(msg)
 		case stateConfirm:
@@ -522,6 +551,9 @@ func (m Model) viewConfirm() string {
 			b.WriteString(subtleStyle.Render("Papel de parede: ") + accentStyle.Render(nome) + "\n\n")
 		}
 	}
+	if m.marcado("extensoes_gnome") && len(m.cfg.ForcarExtensoes) > 0 {
+		b.WriteString(warnStyle.Render("Instalar mesmo sem versão compatível (podem não funcionar): "+strings.Join(m.cfg.ForcarExtensoes, ", ")) + "\n\n")
+	}
 	if m.cfg.DryRun {
 		b.WriteString(warnStyle.Render("Modo dry-run: nada será alterado no sistema, os comandos só serão listados.") + "\n\n")
 	}
@@ -549,9 +581,10 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	ch, user, wallpaper, mods := m.events, m.cfg.User, m.cfg.Wallpaper, m.runMods
+	ch, mods := m.events, m.runMods
+	esc := modules.Escolhas{User: m.cfg.User, Wallpaper: m.cfg.Wallpaper, ForcarExtensoes: m.cfg.ForcarExtensoes}
 	go func() {
-		m.cfg.Start(ctx, user, wallpaper, mods, func(ev any) { ch <- ev })
+		m.cfg.Start(ctx, esc, mods, func(ev any) { ch <- ev })
 		close(ch)
 	}()
 	m.resize()
@@ -865,6 +898,8 @@ func (m Model) View() string {
 		v = m.viewUser()
 	case stateWallpaper:
 		v = m.viewWallpaper()
+	case stateExtensoes:
+		v = m.viewExtensoes()
 	case stateSelect:
 		v = m.viewSelect()
 	case stateConfirm:

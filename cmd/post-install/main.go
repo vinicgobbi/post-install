@@ -49,6 +49,8 @@ type options struct {
 	logDir   string
 	wallDir  string
 	wall     string
+	gnomeDir string
+	forceExt string
 }
 
 func parseFlags() options {
@@ -65,6 +67,8 @@ func parseFlags() options {
 	flag.StringVar(&o.ovpnDir, "ovpn-dir", "", "pasta com os arquivos .ovpn a importar (padrão: OVPN/ ao lado do binário)")
 	flag.StringVar(&o.wallDir, "wallpapers-dir", "", "pasta com as imagens de papel de parede (padrão: Wallpapers/ ao lado do binário)")
 	flag.StringVar(&o.wall, "wallpaper", "", "papel de parede a aplicar: nome do arquivo em --wallpapers-dir, ou \"none\" para não alterar (padrão: perguntar)")
+	flag.StringVar(&o.gnomeDir, "gnome-dir", "", "pasta com extensoes.txt e extensoes.dconf (padrão: GNOME/ ao lado do binário)")
+	flag.StringVar(&o.forceExt, "force-extensions", "", "extensões do GNOME sem versão compatível a instalar mesmo assim (UUIDs separados por vírgula, ou \"none\"); sem ela, pergunta")
 	flag.StringVar(&o.logDir, "log-dir", "", "pasta onde os logs da execução são gravados (padrão: logs/ ao lado do binário)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Uso: sudo %s [opções]\n\nOpções:\n", os.Args[0])
@@ -72,7 +76,7 @@ func parseFlags() options {
 	}
 	flag.Parse()
 
-	// Por padrão, OVPN/, Wallpapers/ e logs/ ficam ao lado do binário (estrutura do
+	// Por padrão, OVPN/, Wallpapers/, GNOME/ e logs/ ficam ao lado do binário (estrutura do
 	// pacote .tar.gz da release), para funcionar de qualquer diretório.
 	base := exeDir()
 	if o.ovpnDir == "" {
@@ -84,9 +88,12 @@ func parseFlags() options {
 	if o.wallDir == "" {
 		o.wallDir = filepath.Join(base, "Wallpapers")
 	}
+	if o.gnomeDir == "" {
+		o.gnomeDir = filepath.Join(base, "GNOME")
+	}
 	// Absolutos: os scripts como usuário rodam via "su -", que muda o
 	// diretório atual para a home dele.
-	for _, d := range []*string{&o.ovpnDir, &o.wallDir, &o.logDir} {
+	for _, d := range []*string{&o.ovpnDir, &o.wallDir, &o.gnomeDir, &o.logDir} {
 		if abs, err := filepath.Abs(*d); err == nil {
 			*d = abs
 		}
@@ -186,53 +193,82 @@ func run() int {
 	// Legível por todos: o apt instala os .deb baixados aqui como o usuário _apt.
 	os.Chmod(workDir, 0o755)
 
-	walls := modules.ListWallpapers(o.wallDir)
-	wallpaper, wallChosen, err := resolveWallpaper(walls, o.wall)
+	p := preparo{walls: modules.ListWallpapers(o.wallDir)}
+	p.esc.Wallpaper, p.wallChosen, err = resolveWallpaper(p.walls, o.wall)
 	if err != nil {
 		return fail("%v", err)
 	}
+	if o.forceExt != "" {
+		p.extChosen = true
+		if o.forceExt != "none" {
+			p.esc.ForcarExtensoes = splitList(o.forceExt)
+		}
+	}
+	// Consulta antes da interface quais extensões do GNOME não têm versão
+	// para o GNOME Shell da máquina, para perguntar se instala mesmo assim.
+	if !sys.IsKDE() && !p.extChosen && isSelected(all, sel, "extensoes_gnome") {
+		out.Info("Verificando a compatibilidade das extensões do GNOME...")
+		p.shell, p.incompat = modules.VerificarExtensoes(o.gnomeDir)
+	}
 
-	start := func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any)) []engine.Result {
+	start := func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) []engine.Result {
 		log.SetSink(func(e runlog.Entry) { emit(e) })
 		log.Infof("Sistema detectado: %s", sys.Summary())
-		log.Infof("Configuração será aplicada para: %s", user)
+		log.Infof("Configuração será aplicada para: %s", esc.User)
 		if log.CleanPath != "" {
 			log.Infof("Log desta execução: %s", log.CleanPath)
 		}
 		c := &modules.Ctx{
-			Runner:    &runner.Runner{Ctx: ctx, Log: log, User: user, DryRun: o.dryRun, WorkDir: workDir},
-			Sys:       sys,
-			OVPNDir:   o.ovpnDir,
-			Wallpaper: wallpaper,
+			Runner:          &runner.Runner{Ctx: ctx, Log: log, User: esc.User, DryRun: o.dryRun, WorkDir: workDir},
+			Sys:             sys,
+			OVPNDir:         o.ovpnDir,
+			Wallpaper:       esc.Wallpaper,
+			GNOMEDir:        o.gnomeDir,
+			ForcarExtensoes: esc.ForcarExtensoes,
 		}
 		return engine.Run(ctx, mods, c, engine.Options{FailFast: o.failFast}, emit)
 	}
 
 	interactive := !o.noTUI && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 	if interactive {
-		return runTUI(o, sys, all, sel, walls, wallpaper, wallChosen, log, start)
+		return runTUI(o, sys, all, sel, p, log, start)
 	}
-	return runPlain(o, sys, all, sel, walls, wallpaper, wallChosen, out, start)
+	return runPlain(o, sys, all, sel, p, out, start)
 }
 
-type startFunc func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any)) []engine.Result
+// preparo reúne o que é levantado antes da interface e as escolhas que já
+// vieram por flag.
+type preparo struct {
+	esc        modules.Escolhas
+	walls      []string
+	wallChosen bool
+	shell      string
+	incompat   []modules.ExtInfo
+	extChosen  bool
+}
 
-func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, walls []string, wallpaper string, wallChosen bool, log *runlog.Logger, start startFunc) int {
+type startFunc func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) []engine.Result
+
+func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p preparo, log *runlog.Logger, start startFunc) int {
 	m := tui.New(tui.Config{
-		Sys:          sys,
-		Version:      version,
-		DryRun:       o.dryRun,
-		Modules:      all,
-		Selected:     sel,
-		User:         o.user,
-		DetectedUser: detectUser(),
-		ValidateUser: validateUser,
-		Wallpapers:   walls,
-		Wallpaper:    wallpaper,
-		WallChosen:   wallChosen,
-		LogPaths:     []string{log.CleanPath, log.RawPath},
-		Start: func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any)) {
-			start(ctx, user, wallpaper, mods, emit)
+		Sys:              sys,
+		Version:          version,
+		DryRun:           o.dryRun,
+		Modules:          all,
+		Selected:         sel,
+		User:             o.user,
+		DetectedUser:     detectUser(),
+		ValidateUser:     validateUser,
+		Wallpapers:       p.walls,
+		Wallpaper:        p.esc.Wallpaper,
+		WallChosen:       p.wallChosen,
+		ShellVersion:     p.shell,
+		ExtIncompativeis: p.incompat,
+		ForcarExtensoes:  p.esc.ForcarExtensoes,
+		ExtChosen:        p.extChosen,
+		LogPaths:         []string{log.CleanPath, log.RawPath},
+		Start: func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) {
+			start(ctx, esc, mods, emit)
 		},
 	})
 	final, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
@@ -251,27 +287,39 @@ func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, wall
 	return exitCode(res.Results)
 }
 
-func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, walls []string, wallpaper string, wallChosen bool, out *plain.Printer, start startFunc) int {
+func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p preparo, out *plain.Printer, start startFunc) int {
 	stdinTTY := term.IsTerminal(int(os.Stdin.Fd()))
 	out.Info("Sistema detectado: %s", sys.Summary())
 	for _, w := range sys.Warnings {
 		out.Warn("%s", w)
 	}
 
-	user := o.user
-	if user == "" {
+	esc := p.esc
+	esc.User = o.user
+	if esc.User == "" {
 		if !stdinTTY {
 			out.Handle(runlog.Entry{Level: runlog.Error, Text: "Sem terminal interativo: informe o usuário com --user NOME."})
 			return 1
 		}
-		user = promptUser(out, detectUser())
+		esc.User = promptUser(out, detectUser())
 	}
 
-	if !wallChosen && len(walls) > 0 && isSelected(all, sel, "papel_parede") {
+	if !p.wallChosen && len(p.walls) > 0 && isSelected(all, sel, "papel_parede") {
 		if stdinTTY {
-			wallpaper = promptWallpaper(out, walls)
+			esc.Wallpaper = promptWallpaper(out, p.walls)
 		} else {
 			out.Warn("Sem terminal interativo e sem --wallpaper: o papel de parede não será alterado.")
+		}
+	}
+
+	if len(p.incompat) > 0 {
+		out.Warn("Extensões sem versão compatível com o GNOME Shell %s: não serão instaladas automaticamente.", p.shell)
+		for _, e := range p.incompat {
+			if stdinTTY && confirm(fmt.Sprintf("Instalar %s mesmo assim (suporta até o GNOME %s; pode não funcionar corretamente)?", e.UUID, e.MaiorShell)) {
+				esc.ForcarExtensoes = append(esc.ForcarExtensoes, e.UUID)
+			} else if !stdinTTY {
+				out.Warn("  - %s (suporta até o GNOME %s); use --force-extensions para instalar mesmo assim.", e.UUID, e.MaiorShell)
+			}
 		}
 	}
 
@@ -305,7 +353,7 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, wa
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var elapsed engine.FinishedEvent
-	results := start(ctx, user, wallpaper, mods, func(ev any) {
+	results := start(ctx, esc, mods, func(ev any) {
 		if f, ok := ev.(engine.FinishedEvent); ok {
 			elapsed = f
 		}
@@ -419,6 +467,16 @@ func promptUser(out *plain.Printer, detected string) string {
 		}
 		return name
 	}
+}
+
+func splitList(s string) []string {
+	var out []string
+	for _, it := range strings.Split(s, ",") {
+		if it = strings.TrimSpace(it); it != "" {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 func isSelected(all []modules.Module, sel []bool, id string) bool {

@@ -162,6 +162,15 @@ func (r *Runner) AsUser(script string) error {
 	return r.Run("su", "-", r.User, "-c", userSession+script)
 }
 
+// OutputAsUser executa uma consulta somente-leitura como o usuário alvo (com
+// a sessão D-Bus dele) e devolve o stdout. Roda mesmo em DryRun.
+func (r *Runner) OutputAsUser(script string) (string, error) {
+	if r.User == "" {
+		return "", errors.New("usuário alvo não definido")
+	}
+	return r.Output("su", "-", r.User, "-c", userSession+script)
+}
+
 // Exists informa se um binário está no PATH.
 func Exists(name string) bool {
 	_, err := exec.LookPath(name)

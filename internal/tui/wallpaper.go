@@ -41,7 +41,7 @@ func (m Model) updateWallpaper(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		m.state = stateSelect
+		m.state = m.proxima(stateWallpaper)
 	}
 	return m, nil
 }
