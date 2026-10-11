@@ -107,13 +107,15 @@ func fromRelease(rel, upstream map[string]string) (*Info, error) {
 				info.DistroVersion = "22.04"
 			case "noble":
 				info.DistroVersion = "24.04"
+			case "resolute":
+				info.DistroVersion = "26.04"
 			default:
 				// Versão ainda sem "prod.repo" publicado pela Microsoft (ex.: a
 				// LTS recém-lançada). Os pacotes msodbcsql/mssql-tools da última
 				// LTS suportada são compatíveis na prática.
-				info.DistroVersion = "24.04"
+				info.DistroVersion = "26.04"
 				info.Warnings = append(info.Warnings, fmt.Sprintf(
-					"Ubuntu %s ainda não tem repositório oficial da Microsoft; usando o repositório do Ubuntu 24.04 (compatível) para msodbcsql/mssql-tools.",
+					"Ubuntu %s ainda não tem repositório oficial da Microsoft; usando o repositório do Ubuntu 26.04 (compatível) para msodbcsql/mssql-tools.",
 					info.BaseCodename))
 			}
 		} else {

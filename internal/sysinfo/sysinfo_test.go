@@ -35,7 +35,11 @@ ID_LIKE=debian
 VERSION_CODENAME=noble
 UBUNTU_CODENAME=noble`, family: "debian", codename: "noble", version: "24.04", msSupported: true},
 		{name: "ubuntu futuro usa fallback", osRelease: `ID=ubuntu
-UBUNTU_CODENAME=zesty2`, family: "debian", codename: "zesty2", version: "24.04", msSupported: true, warnings: 1},
+UBUNTU_CODENAME=zesty2`, family: "debian", codename: "zesty2", version: "26.04", msSupported: true, warnings: 1},
+		{name: "ubuntu resolute", osRelease: `ID=ubuntu
+ID_LIKE=debian
+VERSION_CODENAME=resolute
+UBUNTU_CODENAME=resolute`, family: "debian", codename: "resolute", version: "26.04", msSupported: true},
 		{name: "mint usa upstream", osRelease: `ID=linuxmint
 ID_LIKE="ubuntu debian"
 VERSION_CODENAME=wilma`, upstream: "DISTRIB_CODENAME=noble", family: "debian", codename: "noble", version: "24.04", msSupported: true},
