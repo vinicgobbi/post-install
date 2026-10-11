@@ -1,3 +1,9 @@
+## v1.2.1 (2026-10-11)
+
+### Fix
+
+- mostra o tamanho de imagens pequenas em KB
+
 ## v1.2.0 (2026-10-11)
 
 ### Feat
