@@ -1,3 +1,9 @@
+## v1.4.0 (2026-10-11)
+
+### Feat
+
+- instala, ativa e configura extensões do GNOME
+
 ## v1.3.0 (2026-10-11)
 
 ### Feat
