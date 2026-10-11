@@ -1,3 +1,9 @@
+## v1.3.0 (2026-10-11)
+
+### Feat
+
+- usa o repositório da Microsoft do Ubuntu 26.04 (resolute)
+
 ## v1.2.1 (2026-10-11)
 
 ### Fix
