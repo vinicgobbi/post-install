@@ -48,3 +48,11 @@ func TestMirrorsDoPais(t *testing.T) {
 		t.Errorf("got %v", got)
 	}
 }
+
+func TestUsaFormatoDeb822(t *testing.T) {
+	for v, want := range map[string]bool{"20.04": false, "22.04": false, "24.04": false, "24.10": true, "26.04": true, "": true} {
+		if got := usaFormatoDeb822(v); got != want {
+			t.Errorf("usaFormatoDeb822(%q) = %v, esperado %v", v, got, want)
+		}
+	}
+}

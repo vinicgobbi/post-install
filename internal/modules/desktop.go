@@ -204,10 +204,18 @@ mkdir -p "$(dirname "$BOOKMARKS_FILE")"
 touch "$BOOKMARKS_FILE"
 grep -q "file://$PROJECTS_DIR" "$BOOKMARKS_FILE" || echo "file://$PROJECTS_DIR" >> "$BOOKMARKS_FILE"
 
-# Autostart do Solaar (pacote nativo, ou Flatpak como alternativa)
+# Autostart do Solaar (pacote nativo, ou Flatpak como alternativa), iniciando
+# só no ícone da bandeja ("-w hide"), sem abrir a janela
 mkdir -p "$HOME/.config/autostart"
-cp /usr/share/applications/solaar.desktop "$HOME/.config/autostart/" 2>/dev/null || \
-    cp /var/lib/flatpak/exports/share/applications/io.github.pwr_solaar.solaar.desktop "$HOME/.config/autostart/" 2>/dev/null || true
+for desktop in /usr/share/applications/solaar.desktop \
+    /var/lib/flatpak/exports/share/applications/io.github.pwr_solaar.solaar.desktop; do
+    if [[ -f "$desktop" ]]; then
+        destino="$HOME/.config/autostart/$(basename "$desktop")"
+        cp "$desktop" "$destino"
+        sed -i -E '/^Exec=/{/ -w hide$/! s/$/ -w hide/}' "$destino"
+        break
+    fi
+done
 
 # Ajustes visuais
 %s

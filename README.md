@@ -46,11 +46,14 @@ No Ubuntu, os pacotes `firefox` e `thunderbird` do repositório oficial são só
 pacotes de transição que instalam a versão snap. Por isso, no Ubuntu (e
 sabores com `ID=ubuntu`, como o Kubuntu):
 
-- o módulo `repositorios` adiciona o [repositório APT da Mozilla](https://packages.mozilla.org/apt)
-  (suítes `mozilla` e `thunderbird-deb`), conferindo o fingerprint da chave
-  (`35BA A0B3 3E9E B396 F59C A838 C0BA 5CE6 DC63 15A3`), e cria
-  `/etc/apt/preferences.d/mozilla` com prioridade 1000 para a Mozilla e -1
-  para os pacotes de transição `firefox*`/`thunderbird*` do Ubuntu;
+- o módulo `repositorios` segue a instrução oficial da Mozilla para o
+  [repositório APT](https://packages.mozilla.org/apt) dela: chave em
+  `/etc/apt/keyrings/packages.mozilla.org.asc`, conferência do fingerprint
+  (`35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3`), repositório com as suítes
+  `mozilla` (Firefox) e `thunderbird-deb` (Thunderbird) — em
+  `mozilla.sources` (deb822) do Ubuntu 26.04 em diante, ou `mozilla.list` no
+  24.04 e anteriores — e `/etc/apt/preferences.d/mozilla` com prioridade 1000
+  para `packages.mozilla.org`;
 - o módulo `pacotes_base` instala os `.deb` da Mozilla (com
   `--allow-downgrades`, já que o pacote de transição tem epoch maior) e, depois,
   remove os snaps de ambos, se instalados. Antes de remover, copia o perfil do
