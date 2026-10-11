@@ -106,8 +106,12 @@ traz o binário solto (`post-install-linux-amd64`, usado pelo `setup.sh`) e um
 ### Fluxo da TUI
 
 1. Mostra o sistema detectado (distro, base, desktop GNOME/GTK ou KDE).
-2. Pergunta para qual usuário do sistema configurar o ambiente (sem sugestão
-   de nome; valida que o usuário existe, inclusive contas de domínio).
+2. Pergunta para qual usuário do sistema configurar o ambiente. O usuário
+   que executou o `sudo` é detectado (`SUDO_USER`, `PKEXEC_UID` ou `logname`,
+   nunca `root`) e vem como primeira opção; a segunda, "Outro usuário…", abre
+   um campo para digitar o nome. Sem usuário detectado, o campo aparece direto.
+   O nome é validado (inclusive contas de domínio). No modo texto, a pergunta
+   é `Configurar o ambiente para o usuário 'fulano'? [S/n]`.
 3. Pergunta qual papel de parede aplicar, entre as imagens de `Wallpapers/`
    (com resolução e tamanho), ou "Não alterar", que desmarca o módulo
    `papel_parede`. A tela é pulada se a pasta estiver vazia ou se vier
