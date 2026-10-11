@@ -5,6 +5,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,11 +30,18 @@ type Config struct {
 	Modules  []modules.Module
 	Selected []bool // seleção inicial
 	// User já validado (pula a tela de usuário quando preenchido).
-	User         string
+	User string
+	// DetectedUser é quem executou o sudo (sugerido na tela de usuário).
+	DetectedUser string
 	ValidateUser func(string) error
+	// Wallpapers são as imagens disponíveis; Wallpaper é a escolhida (vazio
+	// = não alterar). Com WallChosen (veio de --wallpaper), não pergunta.
+	Wallpapers []string
+	Wallpaper  string
+	WallChosen bool
 	// Start roda a execução dos módulos escolhidos, enviando eventos do
 	// engine (e entradas de log) para emit. Bloqueia até terminar.
-	Start    func(ctx context.Context, user string, mods []modules.Module, emit func(any))
+	Start    func(ctx context.Context, user, wallpaper string, mods []modules.Module, emit func(any))
 	LogPaths []string
 }
 
@@ -41,6 +49,7 @@ type state int
 
 const (
 	stateUser state = iota
+	stateWallpaper
 	stateSelect
 	stateConfirm
 	stateRunning
@@ -54,8 +63,12 @@ type Model struct {
 	state state
 	w, h  int
 
-	input   textinput.Model
-	userErr string
+	input      textinput.Model
+	userErr    string
+	userChoice int  // 0 = usuário detectado, 1 = outro
+	typing     bool // campo de texto visível
+
+	wallCursor int
 
 	cursor int
 	sel    []bool
@@ -87,7 +100,6 @@ func New(cfg Config) Model {
 	in.Placeholder = "nome do usuário"
 	in.Prompt = "› "
 	in.CharLimit = 64
-	in.Focus()
 
 	sel := make([]bool, len(cfg.Modules))
 	copy(sel, cfg.Selected)
@@ -108,9 +120,28 @@ func New(cfg Config) Model {
 		vp:     viewport.New(80, 10),
 	}
 	if cfg.User != "" {
-		m.state = stateSelect
+		m.state = m.afterUser()
+	}
+	if cfg.DetectedUser == "" {
+		m.typing = true
+		m.input.Focus()
 	}
 	return m
+}
+
+// afterUser decide a tela seguinte à do usuário: a escolha do papel de
+// parede só aparece se há imagens, o módulo está marcado e não veio
+// --wallpaper.
+func (m *Model) afterUser() state {
+	if m.cfg.WallChosen || len(m.cfg.Wallpapers) == 0 {
+		return stateSelect
+	}
+	for i, mod := range m.cfg.Modules {
+		if mod.ID == "papel_parede" && m.sel[i] {
+			return stateWallpaper
+		}
+	}
+	return stateSelect
 }
 
 func (m Model) Init() tea.Cmd {
@@ -180,6 +211,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.state {
 		case stateUser:
 			return m.updateUser(msg)
+		case stateWallpaper:
+			return m.updateWallpaper(msg)
 		case stateSelect:
 			return m.updateSelect(msg)
 		case stateConfirm:
@@ -201,29 +234,62 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // ---- Tela: usuário ----
 
+// Com um usuário detectado (quem chamou o sudo), a tela oferece ele ou
+// "outro usuário"; só em "outro" (ou sem detecção) aparece o campo de texto.
+
 func (m Model) updateUser(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if !m.typing {
+		switch msg.String() {
+		case "ctrl+c", "esc", "q":
+			return m, tea.Quit
+		case "up", "k":
+			m.userChoice = 0
+		case "down", "j":
+			m.userChoice = 1
+		case "enter", " ":
+			if m.userChoice == 1 {
+				m.typing = true
+				m.input.Focus()
+				return m, textinput.Blink
+			}
+			return m.chooseUser(m.cfg.DetectedUser)
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
-	case "ctrl+c", "esc":
+	case "ctrl+c":
 		return m, tea.Quit
+	case "esc":
+		if m.cfg.DetectedUser == "" {
+			return m, tea.Quit
+		}
+		m.typing, m.userErr = false, ""
+		m.input.Blur()
+		return m, nil
 	case "enter":
 		nome := strings.TrimSpace(m.input.Value())
 		if nome == "" {
 			m.userErr = "Digite um nome de usuário."
 			return m, nil
 		}
-		if err := m.cfg.ValidateUser(nome); err != nil {
-			m.userErr = err.Error()
-			return m, nil
-		}
-		m.cfg.User = nome
-		m.userErr = ""
-		m.state = stateSelect
-		return m, nil
+		return m.chooseUser(nome)
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	m.userErr = ""
 	return m, cmd
+}
+
+func (m Model) chooseUser(nome string) (tea.Model, tea.Cmd) {
+	if err := m.cfg.ValidateUser(nome); err != nil {
+		m.userErr = err.Error()
+		return m, nil
+	}
+	m.cfg.User = nome
+	m.userErr = ""
+	m.state = m.afterUser()
+	return m, nil
 }
 
 func (m Model) viewUser() string {
@@ -234,13 +300,41 @@ func (m Model) viewUser() string {
 	b.WriteString("\n")
 	b.WriteString(subtleStyle.Render("Grupos, shell, dotfiles, Node, Rust e Claude Code serão aplicados a este usuário."))
 	b.WriteString("\n\n")
-	b.WriteString(m.input.View())
-	b.WriteString("\n")
+
+	if d := m.cfg.DetectedUser; d != "" {
+		opcoes := []struct{ nome, info string }{
+			{d, "usuário detectado (quem executou o sudo)"},
+			{"Outro usuário…", ""},
+		}
+		for i, o := range opcoes {
+			pointer, radio, nome := "  ", subtleStyle.Render("( )"), o.nome
+			if i == m.userChoice {
+				pointer, radio, nome = cursorStyle.Render("› "), cursorStyle.Render("(•)"), cursorStyle.Render(o.nome)
+			}
+			if o.info != "" {
+				nome += "  " + subtleStyle.Render(o.info)
+			}
+			b.WriteString(pointer + radio + " " + nome + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	if m.typing {
+		b.WriteString(m.input.View())
+		b.WriteString("\n")
+	}
 	if m.userErr != "" {
 		b.WriteString(errStyle.Render("✗ " + m.userErr))
 	}
 	b.WriteString("\n\n")
-	b.WriteString(help("enter", "continuar", "esc", "sair"))
+	switch {
+	case !m.typing:
+		b.WriteString(help("↑/↓", "mover", "enter", "escolher", "esc", "sair"))
+	case m.cfg.DetectedUser != "":
+		b.WriteString(help("enter", "continuar", "esc", "voltar"))
+	default:
+		b.WriteString(help("enter", "continuar", "esc", "sair"))
+	}
 	return b.String()
 }
 
@@ -419,6 +513,15 @@ func (m Model) viewConfirm() string {
 		b.WriteString(strings.Join(items, "\n"))
 	}
 	b.WriteString("\n\n")
+	for i, mod := range m.cfg.Modules {
+		if mod.ID == "papel_parede" && m.sel[i] {
+			nome := "não alterar"
+			if m.cfg.Wallpaper != "" {
+				nome = filepath.Base(m.cfg.Wallpaper)
+			}
+			b.WriteString(subtleStyle.Render("Papel de parede: ") + accentStyle.Render(nome) + "\n\n")
+		}
+	}
 	if m.cfg.DryRun {
 		b.WriteString(warnStyle.Render("Modo dry-run: nada será alterado no sistema, os comandos só serão listados.") + "\n\n")
 	}
@@ -446,9 +549,9 @@ func (m Model) startRun() (tea.Model, tea.Cmd) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	ch, user, mods := m.events, m.cfg.User, m.runMods
+	ch, user, wallpaper, mods := m.events, m.cfg.User, m.cfg.Wallpaper, m.runMods
 	go func() {
-		m.cfg.Start(ctx, user, mods, func(ev any) { ch <- ev })
+		m.cfg.Start(ctx, user, wallpaper, mods, func(ev any) { ch <- ev })
 		close(ch)
 	}()
 	m.resize()
@@ -760,6 +863,8 @@ func (m Model) View() string {
 	switch m.state {
 	case stateUser:
 		v = m.viewUser()
+	case stateWallpaper:
+		v = m.viewWallpaper()
 	case stateSelect:
 		v = m.viewSelect()
 	case stateConfirm:

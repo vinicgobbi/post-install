@@ -25,6 +25,8 @@ type Ctx struct {
 	*runner.Runner
 	Sys     *sysinfo.Info
 	OVPNDir string
+	// Wallpaper é o caminho da imagem escolhida (vazio = não alterar).
+	Wallpaper string
 }
 
 // All devolve todos os módulos, na ordem de execução.
@@ -44,6 +46,7 @@ func All() []Module {
 		bitwarden,
 		temasIcones,
 		ambienteUsuario,
+		papelParede,
 		rustTools,
 		claudeCode,
 		vscodeNautilus,

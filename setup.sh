@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Bootstrap do post-install: baixa o binário da release no GitHub (verificando
-# o SHA-256) e executa como root, apontando OVPN/ e logs/ para esta pasta.
+# o SHA-256) e executa como root, apontando OVPN/, Wallpapers/ e logs/ para
+# esta pasta.
 #
 #   sudo ./setup.sh                          # última release
 #   POST_INSTALL_VERSION=v1.2.0 ./setup.sh   # versão específica
@@ -53,4 +54,5 @@ if [[ ! -x "$BIN" ]]; then
     BIN="$TMP_DIR/$ASSET"
 fi
 
-exec "$BIN" --ovpn-dir "$SCRIPT_DIR/OVPN" --log-dir "$SCRIPT_DIR/logs" "$@"
+exec "$BIN" --ovpn-dir "$SCRIPT_DIR/OVPN" --wallpapers-dir "$SCRIPT_DIR/Wallpapers" \
+    --log-dir "$SCRIPT_DIR/logs" "$@"

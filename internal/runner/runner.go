@@ -144,13 +144,22 @@ func (r *Runner) Shell(script string) error {
 	return r.Run("bash", "-c", script)
 }
 
+// userSession aponta o script para a sessão gráfica do usuário, se ela
+// existir. O "su -" não traz XDG_RUNTIME_DIR nem o D-Bus da sessão, e sem
+// eles o gsettings grava num backend em memória e descarta tudo sem erro.
+const userSession = `if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+fi
+`
+
 // AsUser executa um trecho de shell como o usuário alvo, em login shell (com
-// $HOME e PATH corretos).
+// $HOME e PATH corretos e, se houver, a sessão D-Bus dele).
 func (r *Runner) AsUser(script string) error {
 	if r.User == "" {
 		return errors.New("usuário alvo não definido")
 	}
-	return r.Run("su", "-", r.User, "-c", script)
+	return r.Run("su", "-", r.User, "-c", userSession+script)
 }
 
 // Exists informa se um binário está no PATH.
