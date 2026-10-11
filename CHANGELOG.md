@@ -1,3 +1,9 @@
+## v1.1.0 (2026-10-11)
+
+### Feat
+
+- instala Firefox e Thunderbird via repositório da Mozilla no Ubuntu
+
 ## v1.0.0 (2026-10-11)
 
 ### BREAKING CHANGE
