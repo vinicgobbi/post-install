@@ -17,14 +17,12 @@ if [[ "$EUID" -ne 0 ]]; then
     exec sudo POST_INSTALL_VERSION="${POST_INSTALL_VERSION:-}" "$0" "$@"
 fi
 
-case "$(uname -m)" in
-    x86_64) ARCH="amd64" ;;
-    aarch64 | arm64) ARCH="arm64" ;;
-    *)
-        echo "[-] Arquitetura não suportada: $(uname -m)" >&2
-        exit 1
-        ;;
-esac
+# Só há build para amd64.
+if [[ "$(uname -m)" != "x86_64" ]]; then
+    echo "[-] Arquitetura não suportada: $(uname -m) (só amd64/x86_64)." >&2
+    exit 1
+fi
+ARCH="amd64"
 
 baixar() {
     if command -v curl &>/dev/null; then

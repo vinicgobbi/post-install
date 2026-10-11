@@ -70,15 +70,14 @@ cd post-install
 ```
 
 O `setup.sh` se reexecuta com `sudo`, baixa o binário da última release para
-a arquitetura da máquina (`amd64` ou `arm64`), confere o SHA-256 e executa
+`amd64` (única arquitetura suportada), confere o SHA-256 e executa
 apontando `OVPN/` e `logs/` para a pasta do repositório. Para fixar uma
 versão: `POST_INSTALL_VERSION=v1.2.0 ./setup.sh`. Qualquer flag é repassada ao
 binário (ex.: `./setup.sh --dry-run`).
 
 ### Pacote da release (sem clonar o repositório)
 
-Cada release publica, por arquitetura, um pacote com o binário e a estrutura
-de pastas pronta:
+Cada release publica um pacote com o binário e a estrutura de pastas pronta:
 
 ```
 post-install-linux-amd64.tar.gz
@@ -97,7 +96,7 @@ sudo ./post-install/post-install
 
 Por padrão o binário procura `OVPN/` e grava em `logs/` **ao lado dele
 mesmo**, então funciona a partir de qualquer diretório. A release também
-traz o binário solto (`post-install-linux-<arch>`, usado pelo `setup.sh`) e um
+traz o binário solto (`post-install-linux-amd64`, usado pelo `setup.sh`) e um
 `.sha256` para cada arquivo.
 
 ### Fluxo da TUI
@@ -254,7 +253,7 @@ Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
    calcular a próxima versão (`fix` → patch, `feat` → minor, `!`/`BREAKING
    CHANGE` → major), atualizar o `CHANGELOG.md`, criar o commit `bump: ...` e a
    tag `vX.Y.Z` — sem commit `feat`/`fix`/breaking desde a última tag, para aqui;
-3. compila o binário estático (`CGO_ENABLED=0`) para `amd64` e `arm64`, com a
+3. compila o binário estático (`CGO_ENABLED=0`) para `amd64`, com a
    versão embutida, empacota o `.tar.gz` com o binário + `OVPN/` + `logs/` e
    sobe tudo como artefato;
 4. publica a release da tag com os binários soltos, os pacotes `.tar.gz` e os
