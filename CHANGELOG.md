@@ -1,3 +1,9 @@
+## v1.5.0 (2026-10-17)
+
+### Feat
+
+- adiciona ferramentas de terminal, deploy-dev, atalhos do GNOME e Now Bar
+
 ## v1.4.0 (2026-10-11)
 
 ### Feat
