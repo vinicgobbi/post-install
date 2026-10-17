@@ -1,6 +1,8 @@
 # Extensões do GNOME aplicadas pelo módulo "extensoes_gnome" do post-install.
 # Uma por linha (UUID). As que não vêm instaladas com o sistema são baixadas
 # do extensions.gnome.org na versão compatível com o GNOME Shell da máquina.
+# UUID seguido de uma URL git = instalada do repositório (git clone +
+# make install), para extensões que não estão no extensions.gnome.org.
 # Prefixo "-" = manter desativada (ex.: extensões que vêm com o Ubuntu).
 
 # extensions.gnome.org
@@ -13,7 +15,14 @@ fullscreen-avoider@noobsai.github.com
 gsconnect@andyholmes.github.io
 lockkeys@vaina.lt
 
+# Repositório git
+nowbar@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowbar.git
+
 # Vêm com o Ubuntu (só são ativadas/desativadas se existirem no sistema)
+snapd-prompting@canonical.com
+snapd-search-provider@canonical.com
 tiling-assistant@ubuntu.com
+ubuntu-appindicators@ubuntu.com
 ubuntu-dock@ubuntu.com
+web-search-provider@ubuntu.com
 -ding@rastersoft.com

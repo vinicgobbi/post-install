@@ -23,7 +23,7 @@ import (
 var extensoesGnome = Module{
 	ID:    "extensoes_gnome",
 	Title: "Extensões do GNOME",
-	Desc:  "Instala (extensions.gnome.org), ativa e configura as extensões de GNOME/extensoes.txt e GNOME/extensoes.dconf",
+	Desc:  "Instala (extensions.gnome.org ou repositório git), ativa e configura as extensões de GNOME/extensoes.txt e GNOME/extensoes.dconf",
 	Run: func(c *Ctx) error {
 		if c.Sys.IsKDE() {
 			c.Log.Infof("Ambiente Plasma detectado: pulando extensões do GNOME.")
@@ -34,7 +34,7 @@ var extensoesGnome = Module{
 			return nil
 		}
 		lista := filepath.Join(c.GNOMEDir, "extensoes.txt")
-		ativar, desativar, err := lerListaExtensoes(lista)
+		ativar, desativar, git, err := lerListaExtensoes(lista)
 		if errors.Is(err, os.ErrNotExist) {
 			c.Log.Warnf("%s não encontrado: pulando extensões.", lista)
 			return nil
@@ -55,6 +55,15 @@ var extensoesGnome = Module{
 		for _, uuid := range ativar {
 			if extensaoDoSistema(uuid) {
 				instaladas = append(instaladas, uuid)
+				continue
+			}
+			if repo, ok := git[uuid]; ok {
+				if err := instalarExtensaoGit(c, repo); err != nil {
+					c.Log.Warnf("%s: %v", uuid, err)
+					continue
+				}
+				instaladas = append(instaladas, uuid)
+				c.Log.Successf("Extensão %s instalada de %s.", uuid, repo)
 				continue
 			}
 			info, err := ConsultarExtensao(get, uuid, versao)
@@ -107,12 +116,13 @@ var extensoesGnome = Module{
 	},
 }
 
-// lerListaExtensoes lê o arquivo de UUIDs: uma por linha, "#" comenta e o
-// prefixo "-" marca extensões a manter desativadas.
-func lerListaExtensoes(path string) (ativar, desativar []string, err error) {
+// lerListaExtensoes lê o arquivo de UUIDs: uma por linha, "#" comenta, o
+// prefixo "-" marca extensões a manter desativadas e uma URL depois do UUID
+// indica o repositório git de onde instalar (devolvida em git, por UUID).
+func lerListaExtensoes(path string) (ativar, desativar []string, git map[string]string, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer f.Close()
 	sc := bufio.NewScanner(f)
@@ -123,11 +133,18 @@ func lerListaExtensoes(path string) (ativar, desativar []string, err error) {
 		}
 		if uuid, ok := strings.CutPrefix(linha, "-"); ok {
 			desativar = append(desativar, strings.TrimSpace(uuid))
-		} else {
-			ativar = append(ativar, linha)
+			continue
+		}
+		campos := strings.Fields(linha)
+		ativar = append(ativar, campos[0])
+		if len(campos) > 1 {
+			if git == nil {
+				git = map[string]string{}
+			}
+			git[campos[0]] = campos[1]
 		}
 	}
-	return ativar, desativar, sc.Err()
+	return ativar, desativar, git, sc.Err()
 }
 
 // versaoGnomeShell devolve a versão maior do GNOME Shell ("50"), que é o que
@@ -228,11 +245,27 @@ func instalarExtensao(c *Ctx, info ExtInfo) error {
 	return c.AsUser("gnome-extensions install --force " + shQuote(zip))
 }
 
+// instalarExtensaoGit clona o repositório e roda o "make install" dele, que
+// copia a extensão para ~/.local/share/gnome-shell/extensions.
+func instalarExtensaoGit(c *Ctx, repo string) error {
+	if !runner.Exists("make") {
+		if err := c.install("make"); err != nil {
+			return err
+		}
+	}
+	return c.AsUser(`set -e
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+git clone --depth 1 ` + shQuote(repo) + ` "$dir"
+make -C "$dir" install
+`)
+}
+
 // VerificarExtensoes roda antes da execução (sem root, sem o Ctx) para a
 // interface perguntar sobre as extensões sem versão compatível. Devolve a
 // versão do GNOME Shell e as incompatíveis; sem GNOME ou sem a lista, nada.
 func VerificarExtensoes(gnomeDir string) (string, []ExtInfo) {
-	ativar, _, err := lerListaExtensoes(filepath.Join(gnomeDir, "extensoes.txt"))
+	ativar, _, git, err := lerListaExtensoes(filepath.Join(gnomeDir, "extensoes.txt"))
 	if err != nil || !runner.Exists("gnome-shell") {
 		return "", nil
 	}
@@ -261,7 +294,7 @@ func VerificarExtensoes(gnomeDir string) (string, []ExtInfo) {
 		incompt []ExtInfo
 	)
 	for _, uuid := range ativar {
-		if extensaoDoSistema(uuid) {
+		if _, ok := git[uuid]; ok || extensaoDoSistema(uuid) {
 			continue
 		}
 		wg.Add(1)

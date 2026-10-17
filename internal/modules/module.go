@@ -27,7 +27,7 @@ type Ctx struct {
 	OVPNDir string
 	// Wallpaper é o caminho da imagem escolhida (vazio = não alterar).
 	Wallpaper string
-	// GNOMEDir guarda extensoes.txt e extensoes.dconf.
+	// GNOMEDir guarda extensoes.txt, extensoes.dconf e atalhos.dconf.
 	GNOMEDir string
 	// ForcarExtensoes são as extensões sem versão compatível que o usuário
 	// pediu para instalar mesmo assim.
@@ -61,8 +61,10 @@ func All() []Module {
 		ambienteUsuario,
 		papelParede,
 		extensoesGnome,
+		atalhosGnome,
 		rustTools,
 		claudeCode,
+		deployDev,
 		vscodeNautilus,
 		ovpn,
 		virtManager,

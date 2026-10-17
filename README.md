@@ -2,11 +2,13 @@
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
 workstation Linux recém-instalada: mirrors, atualização do sistema, Docker,
-VSCode, PHP + SQL Server, Flatpaks (incluindo jogos — Steam, Heroic,
+VSCode, PHP + SQL Server, ferramentas de terminal (gh, nmap, pipx, ffmpeg,
+bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
-temas/ícones GNOME, o ambiente do usuário (zsh, Oh My Zsh, fnm/Node, dotfiles
-pessoais), Rust (rustup, eza, topgrade), Claude Code, importação de perfis
-OpenVPN e as extensões "Abrir com o VSCode"/"Copiar caminho" no Nautilus.
+temas/ícones GNOME, extensões e atalhos do GNOME, o ambiente do usuário (zsh,
+Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade), Claude
+Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
+VSCode"/"Copiar caminho" no Nautilus.
 
 ## Sistemas suportados
 
@@ -88,7 +90,7 @@ post-install-linux-amd64.tar.gz
     ├── post-install      # binário
     ├── OVPN/README.md    # coloque aqui os .ovpn a importar
     ├── Wallpapers/       # papéis de parede oferecidos na TUI
-    ├── GNOME/            # lista e configurações das extensões do GNOME
+    ├── GNOME/            # extensões (lista e configurações) e atalhos do GNOME
     ├── logs/             # logs de cada execução
     └── README.md
 ```
@@ -183,9 +185,10 @@ internal/
     mirrors.go              #   mirrors (dnf, reflector no Arch, teste de velocidade no Ubuntu)
     repositorios.go         #   atualização, repositórios/Chaotic-AUR+yay, pacotes base
     apps.go                 #   Solaar, LibreOffice, Flatpaks, Tailscale, PHP, Chrome+GCM, Bitwarden
-    desktop.go              #   temas/ícones, ambiente do usuário, Rust, Claude Code, Nautilus/Dolphin
+    desktop.go              #   temas/ícones, ambiente do usuário, Rust, Claude Code, deploy-dev, Nautilus/Dolphin
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
-    gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org + gsettings + dconf)
+    gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
+    gnome_atalhos.go        #   atalhos do GNOME (dconf)
     sistema.go              #   OpenVPN, virt-manager, limpeza
   config/flatpaks.go        # listas de Flatpaks (GTK, KDE, jogos)
   tui/                      # interface Bubble Tea
@@ -260,16 +263,21 @@ alterações sem erro.
 
 A pasta `GNOME/` define as extensões (editável sem recompilar):
 
-- `extensoes.txt` — uma extensão (UUID) por linha; `#` comenta e o prefixo
-  `-` mantém a extensão desativada (ex.: `-ding@rastersoft.com`);
-- `extensoes.dconf` — as preferências delas, no formato do `dconf dump`.
+- `extensoes.txt` — uma extensão (UUID) por linha; `#` comenta, o prefixo
+  `-` mantém a extensão desativada (ex.: `-ding@rastersoft.com`) e uma URL
+  git depois do UUID instala a extensão do repositório em vez do
+  extensions.gnome.org (ex.: a Now Bar);
+- `extensoes.dconf` — as preferências delas, no formato do `dconf dump`;
+- `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
+  `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
 
 O módulo `extensoes_gnome` (pulado no Plasma), como o usuário alvo:
 
 1. para cada extensão que não vem com o sistema (`/usr/share/gnome-shell/extensions`),
    consulta o [extensions.gnome.org](https://extensions.gnome.org) pela versão
    compatível com o GNOME Shell da máquina, baixa e instala com
-   `gnome-extensions install --force`;
+   `gnome-extensions install --force`; as que têm URL git são clonadas e
+   instaladas com o `make install` do próprio repositório;
 2. ativa via `gsettings` (`enabled-extensions`/`disabled-extensions`,
    mesclando com o que já estava ativo) — no Wayland, extensões novas só
    carregam no próximo login, por isso não usa `gnome-extensions enable`;
@@ -292,6 +300,22 @@ Para atualizar as preferências a partir de uma máquina já configurada:
 `dconf dump /org/gnome/shell/extensions/ > GNOME/extensoes.dconf` — e tire
 o que for estado da máquina (dispositivos pareados, monitor, tamanho de
 janela).
+
+## Atalhos do GNOME
+
+O módulo `atalhos_gnome` (pulado no Plasma) aplica `GNOME/atalhos.dconf` com
+`dconf load /org/gnome/`:
+
+- `Print` e `Shift+Super+S` abrem a captura interativa do Gradia (Flatpak,
+  instalado pelo módulo se ainda não estiver);
+- a captura nativa do GNOME sai do `Print` e a gravação de tela vai para
+  `Shift+Super+R`;
+- o volume sobe e desce de 2 em 2% (`volume-step`).
+
+Para atualizar a partir de uma máquina já configurada, use
+`dconf dump /org/gnome/settings-daemon/plugins/media-keys/` e
+`dconf dump /org/gnome/shell/keybindings/`, e ajuste os nomes das seções
+para ficarem relativos a `/org/gnome/`.
 
 ## Importação de perfis OpenVPN
 
