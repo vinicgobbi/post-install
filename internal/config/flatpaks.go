@@ -31,7 +31,8 @@ var FlatpaksGTK = []string{
 	"org.filezillaproject.Filezilla", "org.gaphor.Gaphor", "org.gnome.Boxes",
 	"org.libreoffice.LibreOffice", "org.onlyoffice.desktopeditors", "org.qbittorrent.qBittorrent",
 	"org.remmina.Remmina", "org.telegram.desktop", "org.videolan.VLC", "me.iepure.devtoolbox",
-	"com.rtosta.zapzap",
+	"com.rtosta.zapzap", "be.alexandervanhee.gradia", "org.gnome.Snapshot",
+	"org.gnome.Weather", "net.blip.Blip",
 }
 
 var FlatpaksJogos = []string{

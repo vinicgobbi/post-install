@@ -59,15 +59,18 @@ func TestUsaFormatoDeb822(t *testing.T) {
 }
 
 func TestLerListaExtensoes(t *testing.T) {
-	ativar, desativar, err := lerListaExtensoes("../../GNOME/extensoes.txt")
+	ativar, desativar, git, err := lerListaExtensoes("../../GNOME/extensoes.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ativar) != 10 || !slices.Contains(ativar, "gsconnect@andyholmes.github.io") || !slices.Contains(ativar, "ubuntu-dock@ubuntu.com") {
+	if len(ativar) != 15 || !slices.Contains(ativar, "gsconnect@andyholmes.github.io") || !slices.Contains(ativar, "ubuntu-dock@ubuntu.com") {
 		t.Errorf("ativar = %v", ativar)
 	}
 	if !slices.Equal(desativar, []string{"ding@rastersoft.com"}) {
 		t.Errorf("desativar = %v", desativar)
+	}
+	if !slices.Contains(ativar, "nowbar@vinicgobbi.dev.br") || git["nowbar@vinicgobbi.dev.br"] != "https://github.com/vinicgobbi/gnome-extension-nowbar.git" || len(git) != 1 {
+		t.Errorf("git = %v", git)
 	}
 }
 

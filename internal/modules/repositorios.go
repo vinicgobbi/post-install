@@ -43,9 +43,9 @@ const (
 var repositorios = Module{
 	ID:    "repositorios",
 	Title: "Configurar repositórios",
-	Desc:  "Docker/VSCode/MS SQL e Mozilla no Ubuntu (Fedora/RHEL/Debian) ou Chaotic-AUR + yay (Arch)",
+	Desc:  "Docker/VSCode/MS SQL/GitHub CLI e Mozilla no Ubuntu (Fedora/RHEL/Debian) ou Chaotic-AUR + yay (Arch)",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Configurando repositórios (Docker, Microsoft)...")
+		c.Log.Infof("Configurando repositórios (Docker, Microsoft, GitHub CLI)...")
 		var err error
 		switch c.Sys.PkgMgr {
 		case "pacman":
@@ -180,6 +180,9 @@ func repositoriosDNF(c *Ctx) error {
 		func() error { return c.Download(msRepo, "/etc/yum.repos.d/msprod.repo") },
 		func() error { return c.Run("rpm", "--import", "https://packages.microsoft.com/keys/microsoft.asc") },
 		func() error { return c.WriteFile("/etc/yum.repos.d/vscode.repo", vscodeYumRepo, 0o644) },
+		func() error {
+			return c.Download("https://cli.github.com/packages/rpm/gh-cli.repo", "/etc/yum.repos.d/gh-cli.repo")
+		},
 	)
 }
 
@@ -226,6 +229,22 @@ func repositoriosAPT(c *Ctx) error {
 		}
 	}
 
+	// GitHub CLI pelo repositório oficial (https://github.com/cli/cli/blob/trunk/docs/install_linux.md):
+	// o "gh" dos repositórios da distro fica bem atrás das releases.
+	err = step(
+		func() error {
+			return c.Download("https://cli.github.com/packages/githubcli-archive-keyring.gpg", "/etc/apt/keyrings/githubcli-archive-keyring.gpg")
+		},
+		func() error { return c.Chmod("/etc/apt/keyrings/githubcli-archive-keyring.gpg", 0o644) },
+		func() error {
+			return c.WriteFile("/etc/apt/sources.list.d/github-cli.list",
+				"deb [arch="+s.Arch+" signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n", 0o644)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
 	asc := c.Temp("microsoft.asc")
 	return step(
 		func() error { return c.Download("https://packages.microsoft.com/keys/microsoft.asc", asc) },
@@ -240,10 +259,44 @@ func repositoriosAPT(c *Ctx) error {
 	)
 }
 
+// ferramentas devolve os utilitários de terminal com os nomes de pacote de
+// cada distro. O FUSE 2 é para AppImages: no Ubuntu 24.04+ e Debian 13 o
+// pacote ganhou o sufixo "t64" (transição do time_t de 64 bits).
+func ferramentas(c *Ctx) []string {
+	switch c.Sys.PkgMgr {
+	case "dnf":
+		return []string{"gh", "nmap", "pipx", "ffmpeg-free", "bashtop", "fuse-libs"}
+	case "pacman":
+		return []string{"github-cli", "nmap", "python-pipx", "ffmpeg", "bashtop", "fuse2"}
+	default:
+		fuse := "libfuse2t64"
+		if !c.Probe("apt-cache", "show", fuse) {
+			fuse = "libfuse2"
+		}
+		return []string{"gh", "nmap", "pipx", "ffmpeg", "bashtop", fuse}
+	}
+}
+
+// instalarFerramentas tenta tudo numa chamada só; se falhar (algum pacote
+// ausente na distro), instala um por um e só avisa dos que faltarem, sem
+// derrubar o módulo.
+func instalarFerramentas(c *Ctx) {
+	c.Log.Infof("Instalando ferramentas de terminal (gh, nmap, pipx, ffmpeg, bashtop, FUSE 2)...")
+	pkgs := ferramentas(c)
+	if c.install(pkgs...) == nil {
+		return
+	}
+	for _, p := range pkgs {
+		if err := c.install(p); err != nil {
+			c.Log.Warnf("Não foi possível instalar %s: %v", p, err)
+		}
+	}
+}
+
 var pacotesBase = Module{
 	ID:    "pacotes_base",
 	Title: "Instalar pacotes base",
-	Desc:  "Docker, VSCode, PHP, Zsh, Firefox, Thunderbird e ferramentas de SQL Server (no Ubuntu, Firefox/Thunderbird em .deb da Mozilla, removendo os snaps)",
+	Desc:  "Docker, VSCode, PHP, Zsh, Firefox, Thunderbird, ferramentas de SQL Server e de terminal (gh, nmap, pipx, ffmpeg, bashtop, FUSE 2 para AppImages; no Ubuntu, Firefox/Thunderbird em .deb da Mozilla, removendo os snaps)",
 	Deps:  []string{"repositorios"},
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando pacotes base e utilitários...")
@@ -290,6 +343,7 @@ var pacotesBase = Module{
 		if err := instalarFirefoxThunderbird(c); err != nil {
 			return err
 		}
+		instalarFerramentas(c)
 
 		// No Debian/Ubuntu o "bat" instala o binário como "batcat" por
 		// conflito de nome; cria um link para "bat" funcionar em todo lugar.

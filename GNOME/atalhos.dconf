@@ -1,0 +1,22 @@
+# Atalhos do GNOME, carregados com:
+#   dconf load /org/gnome/ < atalhos.dconf
+# Print e Shift+Super+S abrem a captura do Gradia (Flatpak); a captura nativa
+# sai do Print e a gravação de tela vai para Shift+Super+R.
+
+[settings-daemon/plugins/media-keys]
+custom-keybindings=['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/']
+volume-step=2
+
+[settings-daemon/plugins/media-keys/custom-keybindings/custom0]
+binding='Print'
+command='flatpak run be.alexandervanhee.gradia --screenshot=INTERACTIVE'
+name='Gradia'
+
+[settings-daemon/plugins/media-keys/custom-keybindings/custom1]
+binding='<Shift><Super>s'
+command='flatpak run be.alexandervanhee.gradia --screenshot=INTERACTIVE'
+name='Gradia Like Windows'
+
+[shell/keybindings]
+show-screen-recording-ui=['<Shift><Super>r']
+show-screenshot-ui=@as []

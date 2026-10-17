@@ -14,7 +14,7 @@ level-indicator-custom-colors=['#ff7800', '#ff7800', '#15c931', '#15c931', '#15c
 swap-icon-text=false
 
 [caffeine]
-indicator-position-max=3
+indicator-position-max=1
 
 [copyous]
 database-backend='json'
@@ -34,6 +34,13 @@ show-mounts=false
 [lockkeys]
 capslock-indicator='when-active'
 numlock-indicator='when-active'
+
+[nowbar]
+max-width=220
+panel-box='left'
+pill-width='fit'
+show-count=false
+weather-unit='metric'
 
 [tiling-assistant]
 focus-hint-color='rgb(203,67,20)'

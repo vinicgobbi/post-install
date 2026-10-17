@@ -1,8 +1,14 @@
 package modules
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 var temasIcones = Module{
@@ -267,6 +273,73 @@ var claudeCode = Module{
 		c.Log.Successf("Claude Code instalado para %s.", c.User)
 		return nil
 	},
+}
+
+// O deploy-dev se instala sozinho (install copia para ~/.local/bin e põe a
+// pasta no PATH) e depois se atualiza sozinho a partir das releases.
+var deployDev = Module{
+	ID:    "deploy_dev",
+	Title: "Instalar deploy-dev",
+	Desc:  "CLI do deploy-tools que gera e valida o workflow de deploy dos projetos (github.com/vinicgobbi/deploy-tools)",
+	Run: func(c *Ctx) error {
+		c.Log.Infof("Instalando o deploy-dev (última release do deploy-tools)...")
+		const repo = "vinicgobbi/deploy-tools"
+		bin, err := latestReleaseAsset(c, repo, func(n string) bool { return n == "deploy-dev-linux-amd64" })
+		if err != nil {
+			return err
+		}
+		sum, err := latestReleaseAsset(c, repo, func(n string) bool { return n == "deploy-dev-linux-amd64.sha256" })
+		if err != nil {
+			return err
+		}
+		dest := c.Temp("deploy-dev-linux-amd64")
+		if err := c.Download(bin, dest); err != nil {
+			return err
+		}
+		if !c.DryRun {
+			if err := conferirSHA256(c, sum, dest); err != nil {
+				return err
+			}
+		}
+		// O binário baixado é do root; o usuário copia para um temporário
+		// dele para poder marcar como executável.
+		if err := c.AsUser(`set -e
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+install -m 0755 ` + shQuote(dest) + ` "$dir/deploy-dev"
+"$dir/deploy-dev" install --add-to-path
+`); err != nil {
+			return err
+		}
+		c.Log.Successf("deploy-dev instalado em ~/.local/bin para %s.", c.User)
+		return nil
+	},
+}
+
+// conferirSHA256 compara o arquivo com o .sha256 publicado na release
+// (formato do sha256sum: "<hash>  <nome>").
+func conferirSHA256(c *Ctx, sumURL, arquivo string) error {
+	body, err := c.Get(sumURL, 30*time.Second)
+	if err != nil {
+		return err
+	}
+	campos := strings.Fields(string(body))
+	if len(campos) == 0 {
+		return errorf("arquivo de SHA-256 vazio: %s", sumURL)
+	}
+	f, err := os.Open(arquivo)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	if got := hex.EncodeToString(h.Sum(nil)); !strings.EqualFold(got, campos[0]) {
+		return errorf("SHA-256 de %s (%s) não confere com o da release (%s)", filepath.Base(arquivo), got, campos[0])
+	}
+	return nil
 }
 
 const dolphinServiceMenu = `[Desktop Entry]
