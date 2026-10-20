@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
@@ -29,6 +30,7 @@ import (
 	"github.com/vinicgobbi/post-install/internal/runner"
 	"github.com/vinicgobbi/post-install/internal/sysinfo"
 	"github.com/vinicgobbi/post-install/internal/tui"
+	"github.com/vinicgobbi/post-install/internal/update"
 )
 
 var stdin = bufio.NewReader(os.Stdin)
@@ -52,6 +54,7 @@ type options struct {
 	wall     string
 	gnomeDir string
 	forceExt string
+	noUpdate bool
 }
 
 func parseFlags() options {
@@ -70,6 +73,7 @@ func parseFlags() options {
 	flag.StringVar(&o.wall, "wallpaper", "", "papel de parede a aplicar: nome do arquivo em --wallpapers-dir, ou \"none\" para não alterar (padrão: perguntar)")
 	flag.StringVar(&o.gnomeDir, "gnome-dir", "", "pasta com extensoes.txt e extensoes.dconf (padrão: GNOME/ ao lado do binário)")
 	flag.StringVar(&o.forceExt, "force-extensions", "", "extensões do GNOME sem versão compatível a instalar mesmo assim (UUIDs separados por vírgula, ou \"none\"); sem ela, pergunta")
+	flag.BoolVar(&o.noUpdate, "no-update-check", false, "não verificar se há uma versão mais nova do post-install")
 	flag.StringVar(&o.logDir, "log-dir", "", "pasta onde os logs da execução são gravados (padrão: logs/ ao lado do binário)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Uso: sudo %s [opções]\n\nOpções:\n", os.Args[0])
@@ -119,16 +123,58 @@ func resolveWallpaper(walls []string, name string) (path string, ok bool, err er
 	return "", false, fmt.Errorf("papel de parede %q não encontrado na pasta de papéis de parede", name)
 }
 
+// exePath devolve o caminho real do executável (sem links simbólicos).
+func exePath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return filepath.EvalSymlinks(exe)
+}
+
 // exeDir devolve a pasta do executável (ou o diretório atual, se não der
 // para descobrir).
 func exeDir() string {
-	exe, err := os.Executable()
-	if err == nil {
-		if exe, err = filepath.EvalSymlinks(exe); err == nil {
-			return filepath.Dir(exe)
-		}
+	if exe, err := exePath(); err == nil {
+		return filepath.Dir(exe)
 	}
 	return "."
+}
+
+// verificarAtualizacao consulta a última release (com prazo curto, para não
+// atrasar o início sem rede). Falhas só viram aviso.
+func verificarAtualizacao(out *plain.Printer) *update.Release {
+	if version == "dev" {
+		return nil
+	}
+	out.Info("Verificando se há versão nova do post-install...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rel, err := update.Check(ctx, version)
+	if err != nil {
+		out.Warn("Não foi possível verificar se há versão nova: %v", err)
+		return nil
+	}
+	return rel
+}
+
+// comandoReexecucao monta o comando para executar de novo com as mesmas
+// opções, depois de uma atualização.
+func comandoReexecucao(exe string) string {
+	partes := []string{"sudo", shellQuote(exe)}
+	for _, a := range os.Args[1:] {
+		partes = append(partes, shellQuote(a))
+	}
+	return strings.Join(partes, " ")
+}
+
+// shellQuote só põe aspas quando o argumento tem algo que o shell
+// interpretaria.
+func shellQuote(s string) string {
+	if s != "" && !strings.ContainsAny(s, " \t\n'\"\\$`!*?[]{}()<>|&;#~") {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func main() {
@@ -203,6 +249,9 @@ func run() int {
 	os.Chmod(workDir, 0o755)
 
 	p := preparo{walls: modules.ListWallpapers(o.wallDir)}
+	if !o.noUpdate {
+		p.upd = verificarAtualizacao(out)
+	}
 	p.esc.Wallpaper, p.wallChosen, err = resolveWallpaper(p.walls, o.wall)
 	if err != nil {
 		return fail("%v", err)
@@ -259,12 +308,13 @@ type preparo struct {
 	shell      string
 	incompat   []modules.ExtInfo
 	extChosen  bool
+	upd        *update.Release // versão nova disponível (nil = nenhuma)
 }
 
 type startFunc func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) []engine.Result
 
 func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p preparo, log *runlog.Logger, start startFunc) int {
-	m := tui.New(tui.Config{
+	cfg := tui.Config{
 		Sys:              sys,
 		Version:          version,
 		DryRun:           o.dryRun,
@@ -284,11 +334,22 @@ func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p pr
 		Start: func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) {
 			start(ctx, esc, mods, emit)
 		},
-	})
-	final, err := tea.NewProgram(m, tea.WithAltScreen()).Run()
+	}
+	var rerun string
+	if exe, err := exePath(); err == nil && p.upd != nil {
+		rerun = comandoReexecucao(exe)
+		cfg.UpdateVersion = p.upd.Tag
+		cfg.RerunCommand = rerun
+		cfg.ApplyUpdate = func() error { return update.Apply(context.Background(), p.upd, exe) }
+	}
+	final, err := tea.NewProgram(tui.New(cfg), tea.WithAltScreen()).Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "erro na interface:", err)
 		return 1
+	}
+	if final.(tui.Model).Updated() {
+		fmt.Printf("post-install atualizado para %s. Execute de novo para usar a versão nova:\n  %s\n", p.upd.Tag, rerun)
+		return 0
 	}
 	res := final.(tui.Model).Result()
 	if res == nil {
@@ -306,6 +367,12 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p 
 	out.Info("Sistema detectado: %s", sys.Summary())
 	for _, w := range sys.Warnings {
 		out.Warn("%s", w)
+	}
+
+	if p.upd != nil {
+		if code, sair := oferecerAtualizacao(o, p.upd, out, stdinTTY); sair {
+			return code
+		}
 	}
 
 	esc := p.esc
@@ -376,6 +443,35 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p 
 	fmt.Println()
 	fmt.Println(tui.Summary(results, elapsed.Elapsed, nil))
 	return exitCode(results)
+}
+
+// oferecerAtualizacao pergunta (modo texto) se atualiza para a versão nova.
+// Devolve sair=true quando a execução deve parar (atualizou ou falhou).
+func oferecerAtualizacao(o options, rel *update.Release, out *plain.Printer, stdinTTY bool) (code int, sair bool) {
+	novidade := fmt.Sprintf("Nova versão disponível: %s (você está na %s).", rel.Tag, version)
+	switch {
+	case o.dryRun:
+		out.Info("%s Execute sem --dry-run para atualizar.", novidade)
+		return 0, false
+	case !stdinTTY || o.yes:
+		out.Warn("%s Execute de forma interativa para atualizar.", novidade)
+		return 0, false
+	case !confirmDefaultYes(novidade + " Atualizar agora (depois é preciso executar de novo)?"):
+		return 0, false
+	}
+	exe, err := exePath()
+	if err != nil {
+		out.Handle(runlog.Entry{Level: runlog.Error, Text: fmt.Sprintf("Falha ao localizar o executável: %v", err)})
+		return 1, true
+	}
+	out.Info("Baixando e conferindo %s...", rel.Tag)
+	if err := update.Apply(context.Background(), rel, exe); err != nil {
+		out.Handle(runlog.Entry{Level: runlog.Error, Text: fmt.Sprintf("Falha ao atualizar: %v", err)})
+		return 1, true
+	}
+	out.Handle(runlog.Entry{Level: runlog.Success, Text: fmt.Sprintf("post-install atualizado para %s. Execute de novo para usar a versão nova:", rel.Tag)})
+	fmt.Fprintln(out.W, "  "+comandoReexecucao(exe))
+	return 0, true
 }
 
 func exitCode(results []engine.Result) int {
