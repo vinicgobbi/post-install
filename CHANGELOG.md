@@ -1,3 +1,10 @@
+## v1.7.0 (2026-10-20)
+
+### Feat
+
+- verifica se há versão nova e oferece atualizar ao iniciar
+- avisa por PR quando há versão nova dos pins
+
 ## v1.6.0 (2026-10-20)
 
 ### Feat
