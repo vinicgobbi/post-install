@@ -64,6 +64,9 @@ type Logger struct {
 
 	CleanPath string
 	RawPath   string
+	// dir é o diretório de logs quando foi criado por New (só então Chown
+	// muda o dono dele também).
+	dir string
 }
 
 // New cria os arquivos de log em dir. Com dir vazio, nada é gravado em disco
@@ -73,7 +76,11 @@ func New(dir, prefixo string) (*Logger, error) {
 	if dir == "" {
 		return l, nil
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	// Os logs trazem a saída completa dos comandos: só o dono lê.
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		l.dir = dir
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("criando diretório de logs: %w", err)
 	}
 	ts := time.Now().Format("2006-01-02_150405")
@@ -81,14 +88,29 @@ func New(dir, prefixo string) (*Logger, error) {
 	l.RawPath = filepath.Join(dir, fmt.Sprintf("%s_%s.raw.log", prefixo, ts))
 
 	var err error
-	if l.clean, err = os.Create(l.CleanPath); err != nil {
+	if l.clean, err = os.OpenFile(l.CleanPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600); err != nil {
 		return nil, err
 	}
-	if l.raw, err = os.Create(l.RawPath); err != nil {
+	if l.raw, err = os.OpenFile(l.RawPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600); err != nil {
 		l.clean.Close()
 		return nil, err
 	}
 	return l, nil
+}
+
+// Chown passa os arquivos de log (e o diretório, se foi criado por New) para
+// o usuário alvo: o programa roda como root, e sem isso o usuário não
+// conseguiria nem ler nem apagar os logs da pasta dele.
+func (l *Logger) Chown(uid, gid int) error {
+	for _, p := range []string{l.dir, l.CleanPath, l.RawPath} {
+		if p == "" {
+			continue
+		}
+		if err := os.Chown(p, uid, gid); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetSink define quem recebe cada mensagem (a TUI ou o modo texto).

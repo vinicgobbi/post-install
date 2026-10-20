@@ -1,15 +1,37 @@
 package modules
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/vinicgobbi/post-install/internal/runner"
 )
+
+// Código de terceiros e dos repositórios pessoais que este programa executa
+// fica fixado numa versão conhecida: uma conta comprometida ou um push errado
+// na branch principal não chega sozinho às próximas instalações. Para
+// atualizar, troque o commit/tag (e o SHA-256, quando houver) aqui.
+const (
+	dotfilesRepo   = "https://github.com/vinicgobbi/Dotfiles.git"
+	dotfilesCommit = "1e9a97699b70582f87e768f1fe6aa1dde9b58fd6"
+
+	vscodeNautilusRepo   = "https://github.com/vinicgobbi/vscode_nautilus.git"
+	vscodeNautilusCommit = "77ed67c7b420a3a148c83ce8721f18b9e737cd44"
+
+	copypathRepo   = "https://github.com/vinicgobbi/nautilus-copypath.git"
+	copypathCommit = "f2e1c9d0a3b5ed2584539dd9d127cf6121fba599"
+
+	yaruTag    = "26.10.3"
+	yaruSHA256 = "ac396932559dd1b515ee4d94d470093dfac407027d9609e756299df9e06c3f7b"
+)
+
+// clonarFixado devolve as linhas de shell que clonam repo em dir (expressão
+// de shell, ex.: "$dir/x") e posicionam no commit ref.
+func clonarFixado(repo, ref, dir string) string {
+	return "git clone --quiet " + shQuote(repo) + " " + dir + "\n" +
+		"git -C " + dir + " -c advice.detachedHead=false checkout --quiet " + shQuote(ref) + "\n"
+}
 
 var temasIcones = Module{
 	ID:    "temas_icones",
@@ -73,14 +95,14 @@ func instalarAdwGtk3(c *Ctx) error {
 	}
 
 	c.Log.Infof("adw-gtk3 ausente dos repositórios. Baixando tarball oficial do GitHub...")
-	url, err := latestReleaseAsset(c, "lassekongo83/adw-gtk3", func(n string) bool { return strings.HasSuffix(n, ".tar.xz") })
+	asset, err := latestReleaseAsset(c, "lassekongo83/adw-gtk3", func(n string) bool { return strings.HasSuffix(n, ".tar.xz") })
 	if err != nil {
 		c.Log.Warnf("Não foi possível localizar o tarball do adw-gtk3: %v", err)
 		return nil
 	}
 	tarball := c.Temp("adw-gtk3.tar.xz")
 	return step(
-		func() error { return c.Download(url, tarball) },
+		func() error { return downloadAsset(c, asset, tarball) },
 		func() error { return c.Run("tar", "-xJf", tarball, "-C", "/usr/share/themes/") },
 	)
 }
@@ -101,11 +123,11 @@ func instalarYaru(c *Ctx) error {
 		return c.install(pkg)
 	}
 
-	c.Log.Infof("Ícones Yaru ausentes dos repositórios. Baixando do repositório oficial do Ubuntu...")
+	c.Log.Infof("Ícones Yaru ausentes dos repositórios. Baixando a versão %s do repositório oficial do Ubuntu...", yaruTag)
 	tarball, dir := c.Temp("yaru.tar.gz"), c.Temp("yaru")
 	err := step(
 		func() error {
-			return c.Download("https://github.com/ubuntu/yaru/archive/refs/heads/master.tar.gz", tarball)
+			return c.DownloadVerified("https://github.com/ubuntu/yaru/archive/refs/tags/"+yaruTag+".tar.gz", tarball, yaruSHA256)
 		},
 		func() error { return c.MkdirAll(dir, 0o755) },
 		func() error { return c.Run("tar", "-xzf", tarball, "-C", dir) },
@@ -113,7 +135,7 @@ func instalarYaru(c *Ctx) error {
 	if err != nil {
 		return err
 	}
-	if err := c.Run("cp", "-r", dir+"/yaru-master/icons/.", "/usr/share/icons/"); err != nil {
+	if err := c.Run("cp", "-r", dir+"/yaru-"+yaruTag+"/icons/.", "/usr/share/icons/"); err != nil {
 		c.Log.Warnf("Falha ao copiar os ícones Yaru: %v", err)
 	}
 	return nil
@@ -149,20 +171,15 @@ var ambienteUsuario = Module{
 			c.Log.Warnf("Falha ao configurar o Git Credential Manager: %v", err)
 		}
 
-		// O download do fnm e o clone+bootstrap dos dotfiles (Oh My Zsh,
-		// plugins, tema, fontes, config do Solaar) são independentes: rodam
-		// em paralelo.
-		errs := make(chan error, 2)
-		go func() {
-			errs <- c.AsUser(`curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell`)
-		}()
-		go func() {
-			errs <- c.AsUser(`rm -rf /tmp/dotfiles && git clone https://github.com/vinicgobbi/Dotfiles.git /tmp/dotfiles && bash /tmp/dotfiles/bootstrap.sh`)
-		}()
-		for range 2 {
-			if err := <-errs; err != nil {
-				c.Log.Warnf("%v", err)
-			}
+		// fnm e dotfiles (Oh My Zsh, plugins, tema, fontes, config do Solaar)
+		// rodam em sequência: em paralelo, as saídas se misturavam no log.
+		if err := c.AsUser(`curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell`); err != nil {
+			c.Log.Warnf("Falha ao instalar o fnm: %v", err)
+		}
+		if err := c.AsUser("set -e\ndir=$(mktemp -d)\ntrap 'rm -rf \"$dir\"' EXIT\n" +
+			clonarFixado(dotfilesRepo, dotfilesCommit, `"$dir"`) +
+			`bash "$dir/bootstrap.sh"` + "\n"); err != nil {
+			c.Log.Warnf("Falha ao aplicar os dotfiles: %v", err)
 		}
 
 		if err := c.AsUser(scriptAmbienteUsuario(c)); err != nil {
@@ -293,11 +310,11 @@ var deployDev = Module{
 			return err
 		}
 		dest := c.Temp("deploy-dev-linux-amd64")
-		if err := c.Download(bin, dest); err != nil {
+		if err := downloadAsset(c, bin, dest); err != nil {
 			return err
 		}
 		if !c.DryRun {
-			if err := conferirSHA256(c, sum, dest); err != nil {
+			if err := conferirSHA256(c, sum.URL, dest); err != nil {
 				return err
 			}
 		}
@@ -327,19 +344,7 @@ func conferirSHA256(c *Ctx, sumURL, arquivo string) error {
 	if len(campos) == 0 {
 		return errorf("arquivo de SHA-256 vazio: %s", sumURL)
 	}
-	f, err := os.Open(arquivo)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return err
-	}
-	if got := hex.EncodeToString(h.Sum(nil)); !strings.EqualFold(got, campos[0]) {
-		return errorf("SHA-256 de %s (%s) não confere com o da release (%s)", filepath.Base(arquivo), got, campos[0])
-	}
-	return nil
+	return runner.VerifySHA256(arquivo, campos[0])
 }
 
 const dolphinServiceMenu = `[Desktop Entry]
@@ -391,15 +396,11 @@ var vscodeNautilus = Module{
 		err := step(
 			func() error { return c.install(deps...) },
 			func() error {
-				return c.AsUser(`set -e
-rm -rf /tmp/vscode_nautilus
-git clone https://github.com/vinicgobbi/vscode_nautilus.git /tmp/vscode_nautilus
-bash /tmp/vscode_nautilus/install.sh
-
-rm -rf /tmp/nautilus-copypath
-git clone https://github.com/vinicgobbi/nautilus-copypath.git /tmp/nautilus-copypath
-bash /tmp/nautilus-copypath/install.sh
-`)
+				return c.AsUser("set -e\ndir=$(mktemp -d)\ntrap 'rm -rf \"$dir\"' EXIT\n" +
+					clonarFixado(vscodeNautilusRepo, vscodeNautilusCommit, `"$dir/vscode_nautilus"`) +
+					`bash "$dir/vscode_nautilus/install.sh"` + "\n" +
+					clonarFixado(copypathRepo, copypathCommit, `"$dir/nautilus-copypath"`) +
+					`bash "$dir/nautilus-copypath/install.sh"` + "\n")
 			},
 		)
 		if err != nil {

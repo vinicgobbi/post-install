@@ -42,19 +42,38 @@ func otimizarDNF(c *Ctx) error {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	var linhas []string
-	for _, l := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
-		if strings.Contains(l, "fastestmirror=") || strings.Contains(l, "max_parallel_downloads=") {
-			continue
-		}
-		linhas = append(linhas, l)
-	}
-	linhas = append(linhas, "fastestmirror=True", "max_parallel_downloads=10")
-	if err := c.WriteFile(conf, strings.Join(linhas, "\n")+"\n", 0o644); err != nil {
+	if err := c.WriteFile(conf, ajustarDNFConf(string(data)), 0o644); err != nil {
 		return err
 	}
 	c.Log.Successf("DNF otimizado: fastestmirror ativado e downloads paralelos definidos para 10.")
 	return nil
+}
+
+// ajustarDNFConf põe fastestmirror e max_parallel_downloads logo abaixo de
+// [main] (criando a seção se o arquivo não existir ou não a tiver): fora
+// dela, o dnf ignora as opções.
+func ajustarDNFConf(conteudo string) string {
+	opcoes := []string{"fastestmirror=True", "max_parallel_downloads=10"}
+	var linhas []string
+	temMain := false
+	for _, l := range strings.Split(strings.TrimRight(conteudo, "\n"), "\n") {
+		if l == "" && len(linhas) == 0 {
+			continue
+		}
+		k, _, _ := strings.Cut(l, "=")
+		if k = strings.TrimSpace(k); k == "fastestmirror" || k == "max_parallel_downloads" {
+			continue
+		}
+		linhas = append(linhas, l)
+		if strings.TrimSpace(l) == "[main]" && !temMain {
+			temMain = true
+			linhas = append(linhas, opcoes...)
+		}
+	}
+	if !temMain {
+		linhas = append(append([]string{"[main]"}, opcoes...), linhas...)
+	}
+	return strings.Join(linhas, "\n") + "\n"
 }
 
 // No Arch, o reflector já mede de verdade os mirrors da lista oficial.
@@ -111,9 +130,12 @@ var (
 )
 
 // candidatosMirrorUbuntu monta a lista de candidatos a testar:
-//  1. o pick do GeoIP da Canonical (http:// simples: em algumas redes o
-//     https:// desse host trava). Devolve UMA linha só — serve de baseline.
-//  2. os mirrors do próprio país do IP público, extraídos da página de
+//  1. o pick do GeoIP da Canonical (http:// simples: o https:// desse host
+//     não responde). Devolve UMA linha só — serve de baseline. Um atacante na
+//     rede pode trocar a resposta, mas no máximo escolhe o mirror: o apt
+//     confere a assinatura do Release de qualquer mirror.
+//  2. os mirrors do próprio país do IP público (país consultado por HTTPS no
+//     ifconfig.co, no formato em inglês que o Launchpad usa), extraídos da página de
 //     mirrors do Launchpad (organizada em seções por país). É essencial: uma
 //     amostra aleatória global tem grande chance de nunca incluir o mirror
 //     local de fato mais rápido.
@@ -126,7 +148,7 @@ func candidatosMirrorUbuntu(c *Ctx) []string {
 		cands = append(cands, strings.Fields(string(body))...)
 	}
 
-	if body, err := c.Get("http://ip-api.com/line/?fields=country", 5*time.Second); err == nil {
+	if body, err := c.Get("https://ifconfig.co/country", 5*time.Second); err == nil {
 		if pais := strings.TrimSpace(string(body)); pais != "" {
 			if page, err := c.Get("https://launchpad.net/ubuntu/+archivemirrors", 12*time.Second); err == nil {
 				cands = append(cands, mirrorsDoPais(string(page), pais)...)

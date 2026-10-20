@@ -3,6 +3,8 @@
 # do extensions.gnome.org na versão compatível com o GNOME Shell da máquina.
 # UUID seguido de uma URL git = instalada do repositório (git clone +
 # make install), para extensões que não estão no extensions.gnome.org.
+# Depois da URL, opcionalmente, o commit (ou tag) a instalar — recomendado,
+# para uma mudança na branch principal não chegar sozinha às instalações.
 # Prefixo "-" = manter desativada (ex.: extensões que vêm com o Ubuntu).
 
 # extensions.gnome.org
@@ -16,7 +18,7 @@ gsconnect@andyholmes.github.io
 lockkeys@vaina.lt
 
 # Repositório git
-nowbar@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowbar.git
+nowbar@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowbar.git f5cf51c4771a90705da8a6c5db3256251359323f
 
 # Vêm com o Ubuntu (só são ativadas/desativadas se existirem no sistema)
 snapd-prompting@canonical.com
