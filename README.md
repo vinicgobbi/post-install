@@ -111,7 +111,9 @@ Releases anteriores a essa mudança não têm atestado.
 
 ### Fluxo da TUI
 
-1. Mostra o sistema detectado (distro, base, desktop GNOME/GTK ou KDE).
+1. Mostra o sistema detectado (distro, base, desktop GNOME/GTK ou KDE). Se
+   houver uma versão mais nova do post-install, a primeira tela oferece
+   atualizar agora ou ignorar (veja [Atualização](#atualização)).
 2. Pergunta para qual usuário do sistema configurar o ambiente. O usuário
    que executou o `sudo` é detectado (`SUDO_USER`, `PKEXEC_UID` ou `logname`,
    nunca `root`) e vem como primeira opção; a segunda, "Outro usuário…", abre
@@ -157,11 +159,32 @@ dele, que são pulados. Use `--fail-fast` para parar tudo no primeiro erro.
 | `--force-extensions a,b` | extensões do GNOME sem versão compatível a instalar mesmo assim (ou `none`); sem ela, pergunta |
 | `--wallpaper NOME` | papel de parede a aplicar (nome do arquivo, ou `none` para não alterar); sem ela, a TUI pergunta |
 | `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, extensões do GNOME e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` ao lado do binário) |
+| `--no-update-check` | não verifica se há versão nova do post-install |
 | `--version` | mostra a versão |
 
 Sem terminal interativo (pipe, CI), o programa usa o modo texto
 automaticamente e roda todos os módulos (menos os de `--skip`); nesse caso
 `--user` é obrigatório.
+
+## Atualização
+
+Ao iniciar, o post-install consulta a última release no GitHub (com prazo de
+5 s; sem rede, só avisa e segue). Se houver uma versão mais nova:
+
+- **TUI** — a primeira tela oferece *Atualizar agora* ou *Ignorar e continuar*;
+- **modo texto** — pergunta `Atualizar agora? [S/n]`;
+- **`--dry-run`, `--yes` ou sem terminal** — só avisa, sem atualizar.
+
+Atualizar baixa o `.tar.gz` da release, confere o SHA-256 (pelo `.sha256`
+publicado e pelo digest que o GitHub calcula) e substitui o binário. Quando
+ele roda de dentro do pacote da release (com `GNOME/` ao lado), atualiza
+também `GNOME/`, `Wallpapers/`, `README.md` e `OVPN/README.md` — os seus
+`.ovpn` e os `logs/` nunca são tocados. Os arquivos ficam com o dono do
+binário atual. A execução em andamento continua sendo a versão antiga: ao
+final, o programa mostra o comando para executar de novo (com as mesmas
+opções) e sai.
+
+Builds locais (`go build`, versão `dev`) não verificam atualização.
 
 ## Log em arquivo
 
@@ -194,6 +217,7 @@ internal/
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
     sistema.go              #   OpenVPN, virt-manager, limpeza
   config/flatpaks.go        # listas de Flatpaks (GTK, KDE, jogos)
+  update/                   # verificação e aplicação de versão nova (release do GitHub)
   tui/                      # interface Bubble Tea
   plain/                    # saída em texto simples
 .github/workflows/release.yml
@@ -357,7 +381,7 @@ Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
 (`feat:`, `fix:`, `refactor:`, `feat!:` ...). A cada push na `main`, a action
 `.github/workflows/release.yml`:
 
-1. roda `go vet`, `go test`, `staticcheck` e `govulncheck`;
+1. roda `go vet`, `go test`, `staticcheck`, `govulncheck` e `shellcheck`;
 2. usa o [commitizen](https://commitizen-tools.github.io/commitizen/) para
    calcular a próxima versão (`fix` → patch, `feat` → minor, `!`/`BREAKING
    CHANGE` → major), atualizar o `CHANGELOG.md`, criar o commit `bump: ...` e a
@@ -368,9 +392,24 @@ Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
 4. publica a release da tag com os binários soltos, os pacotes `.tar.gz` e os
    `.sha256`, e apaga os artefatos da action.
 
-As actions ficam fixadas pelo SHA do commit (com a tag num comentário), e o
-Dependabot (`.github/dependabot.yml`) abre PRs na `development` atualizando
-actions e módulos Go.
+### Atualização das versões fixadas
+
+Tudo o que é fixado tem quem avise quando sai versão nova — com um PR na
+`development`, que chega como notificação do GitHub:
+
+- **Actions e módulos Go** — o Dependabot (`.github/dependabot.yml`), toda
+  semana. As actions ficam fixadas pelo SHA do commit, com a tag num
+  comentário.
+- **Commits dos repositórios pessoais, Now Bar, Yaru e regra UDEV do
+  Solaar** — o workflow `.github/workflows/pins.yml`, todo dia (ou à mão
+  em Actions → Pins → Run workflow). Ele roda `scripts/atualizar-pins.sh`,
+  que confere o último commit/tag de cada um, atualiza o pin (recalculando o
+  SHA-256 do Yaru) e abre o PR `fix: atualiza versões fixadas` com links de
+  comparação para revisar o que mudou. Se a regra do Solaar mudar, o PR
+  destaca isso (ela roda como root). Precisa de *Settings → Actions → General
+  → Allow GitHub Actions to create and approve pull requests*.
+
+O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 
 ## Segurança
 
@@ -387,7 +426,7 @@ actions e módulos Go.
   vscode_nautilus, nautilus-copypath) ficam fixados num commit e os ícones
   Yaru numa tag com SHA-256 (constantes no topo de
   `internal/modules/desktop.go`); a regra UDEV do Solaar vem embutida no
-  binário. Para atualizar, troque os valores lá. Assets de release do GitHub
+  binário (`internal/modules/42-logitech-unify-permissions.rules`). Assets de release do GitHub
   (GCM, adw-gtk3, deploy-dev) são conferidos pelo SHA-256 que o GitHub
   publica.
 - **Scripts de instalação remotos.** fnm, rustup e Claude Code ainda são

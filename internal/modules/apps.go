@@ -1,6 +1,7 @@
 package modules
 
 import (
+	_ "embed"
 	"encoding/json"
 	"path/filepath"
 	"strings"
@@ -37,7 +38,7 @@ var solaar = Module{
 			c.Log.Infof("Regra UDEV do Solaar já instalada pelo pacote.")
 			return nil
 		}
-		c.Log.Infof("Configurando regras UDEV para o Solaar...")
+		c.Log.Infof("Configurando regras UDEV para o Solaar (regra do Solaar %s)...", solaarTag)
 		err := step(
 			func() error { return c.WriteFile(regraSolaarDestino, regraSolaar, 0o644) },
 			func() error { return c.Run("udevadm", "control", "--reload-rules") },
@@ -56,42 +57,15 @@ const regraSolaarNome = "42-logitech-unify-permissions.rules"
 
 var regraSolaarDestino = "/etc/udev/rules.d/" + regraSolaarNome
 
-// regraSolaar é rules.d-uinput/42-logitech-unify-permissions.rules da tag
-// 1.1.20 do Solaar, embutida em vez de baixada: regras UDEV rodam como root
-// (podem ter RUN+=), então não convém buscá-las de uma branch que muda.
-const regraSolaar = `# This rule was added by Solaar.
-#
-# Allows non-root users to have raw access to Logitech devices.
-# Allowing users to write to the device is potentially dangerous
-# because they could perform firmware updates.
-KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
+// solaarTag é a versão do Solaar de onde veio a regra embutida abaixo
+// (rules.d-uinput/42-logitech-unify-permissions.rules). Ela vem no binário
+// em vez de baixada: regras UDEV rodam como root (podem ter RUN+=), então não
+// convém buscá-las de uma branch que muda. O workflow pins.yml atualiza as
+// duas coisas juntas quando sai versão nova.
+const solaarTag = "1.1.20"
 
-ACTION == "remove", GOTO="solaar_end"
-SUBSYSTEM != "hidraw", GOTO="solaar_end"
-
-# USB-connected Logitech receivers and devices
-ATTRS{idVendor}=="046d", GOTO="solaar_apply"
-
-# Lenovo nano receiver
-ATTRS{idVendor}=="17ef", ATTRS{idProduct}=="6042", GOTO="solaar_apply"
-
-# Bluetooth-connected Logitech devices
-KERNELS == "0005:046D:*", GOTO="solaar_apply"
-
-GOTO="solaar_end"
-
-LABEL="solaar_apply"
-
-# Allow any seated user to access the receiver.
-# uaccess: modern ACL-enabled udev
-TAG+="uaccess"
-
-# Grant members of the "plugdev" group access to receiver (useful for SSH users)
-#MODE="0660", GROUP="plugdev"
-
-LABEL="solaar_end"
-# vim: ft=udevrules
-`
+//go:embed 42-logitech-unify-permissions.rules
+var regraSolaar string
 
 // regraSolaarInstalada diz se algum pacote já instalou a regra do Solaar.
 func regraSolaarInstalada() bool {
