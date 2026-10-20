@@ -51,12 +51,19 @@ type Config struct {
 	// engine (e entradas de log) para emit. Bloqueia até terminar.
 	Start    func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any))
 	LogPaths []string
+	// UpdateVersion é a release mais nova disponível (vazio = nenhuma).
+	// Fora do dry-run, a primeira tela oferece rodar ApplyUpdate; depois de
+	// atualizar, mostra RerunCommand e sai. No dry-run, só avisa no topo.
+	UpdateVersion string
+	ApplyUpdate   func() error
+	RerunCommand  string
 }
 
 type state int
 
 const (
 	stateUser state = iota
+	stateAtualizacao
 	stateWallpaper
 	stateExtensoes
 	stateSelect
@@ -79,6 +86,12 @@ type Model struct {
 
 	wallCursor int
 	extCursor  int
+
+	updChoice         int // 0 = atualizar, 1 = ignorar
+	atualizando       bool
+	atualizado        bool
+	updErr            string
+	depoisAtualizacao state
 
 	cursor int
 	sel    []bool
@@ -104,6 +117,10 @@ type Model struct {
 
 // Result devolve o resultado final (nil se o usuário saiu antes de executar).
 func (m Model) Result() *engine.FinishedEvent { return m.finished }
+
+// Updated diz se o post-install foi atualizado nesta sessão (é preciso
+// executar de novo).
+func (m Model) Updated() bool { return m.atualizado }
 
 func New(cfg Config) Model {
 	in := textinput.New()
@@ -135,6 +152,9 @@ func New(cfg Config) Model {
 	if cfg.DetectedUser == "" {
 		m.typing = true
 		m.input.Focus()
+	}
+	if cfg.UpdateVersion != "" && !cfg.DryRun && cfg.ApplyUpdate != nil {
+		m.depoisAtualizacao, m.state = m.state, stateAtualizacao
 	}
 	return m
 }
@@ -234,10 +254,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case eventsMsg:
 		return m.handleEvents(msg)
 
+	case atualizadoMsg:
+		m.atualizando = false
+		if msg.err != nil {
+			m.updErr = msg.err.Error()
+		} else {
+			m.atualizado = true
+		}
+		return m, nil
+
 	case tea.KeyMsg:
 		switch m.state {
 		case stateUser:
 			return m.updateUser(msg)
+		case stateAtualizacao:
+			return m.updateAtualizacao(msg)
 		case stateWallpaper:
 			return m.updateWallpaper(msg)
 		case stateExtensoes:
@@ -882,6 +913,9 @@ func (m Model) header() string {
 		info += subtleStyle.Render(" · usuário ") + accentStyle.Render(m.cfg.User)
 	}
 	out := title + "\n" + info
+	if m.cfg.UpdateVersion != "" && m.cfg.DryRun {
+		out += "\n" + infoStyle.Render("↑ Nova versão disponível: "+m.cfg.UpdateVersion+" — execute sem --dry-run para atualizar.")
+	}
 	for _, w := range m.cfg.Sys.Warnings {
 		out += "\n" + warnStyle.Width(max(20, m.w)).Render("! "+w)
 	}
@@ -896,6 +930,8 @@ func (m Model) View() string {
 	switch m.state {
 	case stateUser:
 		v = m.viewUser()
+	case stateAtualizacao:
+		v = m.viewAtualizacao()
 	case stateWallpaper:
 		v = m.viewWallpaper()
 	case stateExtensoes:
