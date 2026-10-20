@@ -1,0 +1,51 @@
+# Todo dia (ou à mão): confere se saiu versão nova de algo fixado no
+# post-install fora do alcance do Dependabot — commits dos repositórios
+# pessoais (Dotfiles, extensões do Nautilus, Now Bar), tag do Yaru e regra
+# UDEV do Solaar — e abre/atualiza um PR na development com os pins novos e
+# links de comparação para revisar o que mudou. O PR é a notificação.
+#
+# Requer, em Settings → Actions → General, "Allow GitHub Actions to create and
+# approve pull requests".
+name: Pins
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 06:00 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: development
+      - name: Conferir pins
+        env:
+          PINS_RESUMO: ${{ runner.temp }}/pins-resumo.md
+        run: bash scripts/atualizar-pins.sh
+      - name: Montar descrição do PR
+        id: corpo
+        run: |
+          {
+            echo "Versões novas encontradas pelo workflow \`pins.yml\`:"
+            echo
+            cat "$RUNNER_TEMP/pins-resumo.md"
+            echo
+            echo "Revise os links de comparação antes de mergear: esse código roda nas instalações."
+          } > "$RUNNER_TEMP/pr.md"
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: pins/atualizacao
+          base: development
+          commit-message: "fix: atualiza versões fixadas"
+          title: "fix: atualiza versões fixadas"
+          body-path: ${{ runner.temp }}/pr.md
+          labels: dependencies
+          delete-branch: true

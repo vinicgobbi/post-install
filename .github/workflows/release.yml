@@ -3,7 +3,7 @@
 # ser movida para outro código; o SHA, não. O Dependabot propõe as
 # atualizações (.github/dependabot.yml).
 #
-#   1. test    — go vet, go test, staticcheck e govulncheck
+#   1. test    — go vet, go test, staticcheck, govulncheck e shellcheck
 #   2. bump    — commitizen calcula a próxima versão pelos Conventional Commits,
 #                atualiza o CHANGELOG.md, cria o commit "bump: ..." e a tag vX.Y.Z
 #                (se não houver commit feat/fix/BREAKING, não há release)
@@ -43,6 +43,7 @@ jobs:
       - run: go test ./...
       - run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - run: shellcheck scripts/*.sh
 
   bump:
     needs: test
