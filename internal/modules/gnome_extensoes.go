@@ -57,13 +57,16 @@ var extensoesGnome = Module{
 				instaladas = append(instaladas, uuid)
 				continue
 			}
-			if repo, ok := git[uuid]; ok {
-				if err := instalarExtensaoGit(c, repo); err != nil {
+			if src, ok := git[uuid]; ok {
+				if src.Ref == "" {
+					c.Log.Warnf("%s: sem commit fixado em extensoes.txt — instalando o que estiver na branch principal de %s.", uuid, src.Repo)
+				}
+				if err := instalarExtensaoGit(c, src); err != nil {
 					c.Log.Warnf("%s: %v", uuid, err)
 					continue
 				}
 				instaladas = append(instaladas, uuid)
-				c.Log.Successf("Extensão %s instalada de %s.", uuid, repo)
+				c.Log.Successf("Extensão %s instalada de %s.", uuid, src.Repo)
 				continue
 			}
 			info, err := ConsultarExtensao(get, uuid, versao)
@@ -102,7 +105,7 @@ var extensoesGnome = Module{
 		if forcadas {
 			// Sem isso o GNOME recusa carregar extensões que não declaram a
 			// versão atual. Vale para todas as extensões do usuário.
-			c.Log.Warnf("Desativando a checagem de versão das extensões (disable-extension-version-validation) para carregar as instaladas mesmo assim.")
+			c.Log.Warnf("Desativando a checagem de versão das extensões (disable-extension-version-validation) para carregar as instaladas mesmo assim. Isso vale para todas as extensões, inclusive as instaladas no futuro; para reverter: gsettings reset org.gnome.shell disable-extension-version-validation")
 			script += "gsettings set org.gnome.shell disable-extension-version-validation true\n"
 		}
 		if conf := filepath.Join(c.GNOMEDir, "extensoes.dconf"); fileExists(conf) {
@@ -116,10 +119,18 @@ var extensoesGnome = Module{
 	},
 }
 
+// extGit é a origem de uma extensão instalada de um repositório git. Ref é o
+// commit (ou tag) a usar; vazio = branch principal.
+type extGit struct {
+	Repo string
+	Ref  string
+}
+
 // lerListaExtensoes lê o arquivo de UUIDs: uma por linha, "#" comenta, o
 // prefixo "-" marca extensões a manter desativadas e uma URL depois do UUID
-// indica o repositório git de onde instalar (devolvida em git, por UUID).
-func lerListaExtensoes(path string) (ativar, desativar []string, git map[string]string, err error) {
+// (opcionalmente seguida de um commit/tag) indica o repositório git de onde
+// instalar (devolvido em git, por UUID).
+func lerListaExtensoes(path string) (ativar, desativar []string, git map[string]extGit, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, nil, nil, err
@@ -139,9 +150,13 @@ func lerListaExtensoes(path string) (ativar, desativar []string, git map[string]
 		ativar = append(ativar, campos[0])
 		if len(campos) > 1 {
 			if git == nil {
-				git = map[string]string{}
+				git = map[string]extGit{}
 			}
-			git[campos[0]] = campos[1]
+			src := extGit{Repo: campos[1]}
+			if len(campos) > 2 {
+				src.Ref = campos[2]
+			}
+			git[campos[0]] = src
 		}
 	}
 	return ativar, desativar, git, sc.Err()
@@ -245,18 +260,25 @@ func instalarExtensao(c *Ctx, info ExtInfo) error {
 	return c.AsUser("gnome-extensions install --force " + shQuote(zip))
 }
 
-// instalarExtensaoGit clona o repositório e roda o "make install" dele, que
-// copia a extensão para ~/.local/share/gnome-shell/extensions.
-func instalarExtensaoGit(c *Ctx, repo string) error {
+// instalarExtensaoGit baixa o commit fixado (ou a branch principal) do
+// repositório e roda o "make install" dele, que copia a extensão para
+// ~/.local/share/gnome-shell/extensions.
+func instalarExtensaoGit(c *Ctx, src extGit) error {
 	if !runner.Exists("make") {
 		if err := c.install("make"); err != nil {
 			return err
 		}
 	}
+	ref := src.Ref
+	if ref == "" {
+		ref = "HEAD"
+	}
 	return c.AsUser(`set -e
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
-git clone --depth 1 ` + shQuote(repo) + ` "$dir"
+git init --quiet "$dir"
+git -C "$dir" fetch --quiet --depth 1 ` + shQuote(src.Repo) + ` ` + shQuote(ref) + `
+git -C "$dir" -c advice.detachedHead=false checkout --quiet FETCH_HEAD
 make -C "$dir" install
 `)
 }
@@ -349,10 +371,13 @@ func parseStrv(s string) []string {
 	return out
 }
 
+// strv monta uma lista GVariant de strings, escapando "\" e "'" (sintaxe
+// de texto do GVariant), para um item estranho não quebrar o gsettings.
 func strv(items []string) string {
+	esc := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
 	quoted := make([]string, len(items))
 	for i, it := range items {
-		quoted[i] = "'" + it + "'"
+		quoted[i] = "'" + esc.Replace(it) + "'"
 	}
 	return "[" + strings.Join(quoted, ", ") + "]"
 }

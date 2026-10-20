@@ -2,6 +2,7 @@ package modules
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -30,12 +31,15 @@ var solaar = Module{
 			return err
 		}
 
+		// Os pacotes nativos já trazem a regra em /usr/lib/udev/rules.d; só
+		// o Flatpak (que não instala nada fora do sandbox) precisa dela aqui.
+		if regraSolaarInstalada() {
+			c.Log.Infof("Regra UDEV do Solaar já instalada pelo pacote.")
+			return nil
+		}
 		c.Log.Infof("Configurando regras UDEV para o Solaar...")
 		err := step(
-			func() error {
-				return c.Download("https://raw.githubusercontent.com/pwr-Solaar/Solaar/master/rules.d-uinput/42-logitech-unify-permissions.rules",
-					"/etc/udev/rules.d/42-logitech-unify-permissions.rules")
-			},
+			func() error { return c.WriteFile(regraSolaarDestino, regraSolaar, 0o644) },
 			func() error { return c.Run("udevadm", "control", "--reload-rules") },
 			func() error { return c.Run("udevadm", "trigger", "--subsystem-match=usb") },
 			func() error { return c.Run("udevadm", "trigger", "--subsystem-match=hidraw") },
@@ -46,6 +50,57 @@ var solaar = Module{
 		c.Log.Successf("Regras UDEV do Solaar configuradas.")
 		return nil
 	},
+}
+
+const regraSolaarNome = "42-logitech-unify-permissions.rules"
+
+var regraSolaarDestino = "/etc/udev/rules.d/" + regraSolaarNome
+
+// regraSolaar é rules.d-uinput/42-logitech-unify-permissions.rules da tag
+// 1.1.20 do Solaar, embutida em vez de baixada: regras UDEV rodam como root
+// (podem ter RUN+=), então não convém buscá-las de uma branch que muda.
+const regraSolaar = `# This rule was added by Solaar.
+#
+# Allows non-root users to have raw access to Logitech devices.
+# Allowing users to write to the device is potentially dangerous
+# because they could perform firmware updates.
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"
+
+ACTION == "remove", GOTO="solaar_end"
+SUBSYSTEM != "hidraw", GOTO="solaar_end"
+
+# USB-connected Logitech receivers and devices
+ATTRS{idVendor}=="046d", GOTO="solaar_apply"
+
+# Lenovo nano receiver
+ATTRS{idVendor}=="17ef", ATTRS{idProduct}=="6042", GOTO="solaar_apply"
+
+# Bluetooth-connected Logitech devices
+KERNELS == "0005:046D:*", GOTO="solaar_apply"
+
+GOTO="solaar_end"
+
+LABEL="solaar_apply"
+
+# Allow any seated user to access the receiver.
+# uaccess: modern ACL-enabled udev
+TAG+="uaccess"
+
+# Grant members of the "plugdev" group access to receiver (useful for SSH users)
+#MODE="0660", GROUP="plugdev"
+
+LABEL="solaar_end"
+# vim: ft=udevrules
+`
+
+// regraSolaarInstalada diz se algum pacote já instalou a regra do Solaar.
+func regraSolaarInstalada() bool {
+	for _, dir := range []string{"/usr/lib/udev/rules.d", "/lib/udev/rules.d"} {
+		if fileExists(filepath.Join(dir, regraSolaarNome)) {
+			return true
+		}
+	}
+	return false
 }
 
 func instalarSolaar(c *Ctx, viaPPA bool) error {
@@ -165,16 +220,56 @@ var flatpaksJogos = Module{
 	},
 }
 
+// Chave que assina os repositórios de pacotes do Tailscale.
+const fprTailscale = "2596A99EAAB33821893C0A79458CA832957F5868"
+
+// instalarTailscalePacote configura o repositório oficial do Tailscale
+// (pkgs.tailscale.com, assinado) e instala o pacote — o mesmo que o
+// install.sh deles faz, mas sem executar um script baixado como root.
+func instalarTailscalePacote(c *Ctx) error {
+	const base = "https://pkgs.tailscale.com/stable/"
+	switch c.Sys.PkgMgr {
+	case "pacman":
+		return c.install("tailscale")
+	case "dnf":
+		repo := base + "fedora/"
+		if c.Sys.Family == "rhel" {
+			repo = base + "rhel/" + c.Sys.RHELVersion + "/"
+		}
+		return step(
+			func() error { return importarChaveRPM(c, repo+"repo.gpg", "tailscale.gpg", fprTailscale) },
+			func() error { return c.Download(repo+"tailscale.repo", "/etc/yum.repos.d/tailscale.repo") },
+			func() error { return c.install("tailscale") },
+		)
+	default:
+		const keyring = "/usr/share/keyrings/tailscale-archive-keyring.gpg"
+		distro, codename := c.Sys.DockerDistro, c.Sys.BaseCodename
+		return step(
+			func() error {
+				err := instalarChaveAPT(c, base+distro+"/"+codename+".noarmor.gpg", keyring, fprTailscale)
+				if err != nil {
+					return errorf("repositório do Tailscale indisponível para %s %s: %w", distro, codename, err)
+				}
+				return nil
+			},
+			func() error {
+				return c.WriteFile("/etc/apt/sources.list.d/tailscale.list",
+					"deb [signed-by="+keyring+"] "+base+distro+" "+codename+" main\n", 0o644)
+			},
+			func() error { return c.Run("apt", "update") },
+			func() error { return c.install("tailscale") },
+		)
+	}
+}
+
 var tailscale = Module{
 	ID:    "tailscale",
 	Title: "Instalar Tailscale + Trayscale",
-	Desc:  "Tailscale (VPN mesh) e o cliente gráfico Trayscale via Flatpak",
+	Desc:  "Tailscale (VPN mesh, pelo repositório oficial) e o cliente gráfico Trayscale via Flatpak",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando o Tailscale e o Trayscale...")
-		script := c.Temp("tailscale-install.sh")
 		err := step(
-			func() error { return c.Download("https://tailscale.com/install.sh", script) },
-			func() error { return c.Run("sh", script) },
+			func() error { return instalarTailscalePacote(c) },
 			func() error { return c.Run("systemctl", "enable", "--now", "tailscaled") },
 			c.ensureFlathub,
 			func() error { return c.flatpakInstall("dev.deedles.Trayscale") },
@@ -234,28 +329,48 @@ var phpExtensoes = Module{
 	},
 }
 
-// latestReleaseAsset devolve a URL do primeiro asset da última release de um
+// releaseAsset é um arquivo de uma release do GitHub. SHA256 vem do campo
+// "digest" que o GitHub calcula no upload (vazio em releases antigas).
+type releaseAsset struct {
+	Name   string
+	URL    string
+	SHA256 string
+}
+
+// latestReleaseAsset devolve o primeiro asset da última release de um
 // repositório do GitHub que satisfaça match.
-func latestReleaseAsset(c *Ctx, repo string, match func(name string) bool) (string, error) {
+func latestReleaseAsset(c *Ctx, repo string, match func(name string) bool) (releaseAsset, error) {
 	body, err := c.Get("https://api.github.com/repos/"+repo+"/releases/latest", 30*time.Second)
 	if err != nil {
-		return "", err
+		return releaseAsset{}, err
 	}
 	var rel struct {
 		Assets []struct {
-			Name string `json:"name"`
-			URL  string `json:"browser_download_url"`
+			Name   string `json:"name"`
+			URL    string `json:"browser_download_url"`
+			Digest string `json:"digest"`
 		} `json:"assets"`
 	}
 	if err := json.Unmarshal(body, &rel); err != nil {
-		return "", err
+		return releaseAsset{}, err
 	}
 	for _, a := range rel.Assets {
 		if match(a.Name) {
-			return a.URL, nil
+			sha, _ := strings.CutPrefix(a.Digest, "sha256:")
+			return releaseAsset{Name: a.Name, URL: a.URL, SHA256: sha}, nil
 		}
 	}
-	return "", errorf("nenhum asset compatível na última release de %s", repo)
+	return releaseAsset{}, errorf("nenhum asset compatível na última release de %s", repo)
+}
+
+// downloadAsset baixa um asset de release conferindo o SHA-256 publicado
+// pelo GitHub, quando houver.
+func downloadAsset(c *Ctx, a releaseAsset, dest string) error {
+	if a.SHA256 == "" {
+		c.Log.Warnf("%s não tem SHA-256 publicado na release: baixando sem conferência de integridade.", a.Name)
+		return c.Download(a.URL, dest)
+	}
+	return c.DownloadVerified(a.URL, dest, a.SHA256)
 }
 
 func gcmTarball(name string) bool {
@@ -276,6 +391,30 @@ func instalarGCMTarball(c *Ctx, tarball string) error {
 	)
 }
 
+const (
+	fprGoogle        = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
+	googleChromeRepo = `[google-chrome]
+name=google-chrome
+baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
+enabled=1
+gpgcheck=1
+gpgkey=https://dl.google.com/linux/linux_signing_key.pub
+`
+)
+
+// instalarChromeRPM instala o Chrome pelo repositório do Google (o mesmo
+// .repo que o próprio pacote cria), com a chave conferida antes: o dnf não
+// verifica a assinatura de um .rpm local baixado à parte.
+func instalarChromeRPM(c *Ctx) error {
+	return step(
+		func() error {
+			return importarChaveRPM(c, "https://dl.google.com/linux/linux_signing_key.pub", "google.pub", fprGoogle)
+		},
+		func() error { return c.WriteFile("/etc/yum.repos.d/google-chrome.repo", googleChromeRepo, 0o644) },
+		func() error { return c.install("google-chrome-stable") },
+	)
+}
+
 var chromeGCM = Module{
 	ID:    "chrome_gcm",
 	Title: "Chrome + Git Credential Manager",
@@ -287,20 +426,17 @@ var chromeGCM = Module{
 
 		switch c.Sys.PkgMgr {
 		case "pacman", "dnf":
-			url, err := latestReleaseAsset(c, gcmRepo, gcmTarball)
+			asset, err := latestReleaseAsset(c, gcmRepo, gcmTarball)
 			if err != nil {
 				return err
 			}
 			gcm := c.Temp("gcm.tar.gz")
-			chrome := c.Temp("chrome.rpm")
 			// GCM e Chrome são independentes: baixa/instala os dois em paralelo.
-			g.Go(func() error { return c.Download(url, gcm) })
+			g.Go(func() error { return downloadAsset(c, asset, gcm) })
 			if c.Sys.PkgMgr == "pacman" {
 				g.Go(func() error { return c.installAUR("google-chrome") })
 			} else {
-				g.Go(func() error {
-					return c.Download("https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm", chrome)
-				})
+				g.Go(func() error { return instalarChromeRPM(c) })
 			}
 			if err := g.Wait(); err != nil {
 				return err
@@ -308,20 +444,17 @@ var chromeGCM = Module{
 			if err := instalarGCMTarball(c, gcm); err != nil {
 				return err
 			}
-			if c.Sys.PkgMgr == "dnf" {
-				if err := c.install(chrome); err != nil {
-					return err
-				}
-			}
 		default:
-			url, err := latestReleaseAsset(c, gcmRepo, gcmDeb)
+			asset, err := latestReleaseAsset(c, gcmRepo, gcmDeb)
 			if err != nil {
 				return err
 			}
 			gcm, chrome := c.Temp("gcm.deb"), c.Temp("chrome.deb")
 			// Baixa os dois .deb em paralelo e instala ambos numa única chamada
-			// do apt (evita duas resoluções de dependência).
-			g.Go(func() error { return c.Download(url, gcm) })
+			// do apt (evita duas resoluções de dependência). O .deb do Chrome não
+			// é assinado individualmente, mas ao ser instalado ele configura o
+			// repositório assinado do Google, por onde vêm as atualizações.
+			g.Go(func() error { return downloadAsset(c, asset, gcm) })
 			g.Go(func() error {
 				return c.Download("https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", chrome)
 			})

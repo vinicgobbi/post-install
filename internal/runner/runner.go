@@ -10,6 +10,8 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -241,7 +243,27 @@ func (r *Runner) RemoveAll(path string) error {
 
 // ---- Rede ----
 
-var httpClient = &http.Client{Timeout: 10 * time.Minute}
+// semDowngrade recusa redirecionamentos de https:// para http://, que
+// tirariam a proteção do TLS no meio do caminho.
+func semDowngrade(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("redirecionamentos demais")
+	}
+	if via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+		return fmt.Errorf("redirecionamento inseguro de %s para %s", via[0].URL, req.URL)
+	}
+	return nil
+}
+
+var (
+	httpClient = &http.Client{Timeout: 10 * time.Minute, CheckRedirect: semDowngrade}
+	// getClient não tem timeout próprio: cada Get define o seu pelo contexto.
+	getClient = &http.Client{CheckRedirect: semDowngrade}
+)
+
+// maxGet limita o corpo lido por Get (APIs, listas, páginas HTML): nada
+// legítimo aqui chega perto disso.
+const maxGet = 32 << 20
 
 // Get faz uma requisição GET somente-leitura com timeout e devolve o corpo.
 // Falha em status HTTP de erro (equivale a "curl -f").
@@ -253,7 +275,7 @@ func (r *Runner) Get(url string, timeout time.Duration) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "post-install")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := getClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +283,11 @@ func (r *Runner) Get(url string, timeout time.Duration) ([]byte, error) {
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("GET %s: HTTP %d", url, resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxGet+1))
+	if err == nil && len(body) > maxGet {
+		return nil, fmt.Errorf("GET %s: resposta maior que %d MiB", url, maxGet>>20)
+	}
+	return body, err
 }
 
 // Download baixa uma URL para dest com algumas tentativas antes de desistir,
@@ -321,6 +347,90 @@ func (r *Runner) downloadOnce(url, dest string) error {
 	}
 	r.Log.RawWrite(fmt.Sprintf("download %s -> %s\n", url, dest))
 	return os.Rename(tmp, dest)
+}
+
+// DownloadVerified é Download conferindo o SHA-256 (hex) do arquivo baixado.
+// Em DryRun só registra, como Download.
+func (r *Runner) DownloadVerified(url, dest, sha string) error {
+	if err := r.Download(url, dest); err != nil || r.DryRun {
+		return err
+	}
+	if err := VerifySHA256(dest, sha); err != nil {
+		os.Remove(dest)
+		return err
+	}
+	return nil
+}
+
+// VerifySHA256 compara o SHA-256 de um arquivo com o esperado (hex).
+func VerifySHA256(path, want string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	if got := hex.EncodeToString(h.Sum(nil)); !strings.EqualFold(got, want) {
+		return fmt.Errorf("SHA-256 de %s (%s) não confere com o esperado (%s)", filepath.Base(path), got, want)
+	}
+	return nil
+}
+
+// VerifyKey confere se todas as chaves primárias de um arquivo de chave
+// OpenPGP (armored ou binário) estão entre os fingerprints esperados. O gpg
+// roda com um --homedir temporário: como root numa instalação nova, o
+// /root/.gnupg não existe. Em DryRun (o arquivo não foi baixado) não faz nada.
+func (r *Runner) VerifyKey(path string, fingerprints ...string) error {
+	if r.DryRun {
+		return nil
+	}
+	home, err := os.MkdirTemp(r.WorkDir, "gnupg-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(home)
+	out, err := r.Output("gpg", "--homedir", home, "--batch", "--with-colons", "--show-keys", path)
+	if err != nil {
+		return err
+	}
+	primarias := primaryFingerprints(out)
+	if len(primarias) == 0 {
+		return fmt.Errorf("nenhuma chave encontrada em %s", filepath.Base(path))
+	}
+	for _, fp := range primarias {
+		ok := false
+		for _, want := range fingerprints {
+			ok = ok || strings.EqualFold(fp, want)
+		}
+		if !ok {
+			return fmt.Errorf("chave %s em %s não é nenhuma das esperadas (%s)", fp, filepath.Base(path), strings.Join(fingerprints, ", "))
+		}
+	}
+	r.Log.Infof("Fingerprint da chave %s confere.", filepath.Base(path))
+	return nil
+}
+
+// primaryFingerprints extrai, da saída "--with-colons" do gpg, o fingerprint
+// de cada chave primária (o registro "fpr" logo após um "pub").
+func primaryFingerprints(colons string) []string {
+	var out []string
+	aposPub := false
+	for _, l := range strings.Split(colons, "\n") {
+		campos := strings.Split(l, ":")
+		switch campos[0] {
+		case "pub":
+			aposPub = true
+		case "fpr":
+			if aposPub && len(campos) > 9 {
+				out = append(out, campos[9])
+			}
+			aposPub = false
+		}
+	}
+	return out
 }
 
 // Temp devolve um caminho dentro do WorkDir.

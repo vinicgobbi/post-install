@@ -69,7 +69,8 @@ func TestLerListaExtensoes(t *testing.T) {
 	if !slices.Equal(desativar, []string{"ding@rastersoft.com"}) {
 		t.Errorf("desativar = %v", desativar)
 	}
-	if !slices.Contains(ativar, "nowbar@vinicgobbi.dev.br") || git["nowbar@vinicgobbi.dev.br"] != "https://github.com/vinicgobbi/gnome-extension-nowbar.git" || len(git) != 1 {
+	if !slices.Contains(ativar, "nowbar@vinicgobbi.dev.br") || git["nowbar@vinicgobbi.dev.br"].Repo != "https://github.com/vinicgobbi/gnome-extension-nowbar.git" ||
+		len(git["nowbar@vinicgobbi.dev.br"].Ref) != 40 || len(git) != 1 {
 		t.Errorf("git = %v", git)
 	}
 }
@@ -114,5 +115,38 @@ func TestConsultarExtensao(t *testing.T) {
 func TestVersaoMaior(t *testing.T) {
 	if !versaoMaior("46", "3.38") || !versaoMaior("50", "46") || versaoMaior("3.36", "40") || versaoMaior("46", "46") {
 		t.Error("comparação de versões errada")
+	}
+}
+
+func TestStrvEscapa(t *testing.T) {
+	if got := strv([]string{`a'b`, `c\d`}); got != `['a\'b', 'c\\d']` {
+		t.Errorf("strv = %s", got)
+	}
+}
+
+func TestConexoesNM(t *testing.T) {
+	saida := "Wired connection 1:802-3-ethernet\nvpn\\:corp:vpn\nempresa:vpn\n"
+	got := conexoesNM(saida)
+	want := map[string]string{"Wired connection 1": "802-3-ethernet", "vpn:corp": "vpn", "empresa": "vpn"}
+	if len(got) != len(want) {
+		t.Fatalf("conexoesNM = %v", got)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("conexoesNM[%q] = %q, esperado %q", k, got[k], v)
+		}
+	}
+}
+
+func TestAjustarDNFConf(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\n"},
+		{"[main]\ngpgcheck=1\nfastestmirror=False\n", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\ngpgcheck=1\n"},
+		{"# comentário\n", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\n# comentário\n"},
+	}
+	for _, tt := range tests {
+		if got := ajustarDNFConf(tt.in); got != tt.want {
+			t.Errorf("ajustarDNFConf(%q) = %q, esperado %q", tt.in, got, tt.want)
+		}
 	}
 }

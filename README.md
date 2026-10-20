@@ -38,9 +38,10 @@ AUR). Os demais módulos usam o `yay` para esses pacotes.
 Como o `makepkg` (usado pelo `yay`) recusa rodar como root, o módulo
 `repositorios` libera temporariamente sudo sem senha **só para o binário do
 `pacman`** (`/etc/sudoers.d/99-post-install-aur`) para o usuário escolhido.
-Essa regra é removida pelo módulo `limpeza` ao final; se você pular a
-limpeza, ela fica até a próxima execução completa (ou até remover o arquivo
-manualmente).
+Como `pacman` com argumentos livres equivale a root completo, a regra é
+removida no fim de **toda** execução — com qualquer resultado (falha,
+`--fail-fast`, Ctrl+C, limpeza desmarcada) — e também no início, caso tenha
+sobrado de uma execução morta à força.
 
 ### Ubuntu: Firefox e Thunderbird sem snap
 
@@ -68,19 +69,7 @@ Nas outras distros, os dois vêm do repositório nativo (no Debian puro,
 
 ## Como usar
 
-```bash
-git clone https://github.com/vinicgobbi/post-install.git
-cd post-install
-./setup.sh
-```
-
-O `setup.sh` se reexecuta com `sudo`, baixa o binário da última release para
-`amd64` (única arquitetura suportada), confere o SHA-256 e executa
-apontando `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` para a pasta do repositório. Para fixar uma
-versão: `POST_INSTALL_VERSION=v1.2.0 ./setup.sh`. Qualquer flag é repassada ao
-binário (ex.: `./setup.sh --dry-run`).
-
-### Pacote da release (sem clonar o repositório)
+### Pacote da release
 
 Cada release publica um pacote com o binário e a estrutura de pastas pronta:
 
@@ -103,8 +92,22 @@ sudo ./post-install/post-install
 
 Por padrão o binário procura `OVPN/` e `Wallpapers/` e grava em `logs/`
 **ao lado dele mesmo**, então funciona a partir de qualquer diretório. A release também
-traz o binário solto (`post-install-linux-amd64`, usado pelo `setup.sh`) e um
-`.sha256` para cada arquivo.
+traz o binário solto (`post-install-linux-amd64`) e um `.sha256` para cada
+arquivo. Só `amd64` é suportado.
+
+### Verificando o download
+
+O `.sha256` só prova que o arquivo chegou inteiro (ele vem da mesma release).
+Para provar que o binário foi compilado pela action deste repositório, a
+partir do código da tag, cada release tem um **atestado de proveniência**
+(Sigstore), verificável com o [GitHub CLI](https://cli.github.com/):
+
+```bash
+sha256sum -c post-install-linux-amd64.tar.gz.sha256
+gh attestation verify post-install-linux-amd64.tar.gz --repo vinicgobbi/post-install
+```
+
+Releases anteriores a essa mudança não têm atestado.
 
 ### Fluxo da TUI
 
@@ -162,7 +165,8 @@ automaticamente e roda todos os módulos (menos os de `--skip`); nesse caso
 
 ## Log em arquivo
 
-Cada execução grava dois arquivos em `logs/`:
+Cada execução grava dois arquivos em `logs/` (permissão `0600`, com dono
+transferido para o usuário alvo — o programa roda como root):
 
 - `setup_<timestamp>.log` — só as mensagens (info/aviso/erro/sucesso/passo),
   com hora e nível. Bom para uma leitura rápida.
@@ -173,7 +177,6 @@ Cada execução grava dois arquivos em `logs/`:
 ## Estrutura do projeto
 
 ```
-setup.sh                    # bootstrap: baixa o binário da release e executa
 cmd/post-install/main.go    # flags, verificação de root, TUI x modo texto
 internal/
   sysinfo/                  # detecção de distro/versão/gerenciador/desktop
@@ -266,7 +269,9 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
 - `extensoes.txt` — uma extensão (UUID) por linha; `#` comenta, o prefixo
   `-` mantém a extensão desativada (ex.: `-ding@rastersoft.com`) e uma URL
   git depois do UUID instala a extensão do repositório em vez do
-  extensions.gnome.org (ex.: a Now Bar);
+  extensions.gnome.org (ex.: a Now Bar). Depois da URL, opcionalmente, vem o
+  commit (ou tag) a instalar — recomendado, para uma mudança na branch
+  principal não chegar sozinha às instalações (sem ele, o módulo avisa);
 - `extensoes.dconf` — as preferências delas, no formato do `dconf dump`;
 - `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
   `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
@@ -292,7 +297,9 @@ alguma não tiver versão para o GNOME Shell da máquina, uma tela avisa que ela
 instaladas mesmo assim — com o aviso de que podem não funcionar
 corretamente. As marcadas recebem a versão mais recente publicada e o
 post-install liga `disable-extension-version-validation` (sem isso o GNOME
-recusa carregá-las; vale para todas as extensões do usuário). No modo texto
+recusa carregá-las; vale para todas as extensões do usuário, inclusive as
+instaladas depois — para reverter:
+`gsettings reset org.gnome.shell disable-extension-version-validation`). No modo texto
 a pergunta é feita por extensão (`[s/N]`); sem terminal, use
 `--force-extensions uuid1,uuid2` (ou `none`).
 
@@ -324,7 +331,10 @@ Antes de rodar, copie os arquivos `.ovpn` para a pasta `OVPN/` (veja
 
 1. Garante que o plugin OpenVPN do NetworkManager esteja instalado.
 2. Importa cada `OVPN/*.ovpn` como conexão do NetworkManager (reimportando do
-   zero em reexecuções, para não duplicar).
+   zero em reexecuções, para não duplicar). Só apaga uma conexão existente com
+   o mesmo nome se ela for do tipo VPN; se houver uma cabeada/Wi-Fi homônima,
+   o arquivo é pulado com um aviso. Também avisa quando um `.ovpn` (que
+   costuma ter chave privada embutida) é legível por qualquer usuário.
 3. Se o arquivo declarar `dhcp-option DNS` e/ou `dhcp-option DOMAIN`
    (`DOMAIN-SEARCH`), aplica esses valores na conexão via `nmcli`.
 
@@ -336,8 +346,9 @@ Requer Go (versão em `go.mod`).
 
 ```bash
 go test ./...
-go build -o post-install ./cmd/post-install   # o setup.sh usa ./post-install se existir
+go build -o post-install ./cmd/post-install
 ./post-install --dry-run                       # testa a TUI sem root e sem alterar nada
+sudo ./post-install                            # usa OVPN/, Wallpapers/, GNOME/ e logs/ do repositório
 ```
 
 ## Versionamento e releases
@@ -346,19 +357,49 @@ Os commits seguem [Conventional Commits](https://www.conventionalcommits.org/)
 (`feat:`, `fix:`, `refactor:`, `feat!:` ...). A cada push na `main`, a action
 `.github/workflows/release.yml`:
 
-1. roda `go vet` e `go test`;
+1. roda `go vet`, `go test`, `staticcheck` e `govulncheck`;
 2. usa o [commitizen](https://commitizen-tools.github.io/commitizen/) para
    calcular a próxima versão (`fix` → patch, `feat` → minor, `!`/`BREAKING
    CHANGE` → major), atualizar o `CHANGELOG.md`, criar o commit `bump: ...` e a
    tag `vX.Y.Z` — sem commit `feat`/`fix`/breaking desde a última tag, para aqui;
 3. compila o binário estático (`CGO_ENABLED=0`) para `amd64`, com a
-   versão embutida, empacota o `.tar.gz` com o binário + `OVPN/` + `Wallpapers/` + `GNOME/` + `logs/` e
-   sobe tudo como artefato;
+   versão embutida, empacota o `.tar.gz` com o binário + `OVPN/` + `Wallpapers/` + `GNOME/` + `logs/`,
+   gera o atestado de proveniência dos dois e sobe tudo como artefato;
 4. publica a release da tag com os binários soltos, os pacotes `.tar.gz` e os
    `.sha256`, e apaga os artefatos da action.
+
+As actions ficam fixadas pelo SHA do commit (com a tag num comentário), e o
+Dependabot (`.github/dependabot.yml`) abre PRs na `development` atualizando
+actions e módulos Go.
+
+## Segurança
+
+- **Grupos com poder de root.** O usuário alvo entra nos grupos `docker`
+  (módulo `ambiente_usuario`) e `libvirt`/`kvm` (módulo `virt_manager`).
+  Quem está no `docker` ou no `libvirt` consegue virar root (ex.: montando
+  `/` num contêiner ou numa VM) — é o comportamento normal dessas
+  ferramentas numa workstation de desenvolvimento, mas vale saber.
+- **Chaves de repositório conferidas.** As chaves de Docker, Microsoft,
+  GitHub CLI, Mozilla, Google e Tailscale são baixadas e comparadas com o
+  fingerprint esperado antes de entrarem no sistema; a do Chaotic-AUR é
+  buscada pelo fingerprint completo.
+- **Versões fixadas.** Os repositórios pessoais executados (Dotfiles,
+  vscode_nautilus, nautilus-copypath) ficam fixados num commit e os ícones
+  Yaru numa tag com SHA-256 (constantes no topo de
+  `internal/modules/desktop.go`); a regra UDEV do Solaar vem embutida no
+  binário. Para atualizar, troque os valores lá. Assets de release do GitHub
+  (GCM, adw-gtk3, deploy-dev) são conferidos pelo SHA-256 que o GitHub
+  publica.
+- **Scripts de instalação remotos.** fnm, rustup e Claude Code ainda são
+  instalados pelo `curl | sh` oficial de cada um, como o usuário alvo (não
+  como root). O Tailscale vem do repositório oficial assinado.
+- **O que não é verificado.** O `.deb` do Chrome e os pacotes do Bitwarden
+  são baixados por HTTPS dos sites oficiais, sem conferência de assinatura
+  pelo post-install (o Chrome passa a se atualizar pelo repositório assinado
+  do Google depois de instalado; no Fedora/RHEL ele já é instalado pelo
+  repositório).
 
 ## Requisitos
 
 - Acesso root (`sudo`) — exceto em `--dry-run`.
-- `curl` ou `wget` para o `setup.sh` baixar o binário.
 - Terminal interativo para a TUI (sem ele, o modo texto é usado).

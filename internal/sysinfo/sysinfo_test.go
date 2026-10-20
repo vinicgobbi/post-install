@@ -46,9 +46,12 @@ VERSION_CODENAME=wilma`, upstream: "DISTRIB_CODENAME=noble", family: "debian", c
 		{name: "debian bookworm", osRelease: `ID=debian
 VERSION_ID="12"
 VERSION_CODENAME=bookworm`, family: "debian", codename: "bookworm", version: "12", msSupported: true},
-		{name: "debian trixie sem repo MS", osRelease: `ID=debian
+		{name: "debian trixie", osRelease: `ID=debian
 VERSION_ID="13"
-VERSION_CODENAME=trixie`, family: "debian", codename: "trixie", version: "13"},
+VERSION_CODENAME=trixie`, family: "debian", codename: "trixie", version: "13", msSupported: true},
+		{name: "debian forky sem repo MS", osRelease: `ID=debian
+VERSION_ID="14"
+VERSION_CODENAME=forky`, family: "debian", codename: "forky", version: "14"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

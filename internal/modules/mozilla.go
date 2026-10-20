@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"os"
 	"strconv"
 	"strings"
 
@@ -45,44 +44,8 @@ func usaFormatoDeb822(versao string) bool {
 	return ma > 24 || (ma == 24 && mi > 4)
 }
 
-// fingerprintMozilla confere a chave como na instrução da Mozilla: a linha
-// logo após "pub" na saída do gpg tem que ser o fingerprint esperado. O gpg
-// roda com um --homedir temporário: como root numa instalação nova, o
-// /root/.gnupg não existe e o "gpg -n" falha em vez de criá-lo.
-func fingerprintMozilla(c *Ctx, chave string) error {
-	home := c.Temp("gnupg")
-	if err := os.MkdirAll(home, 0o700); err != nil {
-		return err
-	}
-	out, err := c.Output("gpg", "--homedir", home, "-n", "-q", "--import", "--import-options", "import-show", chave)
-	if err != nil {
-		return err
-	}
-	linhas := strings.Split(out, "\n")
-	for i, l := range linhas {
-		if strings.HasPrefix(l, "pub") && i+1 < len(linhas) {
-			if fp := strings.TrimSpace(linhas[i+1]); fp != mozillaFingerprint {
-				return errorf("fingerprint da chave da Mozilla (%s) não confere com o esperado (%s)", fp, mozillaFingerprint)
-			}
-			c.Log.Infof("Fingerprint da chave da Mozilla confere (%s).", mozillaFingerprint)
-			return nil
-		}
-	}
-	return errorf("não foi possível ler o fingerprint da chave da Mozilla")
-}
-
 func configurarRepoMozilla(c *Ctx) error {
 	c.Log.Infof("Configurando o repositório APT da Mozilla (Firefox e Thunderbird sem snap)...")
-
-	tmp := c.Temp("packages.mozilla.org.asc")
-	if err := c.Download("https://packages.mozilla.org/apt/repo-signing-key.gpg", tmp); err != nil {
-		return err
-	}
-	if !c.DryRun {
-		if err := fingerprintMozilla(c, tmp); err != nil {
-			return err
-		}
-	}
 
 	// Um único arquivo para as duas suítes; remove o do outro formato, se
 	// existir (ex.: configurado à mão antes), para o apt não acusar
@@ -99,8 +62,9 @@ func configurarRepoMozilla(c *Ctx) error {
 	}
 
 	return step(
-		func() error { return c.Run("install", "-d", "-m", "0755", "/etc/apt/keyrings") },
-		func() error { return c.Run("install", "-m", "0644", tmp, mozillaKeyring) },
+		func() error {
+			return instalarChaveAPT(c, "https://packages.mozilla.org/apt/repo-signing-key.gpg", mozillaKeyring, mozillaFingerprint)
+		},
 		func() error { return c.RemoveAll(antigo) },
 		func() error { return c.WriteFile(arquivo, conteudo, 0o644) },
 		func() error { return c.WriteFile("/etc/apt/preferences.d/mozilla", mozillaPreferences, 0o644) },

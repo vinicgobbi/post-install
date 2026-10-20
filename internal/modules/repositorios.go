@@ -1,8 +1,11 @@
 package modules
 
 import (
+	"errors"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/vinicgobbi/post-install/internal/runner"
 )
@@ -35,10 +38,48 @@ var atualizacao = Module{
 
 // Chave GPG oficial do Chaotic-AUR (aur.chaotic.cx) — repo binário que serve
 // pacotes pré-compilados da AUR (yay incluso), evitando compilar tudo na mão.
+// Pelo fingerprint completo: buscando assim, o gpg descarta qualquer chave do
+// keyserver que não seja exatamente esta.
 const (
-	chaoticAURKey  = "3056513887B78AEB"
+	chaoticAURKey  = "EF925EA60F33D0CB85C44AD13056513887B78AEB"
 	sudoersAURFile = "/etc/sudoers.d/99-post-install-aur"
 )
+
+// Fingerprints das chaves primárias que assinam cada repositório. As chaves
+// são baixadas dos sites oficiais e conferidas contra estes valores antes de
+// serem instaladas, para um download adulterado não virar repositório
+// confiável do sistema.
+const (
+	fprDockerAPT = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+	fprDockerRPM = "060A61C51B558A7F742B77AAC52FEB6B621E9F35"
+	fprMicrosoft = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+	// O keyring do GitHub CLI traz a chave atual e a anterior (expirada).
+	fprGitHubCLI    = "7F38BBB59D064DBCB3D84D725612B36462313325"
+	fprGitHubCLIOld = "2C6106201985B60E6C7AC87323F3D4EA75716059"
+)
+
+// importarChaveRPM baixa uma chave, confere o fingerprint e importa no rpm.
+// Assim o dnf já encontra a chave importada e não aceita sozinho (com -y) a
+// que viesse pela URL do gpgkey do .repo.
+func importarChaveRPM(c *Ctx, url, nome string, fprs ...string) error {
+	chave := c.Temp(nome)
+	return step(
+		func() error { return c.Download(url, chave) },
+		func() error { return c.VerifyKey(chave, fprs...) },
+		func() error { return c.Run("rpm", "--import", chave) },
+	)
+}
+
+// instalarChaveAPT baixa uma chave para /etc/apt/keyrings só depois de
+// conferir o fingerprint.
+func instalarChaveAPT(c *Ctx, url, destino string, fprs ...string) error {
+	tmp := c.Temp(filepath.Base(destino))
+	return step(
+		func() error { return c.Download(url, tmp) },
+		func() error { return c.VerifyKey(tmp, fprs...) },
+		func() error { return c.Run("install", "-D", "-m", "0644", tmp, destino) },
+	)
+}
 
 var repositorios = Module{
 	ID:    "repositorios",
@@ -105,8 +146,10 @@ func configurarChaoticAUR(c *Ctx) error {
 
 // O yay (e o makepkg por baixo) recusa rodar como root, mas este programa
 // roda via sudo. Sem essa liberação, todo módulo que instala algo da AUR
-// pararia pedindo senha. A regra é restrita (só o binário do pacman) e
-// temporária: removida pelo módulo "limpeza".
+// pararia pedindo senha. Atenção: pacman como root com argumentos livres
+// equivale a root completo, então a regra é temporária — o main chama
+// RemoverRegraSudoTemporaria no início e no fim de toda execução, seja qual
+// for o resultado (falha, --fail-fast, Ctrl+C, módulo de limpeza desmarcado).
 func permitirSudoPacmanTemporario(c *Ctx) error {
 	if _, err := os.Stat(sudoersAURFile); err == nil {
 		return nil
@@ -122,6 +165,17 @@ func permitirSudoPacmanTemporario(c *Ctx) error {
 	return nil
 }
 
+// RemoverRegraSudoTemporaria apaga a regra criada por
+// permitirSudoPacmanTemporario, se existir (inclusive a que tenha sobrado de
+// uma execução anterior interrompida). Devolve se havia algo a remover.
+func RemoverRegraSudoTemporaria() (bool, error) {
+	err := os.Remove(sudoersAURFile)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // instalarYay tenta primeiro o binário pronto do Chaotic-AUR; se não estiver
 // disponível, compila da AUR como o usuário alvo.
 func instalarYay(c *Ctx) error {
@@ -133,13 +187,15 @@ func instalarYay(c *Ctx) error {
 		return nil
 	}
 	c.Log.Infof("yay não encontrado como binário no Chaotic-AUR; compilando da AUR...")
-	err := c.AsUser(`
-rm -rf /tmp/yay-build
-git clone https://aur.archlinux.org/yay.git /tmp/yay-build
-cd /tmp/yay-build
+	// Diretório criado com mktemp (dono e nome exclusivos), e não um caminho
+	// fixo em /tmp que outro usuário local poderia criar antes.
+	err := c.AsUser(`set -e
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+git clone https://aur.archlinux.org/yay.git "$dir"
+cd "$dir"
 makepkg -si --noconfirm
 `)
-	c.RemoveAll("/tmp/yay-build")
 	if err != nil {
 		return err
 	}
@@ -175,10 +231,17 @@ func repositoriosDNF(c *Ctx) error {
 		msRepo = "https://packages.microsoft.com/config/rhel/" + c.Sys.RHELVersion + "/prod.repo"
 	}
 
+	dockerKey := strings.TrimSuffix(dockerRepo, "docker-ce.repo") + "gpg"
 	return step(
+		func() error { return importarChaveRPM(c, dockerKey, "docker.gpg", fprDockerRPM) },
+		func() error {
+			return importarChaveRPM(c, "https://packages.microsoft.com/keys/microsoft.asc", "microsoft.asc", fprMicrosoft)
+		},
+		func() error {
+			return importarChaveRPM(c, "https://cli.github.com/packages/githubcli-archive-keyring.asc", "githubcli.asc", fprGitHubCLI, fprGitHubCLIOld)
+		},
 		func() error { return c.Download(dockerRepo, "/etc/yum.repos.d/docker-ce.repo") },
 		func() error { return c.Download(msRepo, "/etc/yum.repos.d/msprod.repo") },
-		func() error { return c.Run("rpm", "--import", "https://packages.microsoft.com/keys/microsoft.asc") },
 		func() error { return c.WriteFile("/etc/yum.repos.d/vscode.repo", vscodeYumRepo, 0o644) },
 		func() error {
 			return c.Download("https://cli.github.com/packages/rpm/gh-cli.repo", "/etc/yum.repos.d/gh-cli.repo")
@@ -192,9 +255,8 @@ func repositoriosAPT(c *Ctx) error {
 		func() error { return c.MkdirAll("/etc/apt/keyrings", 0o755) },
 		func() error { return c.install("ca-certificates", "curl", "gnupg", "ufw", "gufw") },
 		func() error {
-			return c.Download("https://download.docker.com/linux/"+s.DockerDistro+"/gpg", "/etc/apt/keyrings/docker.asc")
+			return instalarChaveAPT(c, "https://download.docker.com/linux/"+s.DockerDistro+"/gpg", "/etc/apt/keyrings/docker.asc", fprDockerAPT)
 		},
-		func() error { return c.Chmod("/etc/apt/keyrings/docker.asc", 0o644) },
 		func() error {
 			return c.WriteFile("/etc/apt/sources.list.d/docker.sources", "Types: deb\n"+
 				"Architectures: "+s.Arch+"\n"+
@@ -233,9 +295,9 @@ func repositoriosAPT(c *Ctx) error {
 	// o "gh" dos repositórios da distro fica bem atrás das releases.
 	err = step(
 		func() error {
-			return c.Download("https://cli.github.com/packages/githubcli-archive-keyring.gpg", "/etc/apt/keyrings/githubcli-archive-keyring.gpg")
+			return instalarChaveAPT(c, "https://cli.github.com/packages/githubcli-archive-keyring.gpg",
+				"/etc/apt/keyrings/githubcli-archive-keyring.gpg", fprGitHubCLI, fprGitHubCLIOld)
 		},
-		func() error { return c.Chmod("/etc/apt/keyrings/githubcli-archive-keyring.gpg", 0o644) },
 		func() error {
 			return c.WriteFile("/etc/apt/sources.list.d/github-cli.list",
 				"deb [arch="+s.Arch+" signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n", 0o644)
@@ -248,6 +310,7 @@ func repositoriosAPT(c *Ctx) error {
 	asc := c.Temp("microsoft.asc")
 	return step(
 		func() error { return c.Download("https://packages.microsoft.com/keys/microsoft.asc", asc) },
+		func() error { return c.VerifyKey(asc, fprMicrosoft) },
 		func() error {
 			return c.Run("gpg", "--batch", "--yes", "--dearmor", "-o", "/etc/apt/keyrings/packages.microsoft.gpg", asc)
 		},

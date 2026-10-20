@@ -26,16 +26,21 @@ var ovpn = Module{
 			return nil
 		}
 
-		existentes, _ := c.Output("nmcli", "-g", "NAME", "connection", "show")
+		saida, _ := c.Output("nmcli", "-g", "NAME,TYPE", "connection", "show")
+		existentes := conexoesNM(saida)
 		for _, arquivo := range arquivos {
 			nome := strings.TrimSuffix(filepath.Base(arquivo), ".ovpn")
+			avisarPermissaoOVPN(c, arquivo)
 
-			// Reimporta do zero para continuar idempotente em reexecuções.
-			for _, n := range strings.Split(existentes, "\n") {
-				if n == nome {
-					c.Try("nmcli", "connection", "delete", nome)
-					break
+			// Reimporta do zero para continuar idempotente em reexecuções —
+			// mas só apaga se a conexão com esse nome for mesmo uma VPN, para
+			// não levar junto uma conexão cabeada/Wi-Fi homônima.
+			if tipo, ok := existentes[nome]; ok {
+				if tipo != "vpn" {
+					c.Log.Warnf("Já existe uma conexão '%s' do tipo %s (não VPN): pulando %s para não sobrescrevê-la.", nome, tipo, filepath.Base(arquivo))
+					continue
 				}
+				c.Try("nmcli", "connection", "delete", "id", nome)
 			}
 			if !c.Try("nmcli", "connection", "import", "type", "openvpn", "file", arquivo) {
 				c.Log.Warnf("Falha ao importar %s, pulando.", arquivo)
@@ -60,6 +65,45 @@ var ovpn = Module{
 		}
 		return nil
 	},
+}
+
+// conexoesNM interpreta a saída de "nmcli -g NAME,TYPE connection show"
+// (nome -> tipo). No modo -g, ":" e "\" dentro dos valores vêm escapados
+// com "\".
+func conexoesNM(saida string) map[string]string {
+	out := map[string]string{}
+	for _, linha := range strings.Split(saida, "\n") {
+		if linha == "" {
+			continue
+		}
+		var campos []string
+		var atual strings.Builder
+		for i := 0; i < len(linha); i++ {
+			switch {
+			case linha[i] == '\\' && i+1 < len(linha):
+				i++
+				atual.WriteByte(linha[i])
+			case linha[i] == ':':
+				campos = append(campos, atual.String())
+				atual.Reset()
+			default:
+				atual.WriteByte(linha[i])
+			}
+		}
+		campos = append(campos, atual.String())
+		if len(campos) == 2 {
+			out[campos[0]] = campos[1]
+		}
+	}
+	return out
+}
+
+// avisarPermissaoOVPN avisa quando um .ovpn (que costuma trazer chave privada
+// e certificados embutidos) pode ser lido por qualquer usuário da máquina.
+func avisarPermissaoOVPN(c *Ctx, arquivo string) {
+	if info, err := os.Stat(arquivo); err == nil && info.Mode().Perm()&0o004 != 0 {
+		c.Log.Warnf("%s pode ser lido por qualquer usuário (permissão %o) e costuma conter chaves privadas: considere 'chmod 600'.", filepath.Base(arquivo), info.Mode().Perm())
+	}
 }
 
 // O pacote "-gnome" só traz o diálogo de autenticação GTK; no Plasma quem
@@ -164,10 +208,6 @@ var limpeza = Module{
 			if err == nil {
 				err = c.Run("pacman", "-Sc", "--noconfirm")
 			}
-			if _, statErr := os.Stat(sudoersAURFile); statErr == nil {
-				c.RemoveAll(sudoersAURFile)
-				c.Log.Infof("Regra temporária de sudo sem senha para o pacman (liberada para o yay) removida.")
-			}
 		default:
 			err = step(
 				func() error { return c.Run("apt", "autoremove", "-y") },
@@ -178,10 +218,11 @@ var limpeza = Module{
 			return err
 		}
 
-		// Remove só o que esta execução criou em /tmp (diretório de trabalho
-		// e clones feitos pelos módulos), sem varrer o /tmp inteiro.
-		for _, p := range []string{c.WorkDir, "/tmp/yay-build", "/tmp/vscode_nautilus", "/tmp/nautilus-copypath"} {
-			c.RemoveAll(p)
+		// Os clones feitos como usuário usam mktemp e se apagam sozinhos; aqui
+		// só sobra o diretório de trabalho desta execução (o main também o
+		// remove ao sair, isto só libera o espaço mais cedo).
+		if err := c.RemoveAll(c.WorkDir); err != nil {
+			c.Log.Warnf("Não foi possível remover %s: %v", c.WorkDir, err)
 		}
 		c.Log.Successf("Instalação finalizada com sucesso!")
 		c.Log.Infof("Recomenda-se reiniciar a máquina para aplicar as mudanças de grupo e kernel.")

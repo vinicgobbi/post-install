@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -168,6 +169,14 @@ func run() int {
 		return fail("%v", err)
 	}
 
+	// A regra temporária de sudo sem senha para o pacman (Arch) equivale a
+	// root completo: some no início (sobra de uma execução interrompida) e
+	// no fim de toda execução, com qualquer resultado.
+	if !o.dryRun {
+		removerRegraSudo(out)
+		defer removerRegraSudo(out)
+	}
+
 	sel, err := initialSelection(all, o.modules, o.skip)
 	if err != nil {
 		return fail("%v", err)
@@ -217,6 +226,11 @@ func run() int {
 		log.Infof("Configuração será aplicada para: %s", esc.User)
 		if log.CleanPath != "" {
 			log.Infof("Log desta execução: %s", log.CleanPath)
+			if !o.dryRun {
+				if err := chownLogs(log, esc.User); err != nil {
+					log.Warnf("Não foi possível passar os logs para %s: %v", esc.User, err)
+				}
+			}
 		}
 		c := &modules.Ctx{
 			Runner:          &runner.Runner{Ctx: ctx, Log: log, User: esc.User, DryRun: o.dryRun, WorkDir: workDir},
@@ -413,10 +427,37 @@ func initialSelection(all []modules.Module, only, skip string) ([]bool, error) {
 	return sel, nil
 }
 
+// removerRegraSudo apaga a regra temporária de sudo do pacman, avisando se
+// havia uma.
+func removerRegraSudo(out *plain.Printer) {
+	removida, err := modules.RemoverRegraSudoTemporaria()
+	switch {
+	case err != nil:
+		out.Handle(runlog.Entry{Level: runlog.Error, Text: fmt.Sprintf("Falha ao remover a regra temporária de sudo do pacman: %v — apague-a à mão.", err)})
+	case removida:
+		out.Info("Regra temporária de sudo sem senha para o pacman removida.")
+	}
+}
+
+// chownLogs passa os logs desta execução para o usuário alvo.
+func chownLogs(log *runlog.Logger, user string) error {
+	ids := make([]int, 2)
+	for i, flag := range []string{"-u", "-g"} {
+		out, err := exec.Command("id", flag, "--", user).Output()
+		if err != nil {
+			return err
+		}
+		if ids[i], err = strconv.Atoi(strings.TrimSpace(string(out))); err != nil {
+			return err
+		}
+	}
+	return log.Chown(ids[0], ids[1])
+}
+
 // validateUser usa "id" (e não os/user) para resolver também contas de
 // domínio (AD/LDAP via NSS), já que o binário é compilado sem cgo.
 func validateUser(name string) error {
-	if err := exec.Command("id", "-u", name).Run(); err != nil {
+	if err := exec.Command("id", "-u", "--", name).Run(); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			return fmt.Errorf("usuário '%s' não existe neste sistema", name)

@@ -130,6 +130,8 @@ func fromRelease(rel, upstream map[string]string) (*Info, error) {
 				info.DistroVersion, info.MSRepoSupported = "11", true
 			case "bookworm":
 				info.DistroVersion, info.MSRepoSupported = "12", true
+			case "trixie":
+				info.DistroVersion, info.MSRepoSupported = "13", true
 			default:
 				info.DistroVersion = info.VersionID
 			}
