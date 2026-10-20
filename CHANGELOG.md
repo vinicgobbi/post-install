@@ -1,3 +1,9 @@
+## v1.6.0 (2026-10-20)
+
+### Feat
+
+- endurece a segurança da instalação
+
 ## v1.5.0 (2026-10-17)
 
 ### Feat
