@@ -63,6 +63,7 @@ func All() []Module {
 		extensoesGnome,
 		atalhosGnome,
 		rustTools,
+		ruby,
 		claudeCode,
 		deployDev,
 		vscodeNautilus,

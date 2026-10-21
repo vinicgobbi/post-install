@@ -6,8 +6,8 @@ VSCode, PHP + SQL Server, ferramentas de terminal (gh, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
 temas/ícones GNOME, extensões e atalhos do GNOME, o ambiente do usuário (zsh,
-Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update), Claude
-Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
+Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update),
+Ruby (Bundler e Jekyll), Claude Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
 VSCode"/"Copiar caminho" no Nautilus.
 
 ## Sistemas suportados
@@ -211,7 +211,7 @@ internal/
     mirrors.go              #   mirrors (dnf, reflector no Arch, teste de velocidade no Ubuntu)
     repositorios.go         #   atualização, repositórios/Chaotic-AUR+yay, pacotes base
     apps.go                 #   Solaar, LibreOffice, Flatpaks, Tailscale, PHP, Chrome+GCM, Bitwarden
-    desktop.go              #   temas/ícones, ambiente do usuário, Rust, Claude Code, deploy-dev, Nautilus/Dolphin
+    desktop.go              #   temas/ícones, ambiente do usuário, Rust, Ruby, Claude Code, deploy-dev, Nautilus/Dolphin
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
@@ -381,6 +381,25 @@ disposição do menu é zerada, para o GNOME reordenar tudo.
 Um app instalado depois que se encaixe em duas pastas aparece nas duas, já
 que as exclusões são calculadas na hora da execução; basta rodar de novo
 `sudo ./post-install --modules apps_gnome` para reorganizar.
+
+## Ruby, Bundler e Jekyll
+
+O módulo `ruby` instala o Ruby com os headers de desenvolvimento e o que as
+gems nativas precisam para compilar (`ruby-full`, `ruby-dev`,
+`build-essential` e `zlib1g-dev` no Debian/Ubuntu; `ruby`, `ruby-devel`,
+`rubygems` e compiladores no Fedora/RHEL; `ruby`, `rubygems` e `base-devel`
+no Arch). O Bundler e o Jekyll são instalados **como gems do usuário**, como
+recomenda a documentação do Jekyll, e nada de Ruby exige `sudo` depois:
+
+- `GEM_HOME=~/.local/share/gem` (com `~/.local/share/gem/bin` no `PATH`) é
+  acrescentado ao `~/.zshrc` e ao `~/.bashrc`: `gem install` grava na home;
+- `bundle config set --global path vendor/bundle` (em `~/.bundle/config`):
+  o `bundle install` de cada projeto grava as gems dentro do próprio projeto,
+  em `vendor/bundle` — que o Jekyll já ignora no build e o `.gitignore` do
+  `jekyll new` já exclui.
+
+Para um projeto específico usar as gems do usuário (`GEM_HOME`) em vez de
+`vendor/bundle`: `bundle config set --local path.system true`.
 
 ## Importação de perfis OpenVPN
 
