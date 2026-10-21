@@ -1,3 +1,12 @@
+## v1.8.0 (2026-10-21)
+
+### Feat
+
+- nomes das pastas do menu de apps seguem o idioma do sistema
+- fixa os favoritos e organiza o menu de apps do GNOME em pastas
+- instala o cargo-update junto com eza e topgrade
+- verifica se há versão nova e oferece atualizar ao iniciar
+
 ## v1.7.0 (2026-10-20)
 
 ### Feat
