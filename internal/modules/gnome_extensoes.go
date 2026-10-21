@@ -371,13 +371,17 @@ func parseStrv(s string) []string {
 	return out
 }
 
-// strv monta uma lista GVariant de strings, escapando "\" e "'" (sintaxe
-// de texto do GVariant), para um item estranho não quebrar o gsettings.
+var gvEscape = strings.NewReplacer(`\`, `\\`, `'`, `\'`)
+
+// gvString monta uma string GVariant, escapando "\" e "'" (sintaxe de texto
+// do GVariant), para um valor estranho não quebrar o gsettings/dconf.
+func gvString(s string) string { return "'" + gvEscape.Replace(s) + "'" }
+
+// strv monta uma lista GVariant de strings (veja gvString).
 func strv(items []string) string {
-	esc := strings.NewReplacer(`\`, `\\`, `'`, `\'`)
 	quoted := make([]string, len(items))
 	for i, it := range items {
-		quoted[i] = "'" + esc.Replace(it) + "'"
+		quoted[i] = gvString(it)
 	}
 	return "[" + strings.Join(quoted, ", ") + "]"
 }

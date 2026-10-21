@@ -2,7 +2,10 @@ package modules
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -147,6 +150,157 @@ func TestAjustarDNFConf(t *testing.T) {
 	for _, tt := range tests {
 		if got := ajustarDNFConf(tt.in); got != tt.want {
 			t.Errorf("ajustarDNFConf(%q) = %q, esperado %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestLerDesktop(t *testing.T) {
+	dir := t.TempDir()
+	escrever := func(nome, conteudo string) string {
+		p := filepath.Join(dir, nome)
+		if err := os.WriteFile(p, []byte(conteudo), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	gnome := []string{"ubuntu", "GNOME"}
+	tests := []struct {
+		nome, conteudo string
+		visivel        bool
+		cats           []string
+	}{
+		{"ok.desktop", "[Desktop Entry]\nType=Application\nCategories=Game;Network;\n[Desktop Action x]\nCategories=Office;\n", true, []string{"Game", "Network"}},
+		{"nodisplay.desktop", "[Desktop Entry]\nType=Application\nNoDisplay=true\n", false, nil},
+		{"kde.desktop", "[Desktop Entry]\nType=Application\nOnlyShowIn=KDE;\n", false, nil},
+		{"notgnome.desktop", "[Desktop Entry]\nType=Application\nNotShowIn=GNOME;\n", false, nil},
+		{"ubuntu.desktop", "[Desktop Entry]\nType=Application\nOnlyShowIn=ubuntu;\nCategories=System;\n", true, []string{"System"}},
+		{"tryexec.desktop", "[Desktop Entry]\nType=Application\nTryExec=/nao/existe\n", false, nil},
+		{"link.desktop", "[Desktop Entry]\nType=Link\n", false, nil},
+	}
+	for _, tt := range tests {
+		cats, vis := lerDesktop(escrever(tt.nome, tt.conteudo), gnome)
+		if vis != tt.visivel || !slices.Equal(cats, tt.cats) {
+			t.Errorf("%s: visível %v cats %v, esperado %v %v", tt.nome, vis, cats, tt.visivel, tt.cats)
+		}
+	}
+
+	// ID de subpasta e prioridade: o primeiro diretório vence, mesmo oculto.
+	alta, baixa := filepath.Join(dir, "alta"), filepath.Join(dir, "baixa")
+	os.MkdirAll(filepath.Join(baixa, "kde"), 0o755)
+	os.MkdirAll(alta, 0o755)
+	os.WriteFile(filepath.Join(alta, "x.desktop"), []byte("[Desktop Entry]\nType=Application\nHidden=true\n"), 0o644)
+	os.WriteFile(filepath.Join(baixa, "x.desktop"), []byte("[Desktop Entry]\nType=Application\n"), 0o644)
+	os.WriteFile(filepath.Join(baixa, "kde", "y.desktop"), []byte("[Desktop Entry]\nType=Application\n"), 0o644)
+	apps := appsInstalados([]string{alta, baixa}, gnome)
+	if _, ok := apps["x.desktop"]; ok {
+		t.Error("x.desktop oculto no diretório de maior prioridade não deveria aparecer")
+	}
+	if _, ok := apps["kde-y.desktop"]; !ok {
+		t.Errorf("ID de subpasta não montado: %v", apps)
+	}
+}
+
+func TestOrganizarPastas(t *testing.T) {
+	pastas, err := lerPastas("../../GNOME/pastas.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Amostra real (Ubuntu 26.04 com os Flatpaks do post-install).
+	apps := map[string][]string{
+		"com.valvesoftware.Steam.desktop":          {"Network", "FileTransfer", "Game"},
+		"org.gnome.Boxes.desktop":                  {"GNOME", "GTK", "System", "Development", "Emulator"},
+		"com.microsoft.VSCode.desktop":             {"TextEditor", "Development", "IDE"},
+		"dev.vencord.Vesktop.desktop":              {"Network"},
+		"org.remmina.Remmina.desktop":              {"GTK", "GNOME", "X-GNOME-NetworkSettings", "Network"},
+		"org.telegram.desktop.desktop":             {"Chat", "Network", "InstantMessaging", "Qt"},
+		"firefox.desktop":                          {"GNOME", "GTK", "Network", "WebBrowser"},
+		"org.gnome.Papers.desktop":                 {"GNOME", "GTK", "Office", "Viewer", "Graphics", "2DGraphics", "VectorGraphics"},
+		"com.spotify.Client.desktop":               {"Audio", "Music", "Player", "AudioVideo"},
+		"org.gnome.DiskUtility.desktop":            {"GNOME", "GTK", "Utility", "X-GNOME-Utilities", "Settings", "HardwareSettings"},
+		"org.gnome.Calculator.desktop":             {"GNOME", "GTK", "Utility", "Calculator"},
+		"com.github.tchx84.Flatseal.desktop":       {"Utility"},
+		"org.libreoffice.LibreOffice.draw.desktop": {"Office", "FlowChart", "Graphics", "2DGraphics", "VectorGraphics"},
+		"sem-categoria.desktop":                    nil,
+	}
+	org := organizarPastas(pastas, apps)
+	pastaDe := func(id string) string {
+		for i, o := range org {
+			if slices.Contains(o.membros, id) {
+				return pastas[i].Nome
+			}
+		}
+		return ""
+	}
+	esperado := map[string]string{
+		"com.valvesoftware.Steam.desktop":          "Games",
+		"org.gnome.Boxes.desktop":                  "System", // forçado em "apps", apesar de Development
+		"com.microsoft.VSCode.desktop":             "Development",
+		"dev.vencord.Vesktop.desktop":              "Communication",
+		"org.remmina.Remmina.desktop":              "Internet",
+		"org.telegram.desktop.desktop":             "Communication",
+		"firefox.desktop":                          "Internet",
+		"org.gnome.Papers.desktop":                 "Office",
+		"com.spotify.Client.desktop":               "Multimedia",
+		"org.gnome.DiskUtility.desktop":            "System",
+		"org.gnome.Calculator.desktop":             "Utilities",
+		"com.github.tchx84.Flatseal.desktop":       "System",
+		"org.libreoffice.LibreOffice.draw.desktop": "Office",
+		"sem-categoria.desktop":                    "",
+	}
+	for id, want := range esperado {
+		if got := pastaDe(id); got != want {
+			t.Errorf("%s ficou em %q, esperado %q", id, got, want)
+		}
+	}
+	// O GNOME mostraria a Steam também em Internet e o Boxes em
+	// Development (pelas categorias): precisam estar excluídos lá.
+	idx := func(nome string) int { return slices.IndexFunc(pastas, func(p pasta) bool { return p.Nome == nome }) }
+	if !slices.Contains(org[idx("Internet")].excluidos, "com.valvesoftware.Steam.desktop") ||
+		!slices.Contains(org[idx("Development")].excluidos, "org.gnome.Boxes.desktop") {
+		t.Errorf("excluded-apps incompletos: Internet %v / Desenvolvimento %v", org[idx("Internet")].excluidos, org[idx("Development")].excluidos)
+	}
+	// Forçados sem categoria que bata precisam ir em "apps"; os que batem, não.
+	if !slices.Contains(org[idx("Communication")].apps, "dev.vencord.Vesktop.desktop") ||
+		slices.Contains(org[idx("Communication")].apps, "org.telegram.desktop.desktop") {
+		t.Errorf("apps de Communication = %v", org[idx("Communication")].apps)
+	}
+
+	// Só o .directory do sistema "instalado": as demais caem no nome fixo.
+	conf := dconfPastas(pastas, org, func(d string) bool { return d == "X-GNOME-Shell-System.directory" })
+	for _, trecho := range []string{
+		"folder-children=['games', 'development', 'office', 'communication', 'internet', 'multimedia', 'system', 'utilities']",
+		"[folders/system]\nname='X-GNOME-Shell-System.directory'\ntranslate=true\n",
+		"[folders/games]\nname='Games'\ntranslate=false\n",
+		"[folders/communication]\nname='Communication'\ntranslate=false\n",
+		"apps=@as []",
+	} {
+		if !strings.Contains(conf, trecho) {
+			t.Errorf("dconf sem %q:\n%s", trecho, conf)
+		}
+	}
+}
+
+func TestEscolherFavoritos(t *testing.T) {
+	favs, err := lerFavoritos("../../GNOME/favoritos.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Debian: GNOME Terminal no lugar do Ptyxis, sem loja nem Spotify.
+	apps := map[string][]string{
+		"org.gnome.Settings.desktop": nil, "org.gnome.Nautilus.desktop": nil,
+		"org.gnome.Terminal.desktop": nil, "google-chrome.desktop": nil,
+	}
+	got := escolherFavoritos(favs, apps)
+	want := []string{"org.gnome.Settings.desktop", "org.gnome.Nautilus.desktop", "org.gnome.Terminal.desktop", "google-chrome.desktop"}
+	if !slices.Equal(got, want) {
+		t.Errorf("escolherFavoritos = %v, esperado %v", got, want)
+	}
+}
+
+func TestIdPasta(t *testing.T) {
+	for nome, want := range map[string]string{"Comunicação": "comunicacao", "Sound & Video": "sound---video", "Games": "games"} {
+		if got := idPasta(nome); got != want {
+			t.Errorf("idPasta(%q) = %q, esperado %q", nome, got, want)
 		}
 	}
 }

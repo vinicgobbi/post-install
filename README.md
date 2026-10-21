@@ -6,7 +6,7 @@ VSCode, PHP + SQL Server, ferramentas de terminal (gh, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
 temas/ícones GNOME, extensões e atalhos do GNOME, o ambiente do usuário (zsh,
-Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade), Claude
+Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update), Claude
 Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
 VSCode"/"Copiar caminho" no Nautilus.
 
@@ -79,7 +79,7 @@ post-install-linux-amd64.tar.gz
     ├── post-install      # binário
     ├── OVPN/README.md    # coloque aqui os .ovpn a importar
     ├── Wallpapers/       # papéis de parede oferecidos na TUI
-    ├── GNOME/            # extensões (lista e configurações) e atalhos do GNOME
+    ├── GNOME/            # extensões, atalhos, favoritos e pastas do GNOME
     ├── logs/             # logs de cada execução
     └── README.md
 ```
@@ -215,6 +215,7 @@ internal/
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
+    gnome_apps.go           #   favoritos e pastas do menu de apps (por categoria)
     sistema.go              #   OpenVPN, virt-manager, limpeza
   config/flatpaks.go        # listas de Flatpaks (GTK, KDE, jogos)
   update/                   # verificação e aplicação de versão nova (release do GitHub)
@@ -347,6 +348,39 @@ Para atualizar a partir de uma máquina já configurada, use
 `dconf dump /org/gnome/settings-daemon/plugins/media-keys/` e
 `dconf dump /org/gnome/shell/keybindings/`, e ajuste os nomes das seções
 para ficarem relativos a `/org/gnome/`.
+
+## Favoritos e pastas do menu de apps
+
+O módulo `apps_gnome` (pulado no Plasma) roda perto do fim, depois de tudo
+instalado, e organiza o que existir de fato na máquina — por isso funciona em
+qualquer distro, mesmo com apps diferentes dos do Ubuntu:
+
+- **Favoritos** — fixa na barra de favoritos os apps de
+  `GNOME/favoritos.txt`, na ordem do arquivo. Cada linha aceita alternativas
+  separadas por `|` (ex.: `org.gnome.Ptyxis.desktop | org.gnome.Terminal.desktop`),
+  e entra a primeira instalada; o que não existir é pulado.
+- **Pastas** — apaga as pastas atuais do menu de apps (inclusive as da distro,
+  como System/Utilities do Ubuntu) e recria as de `GNOME/pastas.txt`: Games,
+  Development, Office, Communication, Internet, Multimedia, System e
+  Utilities. Os nomes seguem o idioma do sistema: cada pasta aponta um
+  `.directory` padrão (`Game.directory`, `Office.directory`...), cuja tradução
+  o GNOME usa; sem o arquivo na máquina (o `gnome-menus` pode faltar), fica o
+  nome fixo, em inglês. Cada pasta reúne os apps pelas
+  [categorias do freedesktop.org](https://specifications.freedesktop.org/menu-spec/latest/category-registry.html)
+  que o `.desktop` declara (`Game`, `Development`, `Office`...), então
+  apps instalados depois também caem na pasta certa. `apps =` força apps que
+  declaram categorias ruins (ex.: o Vesktop só declara `Network`).
+
+A ordem das pastas no arquivo é a prioridade: um app que se encaixe em mais
+de uma (a Steam declara `Network` e `Game`) fica só na primeira e é excluído
+das outras (`excluded-apps`). Pastas sem nenhum app instalado não aparecem —
+passam a aparecer quando algo daquela categoria for instalado. Apps sem
+nenhuma categoria conhecida ficam soltos no menu (o log lista quais). A
+disposição do menu é zerada, para o GNOME reordenar tudo.
+
+Um app instalado depois que se encaixe em duas pastas aparece nas duas, já
+que as exclusões são calculadas na hora da execução; basta rodar de novo
+`sudo ./post-install --modules apps_gnome` para reorganizar.
 
 ## Importação de perfis OpenVPN
 

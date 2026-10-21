@@ -1,0 +1,19 @@
+# Apps fixados na barra de favoritos (dash/dock), aplicados pelo módulo
+# "apps_gnome" do post-install, na ordem abaixo.
+#
+# Um app por linha (ID do .desktop). Alternativas separadas por "|": entra o
+# primeiro que estiver instalado (o terminal e a loja mudam de uma distro para
+# outra). Apps que não existirem na máquina são pulados.
+#
+# Para atualizar a partir de uma máquina já configurada:
+#   gsettings get org.gnome.shell favorite-apps
+
+org.gnome.Settings.desktop
+org.gnome.Nautilus.desktop
+org.gnome.Software.desktop | snap-store_snap-store.desktop
+org.gnome.Ptyxis.desktop | org.gnome.Terminal.desktop | org.gnome.Console.desktop
+google-chrome.desktop
+dev.vencord.Vesktop.desktop
+org.telegram.desktop.desktop
+com.rtosta.zapzap.desktop
+com.spotify.Client.desktop
