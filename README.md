@@ -6,7 +6,7 @@ VSCode, PHP + SQL Server, ferramentas de terminal (gh, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
 temas/ícones GNOME, extensões e atalhos do GNOME, o ambiente do usuário (zsh,
-Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade), Claude
+Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update), Claude
 Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
 VSCode"/"Copiar caminho" no Nautilus.
 

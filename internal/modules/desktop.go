@@ -247,18 +247,21 @@ done
 
 var rustTools = Module{
 	ID:    "rust_tools",
-	Title: "Instalar Rust, eza e topgrade",
-	Desc:  "rustup e compilação de eza e topgrade via cargo",
+	Title: "Instalar Rust, eza, topgrade e cargo-update",
+	Desc:  "rustup e compilação de eza, topgrade e cargo-update (cargo install-update, usado pelo topgrade para atualizar o que veio do cargo) via cargo",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando rustup e compilando eza/topgrade via cargo...")
+		c.Log.Infof("Instalando rustup e compilando eza/topgrade/cargo-update via cargo...")
+		// O cargo-update compila com libgit2/libcurl/libssh2 (embutidos se
+		// faltarem no sistema), o que exige CMake, pkg-config e os cabeçalhos
+		// do OpenSSL.
 		var buildPkgs []string
 		switch c.Sys.PkgMgr {
 		case "dnf":
-			buildPkgs = []string{"gcc", "make"}
+			buildPkgs = []string{"gcc", "make", "cmake", "pkgconf-pkg-config", "openssl-devel"}
 		case "pacman":
-			buildPkgs = []string{"base-devel"}
+			buildPkgs = []string{"base-devel", "cmake", "openssl"}
 		default:
-			buildPkgs = []string{"build-essential"}
+			buildPkgs = []string{"build-essential", "cmake", "pkg-config", "libssl-dev"}
 		}
 		err := step(
 			func() error { return c.install(buildPkgs...) },
@@ -266,14 +269,14 @@ var rustTools = Module{
 				return c.AsUser(`set -e
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 source "$HOME/.cargo/env"
-cargo install --locked eza topgrade
+cargo install --locked eza topgrade cargo-update
 `)
 			},
 		)
 		if err != nil {
 			return err
 		}
-		c.Log.Successf("rustup, eza e topgrade instalados para %s.", c.User)
+		c.Log.Successf("rustup, eza, topgrade e cargo-update instalados para %s.", c.User)
 		return nil
 	},
 }
