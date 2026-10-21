@@ -1,45 +1,59 @@
 # Pastas do menu de apps do GNOME, recriadas do zero pelo módulo "apps_gnome"
 # do post-install.
 #
-# Cada [Pasta] junta os apps cujo .desktop declare alguma das "categorias"
+# O nome entre colchetes é o nome da pasta (e vira o ID dela no dconf).
+# "diretorio" aponta um arquivo .directory padrão (de /usr/share/desktop-directories,
+# instalados pelo gnome-shell e pelo gnome-menus): se ele existir na máquina,
+# a pasta usa o nome traduzido para o idioma do sistema (ex.: Game.directory ->
+# "Games" em inglês, "Jogos" em português); senão, usa o nome entre colchetes.
+#
+# Cada pasta junta os apps cujo .desktop declare alguma das "categorias"
 # (categorias do freedesktop.org: Development, Game, Office...). Assim a
 # organização vale em qualquer distro e pega também os apps instalados
 # depois. "apps" coloca na pasta apps específicos (IDs do .desktop) que
 # declaram categorias ruins ou nenhuma.
 #
 # A ORDEM IMPORTA: um app que se encaixe em mais de uma pasta fica só na
-# primeira delas (ex.: a Steam declara Network e Game, e vai para Jogos),
+# primeira delas (ex.: a Steam declara Network e Game, e vai para Games),
 # e é excluído das outras. Apps sem nenhuma categoria daqui ficam soltos no
 # menu. Pastas sem nenhum app instalado não aparecem.
 
-[Jogos]
+[Games]
+diretorio = Game.directory
 categorias = Game
 apps =
 
-[Desenvolvimento]
+[Development]
+diretorio = Development.directory
 categorias = Development IDE WebDevelopment Debugger RevisionControl GUIDesigner
 apps =
 
-[Escritório]
+[Office]
+diretorio = Office.directory
 categorias = Office WordProcessor Spreadsheet Presentation
 apps =
 
-[Comunicação]
+[Communication]
+# Sem .directory padrão para comunicação: nome fixo.
 categorias = Chat InstantMessaging IRCClient VideoConference Telephony
 apps = dev.vencord.Vesktop.desktop
 
 [Internet]
+diretorio = Network.directory
 categorias = WebBrowser Email FileTransfer P2P RemoteAccess News
 apps = org.remmina.Remmina.desktop
 
-[Multimídia]
+[Multimedia]
+diretorio = AudioVideo.directory
 categorias = AudioVideo Audio Video Player Recorder Music Graphics 2DGraphics RasterGraphics VectorGraphics Photography
 apps =
 
-[Sistema]
+[System]
+diretorio = X-GNOME-Shell-System.directory
 categorias = System Settings Monitor PackageManager HardwareSettings Security Filesystem FileManager Emulator TerminalEmulator
 apps = org.gnome.Boxes.desktop com.github.tchx84.Flatseal.desktop io.github.flattool.Ignition.desktop com.mattjakeman.ExtensionManager.desktop solaar.desktop
 
-[Utilitários]
+[Utilities]
+diretorio = X-GNOME-Shell-Utilities.directory
 categorias = Utility Accessories Calculator Clock TextEditor Documentation
 apps =

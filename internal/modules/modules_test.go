@@ -232,19 +232,19 @@ func TestOrganizarPastas(t *testing.T) {
 		return ""
 	}
 	esperado := map[string]string{
-		"com.valvesoftware.Steam.desktop":          "Jogos",
-		"org.gnome.Boxes.desktop":                  "Sistema", // forçado em "apps", apesar de Development
-		"com.microsoft.VSCode.desktop":             "Desenvolvimento",
-		"dev.vencord.Vesktop.desktop":              "Comunicação",
+		"com.valvesoftware.Steam.desktop":          "Games",
+		"org.gnome.Boxes.desktop":                  "System", // forçado em "apps", apesar de Development
+		"com.microsoft.VSCode.desktop":             "Development",
+		"dev.vencord.Vesktop.desktop":              "Communication",
 		"org.remmina.Remmina.desktop":              "Internet",
-		"org.telegram.desktop.desktop":             "Comunicação",
+		"org.telegram.desktop.desktop":             "Communication",
 		"firefox.desktop":                          "Internet",
-		"org.gnome.Papers.desktop":                 "Escritório",
-		"com.spotify.Client.desktop":               "Multimídia",
-		"org.gnome.DiskUtility.desktop":            "Sistema",
-		"org.gnome.Calculator.desktop":             "Utilitários",
-		"com.github.tchx84.Flatseal.desktop":       "Sistema",
-		"org.libreoffice.LibreOffice.draw.desktop": "Escritório",
+		"org.gnome.Papers.desktop":                 "Office",
+		"com.spotify.Client.desktop":               "Multimedia",
+		"org.gnome.DiskUtility.desktop":            "System",
+		"org.gnome.Calculator.desktop":             "Utilities",
+		"com.github.tchx84.Flatseal.desktop":       "System",
+		"org.libreoffice.LibreOffice.draw.desktop": "Office",
 		"sem-categoria.desktop":                    "",
 	}
 	for id, want := range esperado {
@@ -253,22 +253,25 @@ func TestOrganizarPastas(t *testing.T) {
 		}
 	}
 	// O GNOME mostraria a Steam também em Internet e o Boxes em
-	// Desenvolvimento (pelas categorias): precisam estar excluídos lá.
+	// Development (pelas categorias): precisam estar excluídos lá.
 	idx := func(nome string) int { return slices.IndexFunc(pastas, func(p pasta) bool { return p.Nome == nome }) }
 	if !slices.Contains(org[idx("Internet")].excluidos, "com.valvesoftware.Steam.desktop") ||
-		!slices.Contains(org[idx("Desenvolvimento")].excluidos, "org.gnome.Boxes.desktop") {
-		t.Errorf("excluded-apps incompletos: Internet %v / Desenvolvimento %v", org[idx("Internet")].excluidos, org[idx("Desenvolvimento")].excluidos)
+		!slices.Contains(org[idx("Development")].excluidos, "org.gnome.Boxes.desktop") {
+		t.Errorf("excluded-apps incompletos: Internet %v / Desenvolvimento %v", org[idx("Internet")].excluidos, org[idx("Development")].excluidos)
 	}
 	// Forçados sem categoria que bata precisam ir em "apps"; os que batem, não.
-	if !slices.Contains(org[idx("Comunicação")].apps, "dev.vencord.Vesktop.desktop") ||
-		slices.Contains(org[idx("Comunicação")].apps, "org.telegram.desktop.desktop") {
-		t.Errorf("apps de Comunicação = %v", org[idx("Comunicação")].apps)
+	if !slices.Contains(org[idx("Communication")].apps, "dev.vencord.Vesktop.desktop") ||
+		slices.Contains(org[idx("Communication")].apps, "org.telegram.desktop.desktop") {
+		t.Errorf("apps de Communication = %v", org[idx("Communication")].apps)
 	}
 
-	conf := dconfPastas(pastas, org)
+	// Só o .directory do sistema "instalado": as demais caem no nome fixo.
+	conf := dconfPastas(pastas, org, func(d string) bool { return d == "X-GNOME-Shell-System.directory" })
 	for _, trecho := range []string{
-		"folder-children=['jogos', 'desenvolvimento', 'escritorio', 'comunicacao', 'internet', 'multimidia', 'sistema', 'utilitarios']",
-		"[folders/comunicacao]\nname='Comunicação'\ntranslate=false\n",
+		"folder-children=['games', 'development', 'office', 'communication', 'internet', 'multimedia', 'system', 'utilities']",
+		"[folders/system]\nname='X-GNOME-Shell-System.directory'\ntranslate=true\n",
+		"[folders/games]\nname='Games'\ntranslate=false\n",
+		"[folders/communication]\nname='Communication'\ntranslate=false\n",
 		"apps=@as []",
 	} {
 		if !strings.Contains(conf, trecho) {
@@ -291,5 +294,13 @@ func TestEscolherFavoritos(t *testing.T) {
 	want := []string{"org.gnome.Settings.desktop", "org.gnome.Nautilus.desktop", "org.gnome.Terminal.desktop", "google-chrome.desktop"}
 	if !slices.Equal(got, want) {
 		t.Errorf("escolherFavoritos = %v, esperado %v", got, want)
+	}
+}
+
+func TestIdPasta(t *testing.T) {
+	for nome, want := range map[string]string{"Comunicação": "comunicacao", "Sound & Video": "sound---video", "Games": "games"} {
+		if got := idPasta(nome); got != want {
+			t.Errorf("idPasta(%q) = %q, esperado %q", nome, got, want)
+		}
 	}
 }

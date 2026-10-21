@@ -360,9 +360,12 @@ qualquer distro, mesmo com apps diferentes dos do Ubuntu:
   separadas por `|` (ex.: `org.gnome.Ptyxis.desktop | org.gnome.Terminal.desktop`),
   e entra a primeira instalada; o que não existir é pulado.
 - **Pastas** — apaga as pastas atuais do menu de apps (inclusive as da distro,
-  como System/Utilities do Ubuntu) e recria as de `GNOME/pastas.txt`: Jogos,
-  Desenvolvimento, Escritório, Comunicação, Internet, Multimídia, Sistema e
-  Utilitários. Cada pasta reúne os apps pelas
+  como System/Utilities do Ubuntu) e recria as de `GNOME/pastas.txt`: Games,
+  Development, Office, Communication, Internet, Multimedia, System e
+  Utilities. Os nomes seguem o idioma do sistema: cada pasta aponta um
+  `.directory` padrão (`Game.directory`, `Office.directory`...), cuja tradução
+  o GNOME usa; sem o arquivo na máquina (o `gnome-menus` pode faltar), fica o
+  nome fixo, em inglês. Cada pasta reúne os apps pelas
   [categorias do freedesktop.org](https://specifications.freedesktop.org/menu-spec/latest/category-registry.html)
   que o `.desktop` declara (`Game`, `Development`, `Office`...), então
   apps instalados depois também caem na pasta certa. `apps =` força apps que

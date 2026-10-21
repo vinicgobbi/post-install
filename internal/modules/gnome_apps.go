@@ -64,7 +64,7 @@ var appsGnome = Module{
 			// GNOME reordenar tudo.
 			script.WriteString("dconf reset -f /org/gnome/desktop/app-folders/\n")
 			script.WriteString("dconf load /org/gnome/desktop/app-folders/ <<'POST_INSTALL_PASTAS'\n")
-			script.WriteString(dconfPastas(pastas, org))
+			script.WriteString(dconfPastas(pastas, org, diretorioExiste))
 			script.WriteString("POST_INSTALL_PASTAS\n")
 			script.WriteString("gsettings reset org.gnome.shell app-picker-layout\n")
 		}
@@ -82,12 +82,14 @@ var appsGnome = Module{
 // pasta é uma seção de GNOME/pastas.txt.
 type pasta struct {
 	Nome       string
+	Diretorio  string // .directory com o nome traduzido (opcional)
 	Categorias []string
 	Apps       []string // IDs de .desktop colocados na pasta à força
 }
 
-// lerPastas lê as seções "[Nome]" com "categorias = A B" e "apps = x y",
-// na ordem do arquivo (que é a prioridade).
+// lerPastas lê as seções "[Nome]" com "diretorio = X.directory",
+// "categorias = A B" e "apps = x y", na ordem do arquivo (que é a
+// prioridade).
 func lerPastas(path string) ([]pasta, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -111,6 +113,8 @@ func lerPastas(path string) ([]pasta, error) {
 		}
 		p := &out[len(out)-1]
 		switch strings.TrimSpace(k) {
+		case "diretorio":
+			p.Diretorio = strings.TrimSpace(v)
 		case "categorias":
 			p.Categorias = strings.Fields(v)
 		case "apps":
@@ -380,10 +384,24 @@ func gvStrv(items []string) string {
 	return strv(items)
 }
 
+// diretorioExiste diz se um arquivo .directory está instalado (o GNOME
+// procura em desktop-directories dos diretórios de dados do XDG).
+func diretorioExiste(nome string) bool {
+	for _, d := range []string{"/usr/local/share/desktop-directories", "/usr/share/desktop-directories"} {
+		if fileExists(filepath.Join(d, nome)) {
+			return true
+		}
+	}
+	return false
+}
+
 // dconfPastas monta o conteúdo para "dconf load /org/gnome/desktop/app-folders/".
 // Todas as pastas são definidas, mesmo as vazias: o GNOME não mostra pasta
 // vazia, e ela passa a aparecer quando um app da categoria for instalado.
-func dconfPastas(pastas []pasta, org []organizacao) string {
+// Com o .directory da pasta instalado, o nome é o dele (translate=true: o
+// GNOME mostra a tradução do idioma do sistema); sem ele, o nome fixo — sem
+// o arquivo, o GNOME mostraria "X.directory" literalmente.
+func dconfPastas(pastas []pasta, org []organizacao, existe func(string) bool) string {
 	ids := make([]string, len(pastas))
 	for i, p := range pastas {
 		ids[i] = idPasta(p.Nome)
@@ -392,8 +410,11 @@ func dconfPastas(pastas []pasta, org []organizacao) string {
 	b.WriteString("[/]\nfolder-children=" + gvStrv(ids) + "\n")
 	for i, p := range pastas {
 		b.WriteString("\n[folders/" + ids[i] + "]\n")
-		b.WriteString("name=" + gvString(p.Nome) + "\n")
-		b.WriteString("translate=false\n")
+		if p.Diretorio != "" && existe(p.Diretorio) {
+			b.WriteString("name=" + gvString(p.Diretorio) + "\ntranslate=true\n")
+		} else {
+			b.WriteString("name=" + gvString(p.Nome) + "\ntranslate=false\n")
+		}
 		b.WriteString("categories=" + gvStrv(p.Categorias) + "\n")
 		b.WriteString("apps=" + gvStrv(org[i].apps) + "\n")
 		b.WriteString("excluded-apps=" + gvStrv(org[i].excluidos) + "\n")
