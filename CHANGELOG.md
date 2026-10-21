@@ -1,3 +1,9 @@
+## v1.9.1 (2026-10-21)
+
+### Fix
+
+- atualiza versões fixadas
+
 ## v1.9.0 (2026-10-21)
 
 ### Feat
