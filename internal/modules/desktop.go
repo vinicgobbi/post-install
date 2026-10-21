@@ -281,6 +281,61 @@ cargo install --locked eza topgrade cargo-update
 	},
 }
 
+// O Bundler e o Jekyll são instalados como gems do usuário (GEM_HOME na
+// home), como recomenda a documentação do Jekyll: assim gem/bundle nunca
+// pedem sudo, e as versões não ficam presas às dos pacotes da distro.
+const rubyAmbiente = `# Gems do Ruby na home do usuário (gem/bundle sem sudo) — post-install
+export GEM_HOME="$HOME/.local/share/gem"
+export PATH="$GEM_HOME/bin:$PATH"
+`
+
+// scriptRuby instala as gems na home do usuário, configura o Bundler e
+// acrescenta GEM_HOME/PATH ao .zshrc e ao .bashrc (uma vez só).
+func scriptRuby() string {
+	return `set -e
+` + rubyAmbiente + `
+gem install --no-document bundler jekyll
+bundle config set --global path vendor/bundle
+
+for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    [ -f "$rc" ] || continue
+    grep -qF 'GEM_HOME=' "$rc" || printf '\n%s' ` + shQuote(rubyAmbiente) + ` >> "$rc"
+done
+`
+}
+
+var ruby = Module{
+	ID:    "ruby",
+	Title: "Instalar Ruby, Bundler e Jekyll",
+	Desc:  "Ruby com headers de desenvolvimento e, como gems do usuário (sem sudo), Bundler e Jekyll; o Bundler instala as gems de cada projeto em vendor/bundle",
+	Run: func(c *Ctx) error {
+		c.Log.Infof("Instalando Ruby e compiladores para gems nativas...")
+		var pkgs []string
+		switch c.Sys.PkgMgr {
+		case "dnf":
+			pkgs = []string{"ruby", "ruby-devel", "rubygems", "gcc", "gcc-c++", "make", "redhat-rpm-config", "zlib-devel"}
+		case "pacman":
+			// No Arch os headers já vêm no pacote ruby.
+			pkgs = []string{"ruby", "rubygems", "base-devel"}
+		default:
+			pkgs = []string{"ruby-full", "ruby-dev", "build-essential", "zlib1g-dev"}
+		}
+		if err := c.install(pkgs...); err != nil {
+			return err
+		}
+
+		c.Log.Infof("Instalando Bundler e Jekyll como gems de %s...", c.User)
+		// "path vendor/bundle" (global, em ~/.bundle/config): o bundle install
+		// de cada projeto grava as gems dentro do próprio projeto. O Jekyll já
+		// ignora vendor/ no build, e o .gitignore do "jekyll new" também.
+		if err := c.AsUser(scriptRuby()); err != nil {
+			return err
+		}
+		c.Log.Successf("Ruby, Bundler e Jekyll instalados para %s (gems em ~/.local/share/gem; projetos em vendor/bundle).", c.User)
+		return nil
+	},
+}
+
 var claudeCode = Module{
 	ID:    "claude_code",
 	Title: "Instalar Claude Code",
