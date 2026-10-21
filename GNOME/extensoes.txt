@@ -18,7 +18,7 @@ gsconnect@andyholmes.github.io
 lockkeys@vaina.lt
 
 # Repositório git
-nowbar@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowbar.git f5cf51c4771a90705da8a6c5db3256251359323f
+nowbar@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowbar.git ce0f7ae668f03c981f04424c50627649c7de6f42
 
 # Vêm com o Ubuntu (só são ativadas/desativadas se existirem no sistema)
 snapd-prompting@canonical.com
