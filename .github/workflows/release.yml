@@ -113,7 +113,7 @@ jobs:
           #   post-install      binário
           #   OVPN/README.md    pasta onde ficam os .ovpn a importar
           #   Wallpapers/       papéis de parede oferecidos na TUI
-          #   GNOME/            lista e configurações das extensões do GNOME
+          #   GNOME/            extensões, atalhos, favoritos e pastas do GNOME
           #   logs/             logs de cada execução
           #   README.md
           pkg="pkg/post-install"

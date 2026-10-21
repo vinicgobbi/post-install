@@ -68,6 +68,8 @@ func All() []Module {
 		vscodeNautilus,
 		ovpn,
 		virtManager,
+		// Depois de tudo instalado: organiza o que existir na máquina.
+		appsGnome,
 		limpeza,
 	}
 }
