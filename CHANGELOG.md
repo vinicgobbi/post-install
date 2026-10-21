@@ -1,3 +1,13 @@
+## v1.9.0 (2026-10-21)
+
+### Feat
+
+- instala Ruby, Bundler e Jekyll sem precisar de sudo
+
+### Fix
+
+- atualiza o Go para 1.27.3 (GO-2026-6809)
+
 ## v1.8.0 (2026-10-21)
 
 ### Feat
