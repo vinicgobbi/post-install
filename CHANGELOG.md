@@ -1,3 +1,9 @@
+## v1.10.0 (2026-10-23)
+
+### Feat
+
+- instala o Gitea CLI (tea) junto das ferramentas de terminal
+
 ## v1.9.1 (2026-10-21)
 
 ### Fix
