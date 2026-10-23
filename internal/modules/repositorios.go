@@ -1,11 +1,14 @@
 package modules
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/vinicgobbi/post-install/internal/runner"
 )
@@ -330,7 +333,7 @@ func ferramentas(c *Ctx) []string {
 	case "dnf":
 		return []string{"gh", "nmap", "pipx", "ffmpeg-free", "bashtop", "fuse-libs"}
 	case "pacman":
-		return []string{"github-cli", "nmap", "python-pipx", "ffmpeg", "bashtop", "fuse2"}
+		return []string{"github-cli", "tea", "nmap", "python-pipx", "ffmpeg", "bashtop", "fuse2"}
 	default:
 		fuse := "libfuse2t64"
 		if !c.Probe("apt-cache", "show", fuse) {
@@ -344,7 +347,7 @@ func ferramentas(c *Ctx) []string {
 // ausente na distro), instala um por um e só avisa dos que faltarem, sem
 // derrubar o módulo.
 func instalarFerramentas(c *Ctx) {
-	c.Log.Infof("Instalando ferramentas de terminal (gh, nmap, pipx, ffmpeg, bashtop, FUSE 2)...")
+	c.Log.Infof("Instalando ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2)...")
 	pkgs := ferramentas(c)
 	if c.install(pkgs...) == nil {
 		return
@@ -356,10 +359,45 @@ func instalarFerramentas(c *Ctx) {
 	}
 }
 
+// instalarTea instala o Gitea CLI pelo binário da última release em
+// gitea.com, conferindo o SHA-256 publicado: fora o Arch (que já o recebe em
+// ferramentas), nenhuma distro tem pacote do tea.
+func instalarTea(c *Ctx) error {
+	body, err := c.Get("https://gitea.com/api/v1/repos/gitea/tea/releases/latest", 30*time.Second)
+	if err != nil {
+		return err
+	}
+	var rel struct {
+		Tag string `json:"tag_name"`
+	}
+	if err := json.Unmarshal(body, &rel); err != nil {
+		return err
+	}
+	// Só o .xz tem .sha256 publicado (o binário solto não).
+	nome := "tea-" + strings.TrimPrefix(rel.Tag, "v") + "-linux-" + runtime.GOARCH + ".xz"
+	base := "https://gitea.com/gitea/tea/releases/download/" + rel.Tag + "/"
+	sum, err := c.Get(base+nome+".sha256", 30*time.Second)
+	if err != nil {
+		return err
+	}
+	campos := strings.Fields(string(sum))
+	if len(campos) == 0 {
+		return errorf("arquivo de SHA-256 vazio: %s", base+nome+".sha256")
+	}
+	xz := c.Temp(nome)
+	return step(
+		func() error { return c.DownloadVerified(base+nome, xz, campos[0]) },
+		func() error { return c.Run("xz", "-df", xz) },
+		func() error {
+			return c.Run("install", "-m", "0755", strings.TrimSuffix(xz, ".xz"), "/usr/local/bin/tea")
+		},
+	)
+}
+
 var pacotesBase = Module{
 	ID:    "pacotes_base",
 	Title: "Instalar pacotes base",
-	Desc:  "Docker, VSCode, PHP, Zsh, Firefox, Thunderbird, ferramentas de SQL Server e de terminal (gh, nmap, pipx, ffmpeg, bashtop, FUSE 2 para AppImages; no Ubuntu, Firefox/Thunderbird em .deb da Mozilla, removendo os snaps)",
+	Desc:  "Docker, VSCode, PHP, Zsh, Firefox, Thunderbird, ferramentas de SQL Server e de terminal (gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2 para AppImages; no Ubuntu, Firefox/Thunderbird em .deb da Mozilla, removendo os snaps)",
 	Deps:  []string{"repositorios"},
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando pacotes base e utilitários...")
@@ -407,6 +445,12 @@ var pacotesBase = Module{
 			return err
 		}
 		instalarFerramentas(c)
+		if c.Sys.PkgMgr != "pacman" {
+			c.Log.Infof("Instalando o Gitea CLI (tea)...")
+			if err := instalarTea(c); err != nil {
+				c.Log.Warnf("Não foi possível instalar o tea: %v", err)
+			}
+		}
 
 		// No Debian/Ubuntu o "bat" instala o binário como "batcat" por
 		// conflito de nome; cria um link para "bat" funcionar em todo lugar.
