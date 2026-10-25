@@ -1,3 +1,10 @@
+## v1.12.0 (2026-10-25)
+
+### Feat
+
+- gravação de tela com o vokoscreenNG no Shift+Super+R (Cinnamon)
+- Flameshot no lugar do Gradia para capturas no Cinnamon
+
 ## v1.11.1 (2026-10-25)
 
 ### Fix
