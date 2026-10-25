@@ -402,16 +402,21 @@ O módulo `atalhos_cinnamon` aplica `CINNAMON/atalhos.dconf` com
 
 - `Super+L` bloqueia a tela (junto do `Ctrl+Alt+L` padrão); o Looking Glass,
   que usava `Super+L`, fica sem atalho;
-- `Print` e `Shift+Super+S` selecionam uma área da tela e abrem a captura
-  no Gradia (Flatpak, instalado pelo módulo se ainda não estiver), pelo
-  `/usr/local/bin/cinnamon-captura-gradia`: o `--screenshot=INTERACTIVE` do
-  Gradia não serve no Cinnamon, cujo portal de captura ignora o modo
-  interativo e devolve a tela inteira, então a seleção é do
-  `gnome-screenshot --area` e a imagem vai para o Gradia pela entrada
-  padrão. A captura nativa de tela inteira sai do `Print` (as variações com
-  `Shift`, `Alt` e `Ctrl` ficam);
-- `Shift+Super+R` liga e desliga o gravador de tela nativo do Cinnamon (tela
-  inteira, salva em `~/Vídeos`), além do `Ctrl+Shift+Alt+R` padrão;
+- `Print` e `Shift+Super+S` abrem a captura do
+  [Flameshot](https://flameshot.org/) (`flameshot gui`: seleção de área com
+  anotação), instalado pelo módulo se ainda não estiver. No Cinnamon ele
+  substitui o Gradia, que fica fora dos Flatpaks: o portal de captura do
+  Cinnamon ignora o modo interativo do Gradia e devolve a tela inteira. A
+  captura nativa de tela inteira sai do `Print` (as variações com `Shift`,
+  `Alt` e `Ctrl` ficam);
+- `Shift+Super+R` inicia e para a gravação do
+  [vokoscreenNG](https://linuxecke.volkoh.de/vokoscreen/vokoscreen.html)
+  (tela inteira, janela ou área, com áudio; o modo e o áudio escolhe-se na
+  janela dele). O vokoscreenNG não tem linha de comando para gravar, então o
+  atalho é global dele, não do Cinnamon: o módulo o instala, põe no início
+  da sessão minimizado na bandeja (o atalho só funciona com ele aberto) e
+  grava o atalho no `~/.config/vokoscreenNG/vokoscreenNG.ini`, mudando só
+  essas opções. O gravador nativo do Cinnamon fica no `Ctrl+Shift+Alt+R`;
 - `Super+V` abre o histórico da área de transferência, como no Windows: o
   menu do [CopyQ](https://hluk.github.io/CopyQ/) aparece no cursor e o item
   escolhido é colado na janela atual. O módulo instala o CopyQ (pacote

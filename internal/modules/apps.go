@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -169,8 +170,12 @@ var flatpaks = Module{
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Configurando Flatpak e instalando apps...")
 		apps := config.FlatpaksGTK
-		if c.Sys.IsKDE() {
+		switch {
+		case c.Sys.IsKDE():
 			apps = config.FlatpaksKDE
+		case c.Sys.IsCinnamon():
+			// No Cinnamon a captura de tela é do Flameshot (atalhos_cinnamon).
+			apps = slices.DeleteFunc(slices.Clone(apps), func(a string) bool { return a == gradiaFlatpak })
 		}
 		if err := step(c.ensureFlathub, func() error { return c.flatpakInstall(apps...) }); err != nil {
 			return err

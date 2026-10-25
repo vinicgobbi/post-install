@@ -402,18 +402,10 @@ func TestVolumeStepCinnamon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, cmd := range []string{volumeStep + " +2", volumeStep + " -2", capturaGradia} {
+	for _, cmd := range []string{volumeStep + " +2", volumeStep + " -2"} {
 		if !strings.Contains(string(conf), "command='"+cmd+"'") {
 			t.Errorf("atalhos.dconf não chama %q", cmd)
 		}
-	}
-
-	captura := filepath.Join(t.TempDir(), "cinnamon-captura-gradia")
-	if err := os.WriteFile(captura, []byte(capturaGradiaScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if out, err := exec.Command("sh", "-n", captura).CombinedOutput(); err != nil {
-		t.Fatalf("sintaxe: %v\n%s", err, out)
 	}
 
 	script := filepath.Join(t.TempDir(), "cinnamon-volume-step")
@@ -429,6 +421,53 @@ func TestVolumeStepCinnamon(t *testing.T) {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) || ee.ExitCode() != 2 {
 			t.Errorf("cinnamon-volume-step %q: %v, esperado saída 2", arg, err)
+		}
+	}
+}
+
+func TestConfigVokoscreen(t *testing.T) {
+	want := []string{"checkBoxStartsMinimized=true", "checkBox_shortcut_start_strg=false",
+		"checkBox_shortcut_start_alt=false", "checkBox_shortcut_start_shift=true",
+		"checkBox_shortcut_start_meta=true", "comboBox_shortcut_start=R"}
+	for nome, atual := range map[string]string{
+		"sem arquivo": "",
+		// Como o vokoscreenNG grava: as outras opções ficam.
+		"existente": "[General]\ncheckBoxStartsMinimized=false\ncheckBox_shortcut_start_strg=true\ncomboBox_shortcut_start=F10\nlineEditVideoPath=/home/x/Videos\n\n[Camera]\nX=1\n",
+	} {
+		home := t.TempDir()
+		ini := filepath.Join(home, ".config/vokoscreenNG/vokoscreenNG.ini")
+		if atual != "" {
+			if err := os.MkdirAll(filepath.Dir(ini), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(ini, []byte(atual), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		cmd := exec.Command("sh", "-c", "set -e\n"+configVokoscreen)
+		cmd.Env = append(os.Environ(), "HOME="+home)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%s: %v\n%s", nome, err, out)
+		}
+		b, err := os.ReadFile(ini)
+		if err != nil {
+			t.Fatal(err)
+		}
+		geral, resto, _ := strings.Cut(string(b), "\n\n")
+		linhas := strings.Split(strings.TrimSpace(geral), "\n")
+		if linhas[0] != "[General]" {
+			t.Errorf("%s: sem [General] no início:\n%s", nome, b)
+		}
+		for _, kv := range want {
+			if !slices.Contains(linhas, kv) {
+				t.Errorf("%s: falta %q em [General]:\n%s", nome, kv, b)
+			}
+		}
+		if atual != "" && (!slices.Contains(linhas, "lineEditVideoPath=/home/x/Videos") || resto != "[Camera]\nX=1\n") {
+			t.Errorf("%s: outras opções alteradas:\n%s", nome, b)
+		}
+		if strings.Count(string(b), "comboBox_shortcut_start=") != 1 {
+			t.Errorf("%s: chave duplicada:\n%s", nome, b)
 		}
 	}
 }
