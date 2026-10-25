@@ -409,8 +409,14 @@ O módulo `atalhos_cinnamon` aplica `CINNAMON/atalhos.dconf` com
   Cinnamon ignora o modo interativo do Gradia e devolve a tela inteira. A
   captura nativa de tela inteira sai do `Print` (as variações com `Shift`,
   `Alt` e `Ctrl` ficam);
-- `Shift+Super+R` liga e desliga o gravador de tela nativo do Cinnamon (tela
-  inteira, salva em `~/Vídeos`), além do `Ctrl+Shift+Alt+R` padrão;
+- `Shift+Super+R` inicia e para a gravação do
+  [vokoscreenNG](https://linuxecke.volkoh.de/vokoscreen/vokoscreen.html)
+  (tela inteira, janela ou área, com áudio; o modo e o áudio escolhe-se na
+  janela dele). O vokoscreenNG não tem linha de comando para gravar, então o
+  atalho é global dele, não do Cinnamon: o módulo o instala, põe no início
+  da sessão minimizado na bandeja (o atalho só funciona com ele aberto) e
+  grava o atalho no `~/.config/vokoscreenNG/vokoscreenNG.ini`, mudando só
+  essas opções. O gravador nativo do Cinnamon fica no `Ctrl+Shift+Alt+R`;
 - `Super+V` abre o histórico da área de transferência, como no Windows: o
   menu do [CopyQ](https://hluk.github.io/CopyQ/) aparece no cursor e o item
   escolhido é colado na janela atual. O módulo instala o CopyQ (pacote

@@ -25,7 +25,7 @@ const (
 var atalhosCinnamon = Module{
 	ID:    "atalhos_cinnamon",
 	Title: "Atalhos do Cinnamon",
-	Desc:  "Aplica CINNAMON/atalhos.dconf: Super+L bloqueia a tela, Print e Shift+Super+S abrem a captura do Flameshot, Shift+Super+R grava a tela, Super+V o histórico da área de transferência (CopyQ), Super+. os emojis (Smile) e volume de 2 em 2%",
+	Desc:  "Aplica CINNAMON/atalhos.dconf: Super+L bloqueia a tela, Print e Shift+Super+S abrem a captura do Flameshot, Shift+Super+R inicia e para a gravação de tela (vokoscreenNG), Super+V o histórico da área de transferência (CopyQ), Super+. os emojis (Smile) e volume de 2 em 2%",
 	Run: func(c *Ctx) error {
 		if !c.Sys.IsCinnamon() {
 			c.Log.Infof("Ambiente %s detectado: pulando atalhos do Cinnamon.", c.Sys.DesktopName())
@@ -40,8 +40,13 @@ var atalhosCinnamon = Module{
 		// Os atalhos chamam esses programas, então eles precisam existir
 		// mesmo quando os módulos de apps não foram marcados.
 		if err := step(
-			func() error { return garantirPacote(c, "flameshot", "Flameshot (captura de tela)") },
-			func() error { return garantirPacote(c, "copyq", "CopyQ (histórico da área de transferência)") },
+			func() error { return garantirPacote(c, "flameshot", "flameshot", "Flameshot (captura de tela)") },
+			func() error {
+				return garantirPacote(c, "copyq", "copyq", "CopyQ (histórico da área de transferência)")
+			},
+			func() error {
+				return garantirPacote(c, "vokoscreenNG", pacoteVokoscreen(c.Sys.PkgMgr), "vokoscreenNG (gravação de tela)")
+			},
 			func() error { return garantirFlatpak(c, smileFlatpak, "Smile") },
 			func() error { return c.WriteFile(volumeStep, volumeStepScript, 0o755) },
 		); err != nil {
@@ -51,49 +56,80 @@ var atalhosCinnamon = Module{
 		if err := c.AsUser(scriptAtalhosCinnamon(conf)); err != nil {
 			return err
 		}
-		c.Log.Successf("Atalhos do Cinnamon aplicados (o CopyQ inicia sozinho no próximo login).")
+		c.Log.Successf("Atalhos do Cinnamon aplicados (o CopyQ e o vokoscreenNG iniciam sozinhos no próximo login).")
 		return nil
 	},
 }
 
 // garantirPacote instala, com o gerenciador nativo, o programa chamado por
-// um atalho se ele ainda não estiver no PATH (o pacote tem o nome do
-// binário).
-func garantirPacote(c *Ctx, bin, nome string) error {
+// um atalho se o binário dele ainda não estiver no PATH.
+func garantirPacote(c *Ctx, bin, pkg, nome string) error {
 	if _, err := lookPath(bin); err == nil {
 		return nil
 	}
 	c.Log.Infof("Instalando o %s...", nome)
-	return c.install(bin)
+	return c.install(pkg)
 }
 
-// copyqAutostart inicia o CopyQ no login, só no ícone da bandeja.
-const copyqAutostart = `[Desktop Entry]
-Type=Application
-Name=CopyQ
-Icon=copyq
-Exec=copyq
-X-GNOME-Autostart-enabled=true
+func pacoteVokoscreen(pkgMgr string) string {
+	switch pkgMgr {
+	case "dnf":
+		return "vokoscreenNG"
+	case "pacman":
+		return "vokoscreen"
+	default:
+		return "vokoscreen-ng"
+	}
+}
+
+// autostart monta o .desktop que inicia um programa no login.
+func autostart(nome, icone, exec string) string {
+	return "[Desktop Entry]\nType=Application\nName=" + nome + "\nIcon=" + icone +
+		"\nExec=" + exec + "\nX-GNOME-Autostart-enabled=true\n"
+}
+
+// configVokoscreen faz o vokoscreenNG iniciar minimizado na bandeja e
+// iniciar/parar a gravação no Shift+Super+R. O atalho é dele, não do
+// Cinnamon (o vokoscreenNG não tem linha de comando para gravar), e só
+// funciona com ele aberto — por isso inicia no login. Só essas chaves mudam
+// no vokoscreenNG.ini; o resto ele completa ao abrir. Com o vokoscreenNG
+// aberto, ele grava a configuração em memória por cima ao fechar.
+const configVokoscreen = `ini="$HOME/.config/vokoscreenNG/vokoscreenNG.ini"
+mkdir -p "$(dirname "$ini")"
+[ -s "$ini" ] || printf '[General]\n' > "$ini"
+for kv in checkBoxStartsMinimized=true checkBox_shortcut_start_strg=false \
+    checkBox_shortcut_start_alt=false checkBox_shortcut_start_shift=true \
+    checkBox_shortcut_start_meta=true comboBox_shortcut_start=R; do
+    k=${kv%%=*}
+    if grep -q "^$k=" "$ini"; then
+        sed -i "s|^$k=.*|$kv|" "$ini"
+    else
+        sed -i "/^\[General\]/a $kv" "$ini"
+    fi
+done
 `
 
 // scriptAtalhosCinnamon aplica os atalhos e prepara o que eles usam: o
 // CopyQ no login (com o item escolhido no Super+V colado na janela atual,
-// como no Windows, se ainda não houver configuração dele) e o Super+. livre
-// do seletor de emojis do IBus, que só funciona em campos de texto com o
-// IBus ativo.
+// como no Windows, se ainda não houver configuração dele), o vokoscreenNG
+// no login com o atalho de gravação e o Super+. livre do seletor de emojis
+// do IBus, que só funciona em campos de texto com o IBus ativo.
 func scriptAtalhosCinnamon(conf string) string {
 	return `set -e
 dconf load /org/cinnamon/desktop/keybindings/ < ` + shQuote(conf) + `
 gsettings set org.freedesktop.ibus.panel.emoji hotkey "@as []" 2>/dev/null || true
 
 mkdir -p "$HOME/.config/autostart"
-cat > "$HOME/.config/autostart/copyq.desktop" <<'POST_INSTALL_COPYQ'
-` + copyqAutostart + `POST_INSTALL_COPYQ
+cat > "$HOME/.config/autostart/copyq.desktop" <<'POST_INSTALL_AUTOSTART'
+` + autostart("CopyQ", "copyq", "copyq") + `POST_INSTALL_AUTOSTART
 if [ ! -f "$HOME/.config/copyq/copyq.conf" ]; then
     mkdir -p "$HOME/.config/copyq"
     printf '[Options]\ntray_item_paste=true\n' > "$HOME/.config/copyq/copyq.conf"
 fi
-`
+
+cat > "$HOME/.config/autostart/vokoscreenNG.desktop" <<'POST_INSTALL_AUTOSTART'
+` + autostart("vokoscreenNG", "vokoscreenNG", "vokoscreenNG") + `POST_INSTALL_AUTOSTART
+` + configVokoscreen
 }
 
 // volumeStepScript muda o volume no passo pedido: as teclas de volume do
