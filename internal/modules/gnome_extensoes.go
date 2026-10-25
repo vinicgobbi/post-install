@@ -25,8 +25,8 @@ var extensoesGnome = Module{
 	Title: "Extensões do GNOME",
 	Desc:  "Instala (extensions.gnome.org ou repositório git), ativa e configura as extensões de GNOME/extensoes.txt e GNOME/extensoes.dconf",
 	Run: func(c *Ctx) error {
-		if c.Sys.IsKDE() {
-			c.Log.Infof("Ambiente Plasma detectado: pulando extensões do GNOME.")
+		if !c.Sys.IsGNOME() {
+			c.Log.Infof("Ambiente %s detectado: pulando extensões do GNOME.", c.Sys.DesktopName())
 			return nil
 		}
 		if !runner.Exists("gnome-extensions") {

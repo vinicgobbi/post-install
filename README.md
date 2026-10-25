@@ -5,7 +5,8 @@ workstation Linux recém-instalada: mirrors, atualização do sistema, Docker,
 VSCode, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
-temas/ícones GNOME, extensões e atalhos do GNOME, o ambiente do usuário (zsh,
+temas/ícones GNOME, extensões e atalhos do GNOME, atalhos e painel do
+Cinnamon, o ambiente do usuário (zsh,
 Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update),
 Ruby (Bundler e Jekyll), Claude Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
 VSCode"/"Copiar caminho" no Nautilus.
@@ -80,6 +81,7 @@ post-install-linux-amd64.tar.gz
     ├── OVPN/README.md    # coloque aqui os .ovpn a importar
     ├── Wallpapers/       # papéis de parede oferecidos na TUI
     ├── GNOME/            # extensões, atalhos, favoritos e pastas do GNOME
+    ├── CINNAMON/         # atalhos, applets e apps fixados do painel do Cinnamon
     ├── logs/             # logs de cada execução
     └── README.md
 ```
@@ -111,7 +113,8 @@ Releases anteriores a essa mudança não têm atestado.
 
 ### Fluxo da TUI
 
-1. Mostra o sistema detectado (distro, base, desktop GNOME/GTK ou KDE). Se
+1. Mostra o sistema detectado (distro, base, desktop GNOME/GTK, Cinnamon ou
+   KDE). Se
    houver uma versão mais nova do post-install, a primeira tela oferece
    atualizar agora ou ignorar (veja [Atualização](#atualização)).
 2. Pergunta para qual usuário do sistema configurar o ambiente. O usuário
@@ -158,7 +161,7 @@ dele, que são pulados. Use `--fail-fast` para parar tudo no primeiro erro.
 | `--list` | lista os módulos e sai |
 | `--force-extensions a,b` | extensões do GNOME sem versão compatível a instalar mesmo assim (ou `none`); sem ela, pergunta |
 | `--wallpaper NOME` | papel de parede a aplicar (nome do arquivo, ou `none` para não alterar); sem ela, a TUI pergunta |
-| `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, extensões do GNOME e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` ao lado do binário) |
+| `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--cinnamon-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, configurações do GNOME e do Cinnamon e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/`, `CINNAMON/` e `logs/` ao lado do binário) |
 | `--no-update-check` | não verifica se há versão nova do post-install |
 | `--version` | mostra a versão |
 
@@ -178,7 +181,7 @@ Ao iniciar, o post-install consulta a última release no GitHub (com prazo de
 Atualizar baixa o `.tar.gz` da release, confere o SHA-256 (pelo `.sha256`
 publicado e pelo digest que o GitHub calcula) e substitui o binário. Quando
 ele roda de dentro do pacote da release (com `GNOME/` ao lado), atualiza
-também `GNOME/`, `Wallpapers/`, `README.md` e `OVPN/README.md` — os seus
+também `GNOME/`, `CINNAMON/`, `Wallpapers/`, `README.md` e `OVPN/README.md` — os seus
 `.ovpn` e os `logs/` nunca são tocados. Os arquivos ficam com o dono do
 binário atual. A execução em andamento continua sendo a versão antiga: ao
 final, o programa mostra o comando para executar de novo (com as mesmas
@@ -216,6 +219,7 @@ internal/
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
     gnome_apps.go           #   favoritos e pastas do menu de apps (por categoria)
+    cinnamon.go             #   atalhos (dconf) e painel do Cinnamon (applets + apps fixados)
     sistema.go              #   OpenVPN, virt-manager, limpeza
   config/flatpaks.go        # listas de Flatpaks (GTK, KDE, jogos)
   update/                   # verificação e aplicação de versão nova (release do GitHub)
@@ -269,7 +273,9 @@ no Mint) e preenche:
 - `MSRepoSupported` — se a Microsoft publica repositório (msodbcsql/mssql-tools)
   para essa distro+versão; se não, os módulos pulam essa parte com um aviso
 - `Desktop` — `kde` se `XDG_CURRENT_DESKTOP` contém KDE ou o `plasmashell`
-  está instalado (o sudo costuma limpar a variável), senão `gtk`
+  está instalado (o sudo costuma limpar a variável); `cinnamon` se ela contém
+  Cinnamon ou o `cinnamon` está instalado; senão `gtk`. Os módulos do GNOME
+  só rodam em `gtk`, e os do Cinnamon só em `cinnamon`
 
 ## Papel de parede
 
@@ -281,7 +287,9 @@ recompilar. O módulo `papel_parede`, como o usuário alvo:
    onde o GNOME guarda as imagens escolhidas em Configurações → Plano de
    fundo);
 2. aplica com `gsettings` (`picture-uri`, `picture-uri-dark` e
-   `picture-options 'zoom'`) — no Plasma, com `plasma-apply-wallpaperimage`.
+   `picture-options 'zoom'`) — no Cinnamon, nas chaves equivalentes de
+   `org.cinnamon.desktop.background`; no Plasma, com
+   `plasma-apply-wallpaperimage`.
 
 Os scripts que rodam como o usuário (`su - usuario`) usam a sessão D-Bus dele
 quando há uma sessão gráfica aberta; sem isso o `gsettings` descarta as
@@ -301,7 +309,7 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
 - `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
   `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
 
-O módulo `extensoes_gnome` (pulado no Plasma), como o usuário alvo:
+O módulo `extensoes_gnome` (pulado no Plasma e no Cinnamon), como o usuário alvo:
 
 1. para cada extensão que não vem com o sistema (`/usr/share/gnome-shell/extensions`),
    consulta o [extensions.gnome.org](https://extensions.gnome.org) pela versão
@@ -335,7 +343,7 @@ janela).
 
 ## Atalhos do GNOME
 
-O módulo `atalhos_gnome` (pulado no Plasma) aplica `GNOME/atalhos.dconf` com
+O módulo `atalhos_gnome` (pulado no Plasma e no Cinnamon) aplica `GNOME/atalhos.dconf` com
 `dconf load /org/gnome/`:
 
 - `Print` e `Shift+Super+S` abrem a captura interativa do Gradia (Flatpak,
@@ -351,7 +359,7 @@ para ficarem relativos a `/org/gnome/`.
 
 ## Favoritos e pastas do menu de apps
 
-O módulo `apps_gnome` (pulado no Plasma) roda perto do fim, depois de tudo
+O módulo `apps_gnome` (pulado no Plasma e no Cinnamon) roda perto do fim, depois de tudo
 instalado, e organiza o que existir de fato na máquina — por isso funciona em
 qualquer distro, mesmo com apps diferentes dos do Ubuntu:
 
@@ -381,6 +389,67 @@ disposição do menu é zerada, para o GNOME reordenar tudo.
 Um app instalado depois que se encaixe em duas pastas aparece nas duas, já
 que as exclusões são calculadas na hora da execução; basta rodar de novo
 `sudo ./post-install --modules apps_gnome` para reorganizar.
+
+## Cinnamon
+
+A pasta `CINNAMON/` define a configuração do Cinnamon (Linux Mint), editável
+sem recompilar. Os módulos só rodam com o Cinnamon detectado.
+
+### Atalhos
+
+O módulo `atalhos_cinnamon` aplica `CINNAMON/atalhos.dconf` com
+`dconf load /org/cinnamon/desktop/keybindings/`:
+
+- `Super+L` bloqueia a tela (junto do `Ctrl+Alt+L` padrão); o Looking Glass,
+  que usava `Super+L`, fica sem atalho;
+- `Print` e `Shift+Super+S` abrem a captura interativa do Gradia (Flatpak,
+  instalado pelo módulo se ainda não estiver); a captura nativa de tela
+  inteira sai do `Print` (as variações com `Shift`, `Alt` e `Ctrl` ficam).
+- `Super+V` abre o histórico da área de transferência, como no Windows: o
+  menu do [CopyQ](https://hluk.github.io/CopyQ/) aparece no cursor e o item
+  escolhido é colado na janela atual. O módulo instala o CopyQ (pacote
+  nativo), põe no início da sessão e, se ainda não houver configuração dele,
+  liga a colagem automática (`tray_item_paste`);
+- `Super+.` abre o seletor de emojis [Smile](https://smile.mijorus.it/)
+  (Flatpak): o emoji escolhido vai para a área de transferência. O atalho
+  igual do seletor do IBus é desligado;
+- as teclas de volume sobem e descem de 2 em 2%. O Cinnamon não tem um
+  `volume-step` como o GNOME (o passo é fixo em 5%), então elas saem das
+  media-keys e chamam `/usr/local/bin/cinnamon-volume-step +2`/`-2`,
+  instalado pelo módulo: muda o volume com `wpctl` (ou `pactl`), respeita o
+  teto de 100% (150% com o volume amplificado) e mostra o OSD do Cinnamon.
+  O passo é o número no comando, em `CINNAMON/atalhos.dconf`.
+
+Para atualizar a partir de uma máquina já configurada:
+`dconf dump /org/cinnamon/desktop/keybindings/` (fica só com o que mudou do
+padrão).
+
+### Preferências
+
+O módulo `preferencias_cinnamon` aplica `CINNAMON/preferencias.dconf` com
+`dconf load /org/cinnamon/`: por enquanto, tira o som que o Cinnamon toca a
+cada notificação (`sounds/notification-enabled`). Para achar a chave de outra
+opção, mude-a em Configurações do Sistema com `dconf watch /org/cinnamon/`
+aberto num terminal.
+
+### Painel
+
+O módulo `painel_cinnamon` roda perto do fim, depois de tudo instalado:
+
+- **Applets** — aplica `CINNAMON/painel.dconf` (`enabled-applets`: menu,
+  lista de janelas, bandeja, rede, som, relógio...). Para atualizar:
+  `gsettings get org.cinnamon enabled-applets`.
+- **Apps fixados** — fixa na lista de janelas (`grouped-window-list`) os apps
+  de `CINNAMON/fixados.txt`, na ordem do arquivo, no mesmo formato do
+  `GNOME/favoritos.txt` (alternativas com `|`; o que não estiver instalado é
+  pulado). Os Flatpaks ganham sozinhos o sufixo `:flatpak` que o Cinnamon
+  usa. A lista vai para `pinned-apps` em
+  `~/.config/cinnamon/spices/grouped-window-list@cinnamon.org/<instância>.json`
+  (a instância vem do `painel.dconf`), mantendo as outras opções do applet.
+
+O Cinnamon só relê os apps fixados ao iniciar, então o módulo o reinicia
+no fim (no X11 as janelas continuam abertas, como no `Ctrl+Alt+Esc`). No
+Wayland reiniciar derrubaria a sessão: os fixados aparecem no próximo login.
 
 ## Ruby, Bundler e Jekyll
 

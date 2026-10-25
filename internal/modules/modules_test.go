@@ -2,7 +2,9 @@ package modules
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -301,6 +303,124 @@ func TestIdPasta(t *testing.T) {
 	for nome, want := range map[string]string{"Comunicação": "comunicacao", "Sound & Video": "sound---video", "Games": "games"} {
 		if got := idPasta(nome); got != want {
 			t.Errorf("idPasta(%q) = %q, esperado %q", nome, got, want)
+		}
+	}
+}
+
+func TestInstanciaApplet(t *testing.T) {
+	conf, err := os.ReadFile("../../CINNAMON/painel.dconf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := instanciaApplet(string(conf), gwlApplet); got != "2" {
+		t.Errorf("instância no painel.dconf = %q, esperado 2", got)
+	}
+	// Saída do gsettings; o uuid é comparado inteiro.
+	applets := "['panel1:left:0:menu@cinnamon.org:0', 'panel1:left:1:my-grouped-window-list@cinnamon.org:7', 'panel2:left:0:grouped-window-list@cinnamon.org:12']"
+	if got := instanciaApplet(applets, gwlApplet); got != "12" {
+		t.Errorf("instância = %q, esperado 12", got)
+	}
+	if got := instanciaApplet("@as []", gwlApplet); got != "" {
+		t.Errorf("instância sem o applet = %q", got)
+	}
+}
+
+func TestIdsCinnamon(t *testing.T) {
+	home := t.TempDir()
+	dirs := dirsAplicativos(home)
+	for _, f := range []string{
+		".local/share/flatpak/exports/share/applications/com.spotify.Client.desktop",
+		".local/share/applications/nemo.desktop",
+	} {
+		if err := os.MkdirAll(filepath.Join(home, filepath.Dir(f)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(home, f), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := idsCinnamon([]string{"nemo.desktop", "com.spotify.Client.desktop"}, dirs)
+	want := []string{"nemo.desktop", "com.spotify.Client.desktop:flatpak"}
+	if !slices.Equal(got, want) {
+		t.Errorf("idsCinnamon = %v, esperado %v", got, want)
+	}
+}
+
+func TestFixarApps(t *testing.T) {
+	atual := `{"group-apps": {"type": "switch", "default": true, "value": false},
+"pinned-apps": {"type": "generic", "default": ["nemo.desktop"], "value": ["firefox.desktop"]},
+"show-apps-order-hotkey": {"type": "keybinding", "value": "<Super>grave"},
+"__md5__": "abc"}`
+	out, err := fixarApps([]byte(atual), []string{"nemo.desktop", "x.desktop:flatpak"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dados map[string]map[string]any
+	if err := json.Unmarshal([]byte(strings.Replace(string(out), `"__md5__": "abc"`, `"__md5__": {}`, 1)), &dados); err != nil {
+		t.Fatalf("JSON inválido: %v\n%s", err, out)
+	}
+	if v := dados["pinned-apps"]["value"]; !slices.Equal(toStrings(v), []string{"nemo.desktop", "x.desktop:flatpak"}) {
+		t.Errorf("pinned-apps = %v", v)
+	}
+	if !slices.Equal(toStrings(dados["pinned-apps"]["default"]), []string{"nemo.desktop"}) || dados["group-apps"]["value"] != false {
+		t.Errorf("outras opções alteradas:\n%s", out)
+	}
+	if !strings.Contains(string(out), `"__md5__": "abc"`) || !strings.Contains(string(out), `"<Super>grave"`) {
+		t.Errorf("__md5__ ou atalho alterados:\n%s", out)
+	}
+
+	// Sem arquivo: só a chave dos fixados, com o tipo.
+	out, err = fixarApps(nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "{\n    \"pinned-apps\": {\n        \"type\": \"generic\",\n        \"value\": []\n    }\n}"; string(out) != want {
+		t.Errorf("fixarApps sem arquivo = %s", out)
+	}
+}
+
+func toStrings(v any) []string {
+	var out []string
+	for _, s := range v.([]any) {
+		out = append(out, s.(string))
+	}
+	return out
+}
+
+func TestLerFixadosCinnamon(t *testing.T) {
+	fixados, err := lerFavoritos("../../CINNAMON/fixados.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fixados) != 9 || fixados[0][0] != "cinnamon-settings.desktop" {
+		t.Errorf("fixados = %v", fixados)
+	}
+}
+
+func TestVolumeStepCinnamon(t *testing.T) {
+	conf, err := os.ReadFile("../../CINNAMON/atalhos.dconf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cmd := range []string{volumeStep + " +2", volumeStep + " -2"} {
+		if !strings.Contains(string(conf), "command='"+cmd+"'") {
+			t.Errorf("atalhos.dconf não chama %q", cmd)
+		}
+	}
+
+	script := filepath.Join(t.TempDir(), "cinnamon-volume-step")
+	if err := os.WriteFile(script, []byte(volumeStepScript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("sh", "-n", script).CombinedOutput(); err != nil {
+		t.Fatalf("sintaxe: %v\n%s", err, out)
+	}
+	// Argumentos inválidos saem antes de mexer no áudio.
+	for _, arg := range []string{"2", "+", "+x", "-2a", ""} {
+		err := exec.Command(script, arg).Run()
+		var ee *exec.ExitError
+		if !errors.As(err, &ee) || ee.ExitCode() != 2 {
+			t.Errorf("cinnamon-volume-step %q: %v, esperado saída 2", arg, err)
 		}
 	}
 }

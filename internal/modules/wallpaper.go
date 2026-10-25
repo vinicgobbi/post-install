@@ -11,7 +11,7 @@ import (
 var papelParede = Module{
 	ID:    "papel_parede",
 	Title: "Papel de parede",
-	Desc:  "Copia o papel de parede escolhido para ~/.local/share/backgrounds e aplica no GNOME (ou no Plasma)",
+	Desc:  "Copia o papel de parede escolhido para ~/.local/share/backgrounds e aplica no GNOME (ou no Plasma/Cinnamon)",
 	Run: func(c *Ctx) error {
 		if c.Wallpaper == "" {
 			c.Log.Infof("Nenhum papel de parede escolhido: mantendo o atual.")
@@ -30,8 +30,12 @@ var papelParede = Module{
 		aplicar := `gsettings set org.gnome.desktop.background picture-uri ` + shQuote(uri) + `
 gsettings set org.gnome.desktop.background picture-uri-dark ` + shQuote(uri) + `
 gsettings set org.gnome.desktop.background picture-options 'zoom'`
-		if c.Sys.IsKDE() {
+		switch {
+		case c.Sys.IsKDE():
 			aplicar = `plasma-apply-wallpaperimage ` + shQuote(destino)
+		case c.Sys.IsCinnamon():
+			aplicar = `gsettings set org.cinnamon.desktop.background picture-uri ` + shQuote(uri) + `
+gsettings set org.cinnamon.desktop.background picture-options 'zoom'`
 		}
 		if err := c.AsUser("set -e\ninstall -D -m 0644 " + shQuote(c.Wallpaper) + " " + shQuote(destino) + "\n" + aplicar); err != nil {
 			return err

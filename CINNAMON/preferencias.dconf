@@ -1,0 +1,10 @@
+# Preferências gerais do Cinnamon, carregadas com:
+#   dconf load /org/cinnamon/ < preferencias.dconf
+# - notificações sem o som do Cinnamon (os apps que tocam o próprio som,
+#   como o Telegram, configuram isso neles).
+#
+# Para descobrir a chave de uma opção, mude-a em Configurações do Sistema
+# com "dconf watch /org/cinnamon/" aberto num terminal.
+
+[sounds]
+notification-enabled=false

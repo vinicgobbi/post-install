@@ -1,0 +1,52 @@
+# Atalhos do Cinnamon, carregados com:
+#   dconf load /org/cinnamon/desktop/keybindings/ < atalhos.dconf
+# - Super+L bloqueia a tela (o Looking Glass, que usava Super+L, fica sem
+#   atalho);
+# - Print e Shift+Super+S abrem a captura do Gradia (Flatpak); a captura
+#   nativa de tela inteira sai do Print (as variações com Shift/Alt/Ctrl
+#   continuam);
+# - Super+V abre o histórico da área de transferência (CopyQ) e Super+. o
+#   seletor de emojis (Smile, Flatpak);
+# - as teclas de volume sobem e descem de 2 em 2% (o número no comando é o
+#   passo): o passo nativo do Cinnamon é fixo em 5%, então elas saem das
+#   media-keys e chamam o cinnamon-volume-step, instalado pelo post-install.
+
+[/]
+custom-list=['custom0', 'custom1', 'custom2', 'custom3', 'custom4', 'custom5']
+looking-glass-keybinding=@as []
+
+[media-keys]
+screensaver=['<Super>l', '<Control><Alt>l', 'XF86ScreenSaver']
+screenshot=@as []
+volume-up=@as []
+volume-down=@as []
+
+[custom-keybindings/custom0]
+binding=['Print']
+command='flatpak run be.alexandervanhee.gradia --screenshot=INTERACTIVE'
+name='Gradia'
+
+[custom-keybindings/custom1]
+binding=['<Shift><Super>s']
+command='flatpak run be.alexandervanhee.gradia --screenshot=INTERACTIVE'
+name='Gradia Like Windows'
+
+[custom-keybindings/custom2]
+binding=['<Super>v']
+command='copyq --start-server menu'
+name='Histórico da área de transferência'
+
+[custom-keybindings/custom3]
+binding=['<Super>period']
+command='flatpak run it.mijorus.smile'
+name='Emojis'
+
+[custom-keybindings/custom4]
+binding=['XF86AudioRaiseVolume']
+command='/usr/local/bin/cinnamon-volume-step +2'
+name='Aumentar volume'
+
+[custom-keybindings/custom5]
+binding=['XF86AudioLowerVolume']
+command='/usr/local/bin/cinnamon-volume-step -2'
+name='Diminuir volume'
