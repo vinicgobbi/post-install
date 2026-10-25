@@ -106,16 +106,13 @@ func avisarPermissaoOVPN(c *Ctx, arquivo string) {
 	}
 }
 
-// O pacote "-gnome" só traz o diálogo de autenticação GTK; no Plasma quem
-// cobre isso é o plasma-nm. No Arch o pacote oficial já cobre os dois.
+// O pacote "-gnome" traz o diálogo de autenticação GTK. No Arch o pacote
+// oficial já o inclui.
 func instalarPluginOpenVPN(c *Ctx) error {
 	switch c.Sys.PkgMgr {
 	case "dnf":
 		if c.Probe("rpm", "-q", "NetworkManager-openvpn") {
 			return nil
-		}
-		if c.Sys.IsKDE() {
-			return c.install("NetworkManager-openvpn")
 		}
 		return c.install("NetworkManager-openvpn", "NetworkManager-openvpn-gnome")
 	case "pacman":
@@ -126,9 +123,6 @@ func instalarPluginOpenVPN(c *Ctx) error {
 	default:
 		if c.Probe("dpkg", "-s", "network-manager-openvpn") {
 			return nil
-		}
-		if c.Sys.IsKDE() {
-			return c.install("network-manager-openvpn")
 		}
 		return c.install("network-manager-openvpn", "network-manager-openvpn-gnome")
 	}

@@ -421,9 +421,7 @@ var pacotesBase = Module{
 				"php-devel", "php-xml", "php-pear", "msodbcsql18", "mssql-tools18", "unixODBC-devel", "bat")
 		default:
 			extras := []string{"code"}
-			// gnome-software só faz sentido em Ubuntu com GNOME; no Kubuntu o
-			// Discover já cobre Flatpak/Snap.
-			if c.Sys.ID == "ubuntu" && !c.Sys.IsKDE() {
+			if c.Sys.ID == "ubuntu" {
 				extras = append(extras, "gnome-software", "gnome-software-plugin-flatpak", "gnome-software-plugin-snap")
 			}
 			pkgs := append([]string{"flatpak", "zsh", "git", "curl", "jq",

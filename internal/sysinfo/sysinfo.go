@@ -1,5 +1,5 @@
-// Package sysinfo detecta a distribuição, a versão, o gerenciador de pacotes
-// e o ambiente de desktop.
+// Package sysinfo detecta a distribuição, a versão e o gerenciador de
+// pacotes, e confere se o GNOME está instalado.
 //
 // A família "arch" é restrita ao Arch puro (ID=arch) de propósito: derivados
 // (Manjaro, EndeavourOS, CachyOS...) divergem de formas diferentes (repos,
@@ -34,28 +34,8 @@ type Info struct {
 	DockerDistro    string // "ubuntu" ou "debian", para as URLs do repo Docker
 	MSRepoSupported bool   // a Microsoft publica repo empacotado para essa combinação
 
-	Desktop string // kde | cinnamon | gtk
-
 	// Avisos gerados durante a detecção (ex.: fallback de versão do Ubuntu).
 	Warnings []string
-}
-
-func (i *Info) IsKDE() bool      { return i.Desktop == "kde" }
-func (i *Info) IsCinnamon() bool { return i.Desktop == "cinnamon" }
-
-// IsGNOME vale para o GNOME e outros desktops GTK que não são o Cinnamon.
-func (i *Info) IsGNOME() bool { return i.Desktop == "gtk" }
-
-// DesktopName é o nome do ambiente para mostrar ao usuário.
-func (i *Info) DesktopName() string {
-	switch i.Desktop {
-	case "kde":
-		return "KDE Plasma"
-	case "cinnamon":
-		return "Cinnamon"
-	default:
-		return "GNOME/GTK"
-	}
 }
 
 // Detect lê /etc/os-release (e, no Mint, /etc/upstream-release/lsb-release)
@@ -74,7 +54,11 @@ func Detect() (*Info, error) {
 	if info.Family == "debian" {
 		info.Arch = dpkgArch()
 	}
-	info.Desktop = detectDesktop()
+	// O sudo costuma limpar XDG_CURRENT_DESKTOP (env_reset), então confere
+	// pelo binário do GNOME Shell.
+	if _, err := exec.LookPath("gnome-shell"); err != nil {
+		return nil, fmt.Errorf("%s sem o GNOME Shell não é suportado (só o GNOME)", info.PrettyName)
+	}
 	return info, nil
 }
 
@@ -171,26 +155,6 @@ func (i *Info) Summary() string {
 	default:
 		return i.PrettyName
 	}
-}
-
-// O programa roda via sudo, que por padrão limpa XDG_CURRENT_DESKTOP
-// (env_reset), então essa variável quase nunca chega até aqui — por isso
-// também checamos se o plasmashell (ou o cinnamon) está instalado.
-func detectDesktop() string {
-	cur := os.Getenv("XDG_CURRENT_DESKTOP")
-	switch {
-	case strings.Contains(cur, "KDE"):
-		return "kde"
-	case strings.Contains(cur, "Cinnamon"):
-		return "cinnamon"
-	}
-	if _, err := exec.LookPath("plasmashell"); err == nil {
-		return "kde"
-	}
-	if _, err := exec.LookPath("cinnamon"); err == nil {
-		return "cinnamon"
-	}
-	return "gtk"
 }
 
 func dpkgArch() string {

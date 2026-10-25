@@ -904,7 +904,7 @@ func (m Model) header() string {
 	if m.cfg.DryRun {
 		title += " " + warnStyle.Bold(true).Render("[dry-run]")
 	}
-	info := subtleStyle.Render(m.cfg.Sys.Summary() + " · " + m.cfg.Sys.DesktopName())
+	info := subtleStyle.Render(m.cfg.Sys.Summary())
 	if m.cfg.User != "" {
 		info += subtleStyle.Render(" · usuário ") + accentStyle.Render(m.cfg.User)
 	}

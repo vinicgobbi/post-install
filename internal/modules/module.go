@@ -29,9 +29,6 @@ type Ctx struct {
 	Wallpaper string
 	// GNOMEDir guarda extensoes.txt, extensoes.dconf e atalhos.dconf.
 	GNOMEDir string
-	// CinnamonDir guarda atalhos.dconf, preferencias.dconf, painel.dconf e
-	// fixados.txt.
-	CinnamonDir string
 	// ForcarExtensoes são as extensões sem versão compatível que o usuário
 	// pediu para instalar mesmo assim.
 	ForcarExtensoes []string
@@ -65,8 +62,6 @@ func All() []Module {
 		papelParede,
 		extensoesGnome,
 		atalhosGnome,
-		atalhosCinnamon,
-		preferenciasCinnamon,
 		rustTools,
 		ruby,
 		claudeCode,
@@ -76,7 +71,6 @@ func All() []Module {
 		virtManager,
 		// Depois de tudo instalado: organiza o que existir na máquina.
 		appsGnome,
-		painelCinnamon,
 		limpeza,
 	}
 }

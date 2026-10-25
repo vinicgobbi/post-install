@@ -36,15 +36,8 @@ func clonarFixado(repo, ref, dir string) string {
 var temasIcones = Module{
 	ID:    "temas_icones",
 	Title: "Temas e ícones",
-	Desc:  "Instala o tema adw-gtk3 e os ícones Yaru (pulado automaticamente no Plasma)",
+	Desc:  "Instala o tema adw-gtk3 e os ícones Yaru",
 	Run: func(c *Ctx) error {
-		// adw-gtk3 e Yaru existem só para dar cara de GNOME a apps GTK; no
-		// Plasma o padrão já é Breeze.
-		if c.Sys.IsKDE() {
-			c.Log.Infof("Ambiente Plasma detectado: pulando temas/ícones GTK (adw-gtk3/Yaru), sem uso no KDE.")
-			return nil
-		}
-
 		if c.Sys.PkgMgr == "pacman" {
 			c.Log.Infof("Instalando adw-gtk-theme (oficial) e ícones Yaru (AUR/Chaotic-AUR)...")
 			if err := step(
@@ -144,7 +137,7 @@ func instalarYaru(c *Ctx) error {
 var ambienteUsuario = Module{
 	ID:    "ambiente_usuario",
 	Title: "Configurar ambiente do usuário",
-	Desc:  "Zsh, Oh My Zsh, fnm/Node, dotfiles e ajustes visuais (GNOME ou Plasma, conforme detectado)",
+	Desc:  "Zsh, Oh My Zsh, fnm/Node, dotfiles e ajustes visuais do GNOME",
 	Deps:  []string{"pacotes_base"},
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Aplicando configurações locais para %s...", c.User)
@@ -198,9 +191,6 @@ func scriptAmbienteUsuario(c *Ctx) string {
 	if c.Sys.ID != "ubuntu" {
 		visual = `gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' && gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
 ` + visual
-	}
-	if c.Sys.IsKDE() {
-		visual = `command -v plasma-apply-colorscheme >/dev/null 2>&1 && plasma-apply-colorscheme BreezeDark >/dev/null 2>&1 || true`
 	}
 
 	return fmt.Sprintf(`
@@ -405,42 +395,11 @@ func conferirSHA256(c *Ctx, sumURL, arquivo string) error {
 	return runner.VerifySHA256(arquivo, campos[0])
 }
 
-const dolphinServiceMenu = `[Desktop Entry]
-Type=Service
-X-KDE-ServiceTypes=KonqPopupMenu/Plugin
-MimeType=all/allfiles;inode/directory;
-Actions=openWithCode;
-
-[Desktop Action openWithCode]
-Name=Abrir com o VSCode
-Icon=code
-Exec=code %U
-`
-
 var vscodeNautilus = Module{
 	ID:    "vscode_nautilus",
 	Title: "Extensão VSCode no gerenciador de arquivos",
-	Desc:  "Adiciona 'Abrir com o VSCode' ao menu de contexto (Nautilus no GNOME, Dolphin no Plasma) e, no Nautilus, 'Copiar caminho'",
+	Desc:  "Adiciona 'Abrir com o VSCode' e 'Copiar caminho' ao menu de contexto do Nautilus",
 	Run: func(c *Ctx) error {
-		if c.Sys.IsKDE() {
-			c.Log.Infof("Ambiente Plasma detectado: adicionando 'Abrir com o VSCode' ao menu de contexto do Dolphin...")
-			if err := step(
-				func() error { return c.MkdirAll("/usr/share/kio/servicemenus", 0o755) },
-				func() error {
-					return c.WriteFile("/usr/share/kio/servicemenus/vscode-open-with.desktop", dolphinServiceMenu, 0o644)
-				},
-			); err != nil {
-				return err
-			}
-			for _, kb := range []string{"kbuildsycoca6", "kbuildsycoca5"} {
-				if _, err := lookPath(kb); err == nil {
-					c.Try(kb, "--noincremental")
-				}
-			}
-			c.Log.Successf("Item 'Abrir com o VSCode' adicionado ao Dolphin.")
-			return nil
-		}
-
 		c.Log.Infof("Instalando extensões do VSCode e de copiar caminho para o Nautilus...")
 		var deps []string
 		switch c.Sys.PkgMgr {

@@ -53,7 +53,6 @@ type options struct {
 	wallDir  string
 	wall     string
 	gnomeDir string
-	cinnDir  string
 	forceExt string
 	noUpdate bool
 }
@@ -73,7 +72,6 @@ func parseFlags() options {
 	flag.StringVar(&o.wallDir, "wallpapers-dir", "", "pasta com as imagens de papel de parede (padrão: Wallpapers/ ao lado do binário)")
 	flag.StringVar(&o.wall, "wallpaper", "", "papel de parede a aplicar: nome do arquivo em --wallpapers-dir, ou \"none\" para não alterar (padrão: perguntar)")
 	flag.StringVar(&o.gnomeDir, "gnome-dir", "", "pasta com extensoes.txt e extensoes.dconf (padrão: GNOME/ ao lado do binário)")
-	flag.StringVar(&o.cinnDir, "cinnamon-dir", "", "pasta com atalhos.dconf, preferencias.dconf, painel.dconf e fixados.txt do Cinnamon (padrão: CINNAMON/ ao lado do binário)")
 	flag.StringVar(&o.forceExt, "force-extensions", "", "extensões do GNOME sem versão compatível a instalar mesmo assim (UUIDs separados por vírgula, ou \"none\"); sem ela, pergunta")
 	flag.BoolVar(&o.noUpdate, "no-update-check", false, "não verificar se há uma versão mais nova do post-install")
 	flag.StringVar(&o.logDir, "log-dir", "", "pasta onde os logs da execução são gravados (padrão: logs/ ao lado do binário)")
@@ -83,7 +81,7 @@ func parseFlags() options {
 	}
 	flag.Parse()
 
-	// Por padrão, OVPN/, Wallpapers/, GNOME/, CINNAMON/ e logs/ ficam ao lado do binário (estrutura do
+	// Por padrão, OVPN/, Wallpapers/, GNOME/ e logs/ ficam ao lado do binário (estrutura do
 	// pacote .tar.gz da release), para funcionar de qualquer diretório.
 	base := exeDir()
 	if o.ovpnDir == "" {
@@ -98,12 +96,9 @@ func parseFlags() options {
 	if o.gnomeDir == "" {
 		o.gnomeDir = filepath.Join(base, "GNOME")
 	}
-	if o.cinnDir == "" {
-		o.cinnDir = filepath.Join(base, "CINNAMON")
-	}
 	// Absolutos: os scripts como usuário rodam via "su -", que muda o
 	// diretório atual para a home dele.
-	for _, d := range []*string{&o.ovpnDir, &o.wallDir, &o.gnomeDir, &o.cinnDir, &o.logDir} {
+	for _, d := range []*string{&o.ovpnDir, &o.wallDir, &o.gnomeDir, &o.logDir} {
 		if abs, err := filepath.Abs(*d); err == nil {
 			*d = abs
 		}
@@ -269,7 +264,7 @@ func run() int {
 	}
 	// Consulta antes da interface quais extensões do GNOME não têm versão
 	// para o GNOME Shell da máquina, para perguntar se instala mesmo assim.
-	if sys.IsGNOME() && !p.extChosen && isSelected(all, sel, "extensoes_gnome") {
+	if !p.extChosen && isSelected(all, sel, "extensoes_gnome") {
 		out.Info("Verificando a compatibilidade das extensões do GNOME...")
 		p.shell, p.incompat = modules.VerificarExtensoes(o.gnomeDir)
 	}
@@ -292,7 +287,6 @@ func run() int {
 			OVPNDir:         o.ovpnDir,
 			Wallpaper:       esc.Wallpaper,
 			GNOMEDir:        o.gnomeDir,
-			CinnamonDir:     o.cinnDir,
 			ForcarExtensoes: esc.ForcarExtensoes,
 		}
 		return engine.Run(ctx, mods, c, engine.Options{FailFast: o.failFast}, emit)
