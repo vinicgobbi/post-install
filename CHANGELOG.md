@@ -1,3 +1,28 @@
+## v2.0.0 (2026-10-25)
+
+### BREAKING CHANGE
+
+- os IDs de módulo de --modules/--skip mudaram:
+repositorios, pacotes_base, ambiente_usuario, chrome_gcm, php_extensoes,
+rust_tools, temas_icones e vscode_nautilus deram lugar a ferramentas,
+shell, firefox_thunderbird, chrome, git_gcm, docker, vscode, go, node,
+php_sqlserver, rust, firewall, temas_yaru e nautilus.
+- Fedora, RHEL/AlmaLinux, Arch, Debian, derivados do Ubuntu
+e Ubuntu anterior ao 22.04 não são mais suportados.
+- Cinnamon e KDE Plasma não são mais suportados, e a flag
+--cinnamon-dir foi removida.
+
+### Feat
+
+- sincroniza as variantes do tema Yaru com os apps Flatpak
+- instala o Go (pacote golang)
+- suporte apenas ao Ubuntu
+- remove o suporte ao Cinnamon e ao KDE Plasma
+
+### Refactor
+
+- reorganiza os módulos em grupos autocontidos
+
 ## v1.12.0 (2026-10-25)
 
 ### Feat
