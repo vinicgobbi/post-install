@@ -1,56 +1,35 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Linux recém-instalada: mirrors, atualização do sistema, Docker,
-VSCode, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
+workstation Ubuntu recém-instalada: mirrors, atualização do sistema, Docker,
+VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
-temas/ícones GNOME, extensões e atalhos do GNOME, atalhos e painel do
-Cinnamon, o ambiente do usuário (zsh,
+temas e ícones Yaru (com todas as variantes do tema nos apps Flatpak),
+extensões e atalhos do GNOME, o ambiente do usuário (zsh,
 Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update),
 Ruby (Bundler e Jekyll), Claude Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
 VSCode"/"Copiar caminho" no Nautilus.
 
 ## Sistemas suportados
 
-| Família  | Distribuições                                  | Gerenciador |
-|----------|------------------------------------------------|-------------|
-| Fedora   | Fedora Linux                                   | `dnf`       |
-| RHEL     | AlmaLinux e derivados (`ID_LIKE=rhel/centos`)  | `dnf`       |
-| Arch     | Arch Linux puro (`ID=arch`)                    | `pacman`    |
-| Debian   | Ubuntu (bionic, focal, jammy, noble, resolute) e derivados | `apt` |
-| Debian   | Debian (bullseye, bookworm)                    | `apt`       |
+Só o **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o
+`gnome-shell` instalado), nas versões **22.04 (jammy), 24.04 (noble) e
+26.04 (resolute)**, além das mais novas que a 26.04.
 
-Se a distribuição/versão não estiver nessa lista, o programa para com uma
-mensagem clara em vez de continuar em um estado incerto. No Arch isso inclui
-derivados como Manjaro/EndeavourOS/CachyOS: cada um diverge de um jeito
-diferente do Arch puro, então não são reconhecidos por `ID_LIKE` — rodar lá é
-por conta e risco, sem suporte. Ubuntus mais novos que a última LTS mapeada
-usam o repositório da Microsoft do 26.04 (compatível), com um aviso.
+Qualquer outro sistema faz o programa parar com uma mensagem clara em vez de
+continuar em um estado incerto — inclusive derivados do Ubuntu (Linux Mint,
+Pop!_OS, Zorin...), sabores com outro desktop (Kubuntu, Xubuntu...) e versões
+anteriores à 22.04 ou interinas entre as LTS suportadas. Versões mais novas
+que a 26.04 usam o repositório da Microsoft do 26.04 (compatível), com um
+aviso.
 
-### Arch Linux: Chaotic-AUR e yay
-
-Como o Arch não tem repositório empacotado próprio para VSCode, Google Chrome,
-Bitwarden nativo ou os pacotes MS SQL, o módulo `repositorios` configura o
-[Chaotic-AUR](https://aur.chaotic.cx/) — repositório binário com pacotes da
-AUR pré-compilados — e instala o `yay` (de lá, se disponível; senão compila da
-AUR). Os demais módulos usam o `yay` para esses pacotes.
-
-Como o `makepkg` (usado pelo `yay`) recusa rodar como root, o módulo
-`repositorios` libera temporariamente sudo sem senha **só para o binário do
-`pacman`** (`/etc/sudoers.d/99-post-install-aur`) para o usuário escolhido.
-Como `pacman` com argumentos livres equivale a root completo, a regra é
-removida no fim de **toda** execução — com qualquer resultado (falha,
-`--fail-fast`, Ctrl+C, limpeza desmarcada) — e também no início, caso tenha
-sobrado de uma execução morta à força.
-
-### Ubuntu: Firefox e Thunderbird sem snap
+### Firefox e Thunderbird sem snap
 
 No Ubuntu, os pacotes `firefox` e `thunderbird` do repositório oficial são só
-pacotes de transição que instalam a versão snap. Por isso, no Ubuntu (e
-sabores com `ID=ubuntu`, como o Kubuntu):
+pacotes de transição que instalam a versão snap. Por isso:
 
-- o módulo `repositorios` segue a instrução oficial da Mozilla para o
+- o módulo `firefox_thunderbird` segue a instrução oficial da Mozilla para o
   [repositório APT](https://packages.mozilla.org/apt) dela: chave em
   `/etc/apt/keyrings/packages.mozilla.org.asc`, conferência do fingerprint
   (`35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3`), repositório com as suítes
@@ -58,15 +37,58 @@ sabores com `ID=ubuntu`, como o Kubuntu):
   `mozilla.sources` (deb822) do Ubuntu 26.04 em diante, ou `mozilla.list` no
   24.04 e anteriores — e `/etc/apt/preferences.d/mozilla` com prioridade 1000
   para `packages.mozilla.org`;
-- o módulo `pacotes_base` instala os `.deb` da Mozilla (com
+- em seguida, instala os `.deb` da Mozilla (com
   `--allow-downgrades`, já que o pacote de transição tem epoch maior) e, depois,
   remove os snaps de ambos, se instalados. Antes de remover, copia o perfil do
   snap para `~/.mozilla/firefox` / `~/.thunderbird` quando o usuário ainda não
   tem um. A remoção é sem `--purge`, então o snapd guarda um snapshot por
   alguns dias.
 
-Nas outras distros, os dois vêm do repositório nativo (no Debian puro,
-`firefox-esr`).
+## Módulos
+
+Os módulos ficam em grupos, mostrados nessa ordem na TUI e no `--list`, e
+rodam de cima para baixo. Cada um é autocontido: configura o próprio
+repositório, se precisar, e instala o que usa, então pode ser marcado ou
+desmarcado sozinho.
+
+| Grupo | ID | O que faz |
+|-------|----|-----------|
+| Sistema | `mirrors` | aponta o APT para o mirror do Ubuntu mais rápido medido na rede |
+| | `atualizacao` | `apt update` + `apt upgrade` |
+| Terminal | `ferramentas` | git, curl, jq, bat, gh (repositório oficial), tea, nmap, pipx, ffmpeg, bashtop, FUSE 2 |
+| | `shell` | Zsh como shell padrão e os dotfiles (Oh My Zsh, plugins, tema, fontes) |
+| Aplicativos | `firefox_thunderbird` | `.deb` da Mozilla no lugar dos snaps |
+| | `chrome` | Google Chrome |
+| | `bitwarden` | Bitwarden desktop nativo |
+| | `remover_libreoffice` | remove o LibreOffice nativo (vem como Flatpak) |
+| | `flatpaks` | Flathub, GNOME Software com Flatpak e a lista de apps |
+| | `flatpaks_jogos` | Steam, Heroic, ProtonPlus, PrismLauncher |
+| | `solaar` | Solaar (PPA), regras UDEV e início com a sessão |
+| Desenvolvimento | `git_gcm` | Git Credential Manager, com o chaveiro do GNOME |
+| | `docker` | Docker Engine, Buildx e Compose; usuário no grupo `docker` |
+| | `vscode` | VSCode (repositório da Microsoft) |
+| | `go` | Go (`golang`) |
+| | `node` | fnm + Node LTS |
+| | `php_sqlserver` | PHP, Composer, msodbcsql18/mssql-tools18 e sqlsrv/pdo_sqlsrv |
+| | `rust` | rustup, eza, topgrade, cargo-update |
+| | `ruby` | Ruby, Bundler e Jekyll |
+| | `claude_code` | Claude Code |
+| | `deploy_dev` | deploy-dev |
+| Rede e virtualização | `tailscale` | Tailscale (repositório oficial) + Trayscale |
+| | `firewall` | ufw + gufw (não ativa o firewall) |
+| | `ovpn` | importa os `.ovpn` de `OVPN/` no NetworkManager |
+| | `virt_manager` | QEMU/KVM, libvirt e virt-manager |
+| GNOME e aparência | `temas_yaru` | temas e ícones Yaru, sincronizados com os apps Flatpak |
+| | `papel_parede` | aplica o papel de parede escolhido |
+| | `extensoes_gnome` | extensões de `GNOME/extensoes.txt` e as preferências delas |
+| | `atalhos_gnome` | atalhos de `GNOME/atalhos.dconf` |
+| | `nautilus` | "Abrir com o VSCode", "Copiar caminho" e a pasta Projetos |
+| | `apps_gnome` | favoritos e pastas do menu de apps |
+| Finalização | `limpeza` | `apt autoremove` + `apt clean` |
+
+O `shell` roda antes de `node` e `ruby` porque o instalador do Oh My Zsh troca
+o `~/.zshrc`, e eles acrescentam linhas nele. Desmarcado o `shell`, os dois
+escrevem só nos arquivos que existirem (`.zshrc`/`.bashrc`).
 
 ## Como usar
 
@@ -81,7 +103,6 @@ post-install-linux-amd64.tar.gz
     ├── OVPN/README.md    # coloque aqui os .ovpn a importar
     ├── Wallpapers/       # papéis de parede oferecidos na TUI
     ├── GNOME/            # extensões, atalhos, favoritos e pastas do GNOME
-    ├── CINNAMON/         # atalhos, applets e apps fixados do painel do Cinnamon
     ├── logs/             # logs de cada execução
     └── README.md
 ```
@@ -113,10 +134,8 @@ Releases anteriores a essa mudança não têm atestado.
 
 ### Fluxo da TUI
 
-1. Mostra o sistema detectado (distro, base, desktop GNOME/GTK, Cinnamon ou
-   KDE). Se
-   houver uma versão mais nova do post-install, a primeira tela oferece
-   atualizar agora ou ignorar (veja [Atualização](#atualização)).
+1. Mostra o sistema detectado (versão do Ubuntu). Se houver uma versão mais
+   nova do post-install, a primeira tela oferece atualizar agora ou ignorar (veja [Atualização](#atualização)).
 2. Pergunta para qual usuário do sistema configurar o ambiente. O usuário
    que executou o `sudo` é detectado (`SUDO_USER`, `PKEXEC_UID` ou `logname`,
    nunca `root`) e vem como primeira opção; a segunda, "Outro usuário…", abre
@@ -133,7 +152,8 @@ Releases anteriores a essa mudança não têm atestado.
    [Extensões do GNOME](#extensões-do-gnome).
 5. Checklist com todos os módulos, já marcados:
    - `↑`/`↓` (ou `j`/`k`) — mover · `espaço` — marcar/desmarcar · `a` — todos
-   - o painel abaixo mostra a descrição do módulo e as dependências
+   - os módulos aparecem agrupados (veja [Módulos](#módulos)); o painel
+     abaixo mostra a descrição do módulo e as dependências
    - marcar um módulo marca as dependências dele; desmarcar uma dependência
      desmarca quem depende dela (com aviso na tela)
 6. Confirmação com a lista do que vai rodar (e o papel de parede e as extensões forçadas).
@@ -161,7 +181,7 @@ dele, que são pulados. Use `--fail-fast` para parar tudo no primeiro erro.
 | `--list` | lista os módulos e sai |
 | `--force-extensions a,b` | extensões do GNOME sem versão compatível a instalar mesmo assim (ou `none`); sem ela, pergunta |
 | `--wallpaper NOME` | papel de parede a aplicar (nome do arquivo, ou `none` para não alterar); sem ela, a TUI pergunta |
-| `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--cinnamon-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, configurações do GNOME e do Cinnamon e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/`, `CINNAMON/` e `logs/` ao lado do binário) |
+| `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, configurações do GNOME e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` ao lado do binário) |
 | `--no-update-check` | não verifica se há versão nova do post-install |
 | `--version` | mostra a versão |
 
@@ -181,7 +201,7 @@ Ao iniciar, o post-install consulta a última release no GitHub (com prazo de
 Atualizar baixa o `.tar.gz` da release, confere o SHA-256 (pelo `.sha256`
 publicado e pelo digest que o GitHub calcula) e substitui o binário. Quando
 ele roda de dentro do pacote da release (com `GNOME/` ao lado), atualiza
-também `GNOME/`, `CINNAMON/`, `Wallpapers/`, `README.md` e `OVPN/README.md` — os seus
+também `GNOME/`, `Wallpapers/`, `README.md` e `OVPN/README.md` — os seus
 `.ovpn` e os `logs/` nunca são tocados. Os arquivos ficam com o dono do
 binário atual. A execução em andamento continua sendo a versão antiga: ao
 final, o programa mostra o comando para executar de novo (com as mesmas
@@ -197,7 +217,7 @@ transferido para o usuário alvo — o programa roda como root):
 - `setup_<timestamp>.log` — só as mensagens (info/aviso/erro/sucesso/passo),
   com hora e nível. Bom para uma leitura rápida.
 - `setup_<timestamp>.raw.log` — transcrição completa, incluindo cada comando
-  executado e a saída crua de `apt`/`dnf`/`flatpak`/`curl`. Bom para
+  executado e a saída crua de `apt`/`flatpak`/`curl`. Bom para
   investigar uma falha.
 
 ## Estrutura do projeto
@@ -205,23 +225,26 @@ transferido para o usuário alvo — o programa roda como root):
 ```
 cmd/post-install/main.go    # flags, verificação de root, TUI x modo texto
 internal/
-  sysinfo/                  # detecção de distro/versão/gerenciador/desktop
+  sysinfo/                  # detecção da versão do Ubuntu e checagem de suporte
   runner/                   # execução de comandos, downloads, escrita de arquivos, dry-run
   runlog/                   # logs .log/.raw.log e repasse das mensagens à interface
   engine/                   # dependências entre módulos e execução em ordem
   modules/                  # os módulos (um arquivo por grupo)
-    module.go               #   tipo Module, ordem de execução (All) e helpers
-    mirrors.go              #   mirrors (dnf, reflector no Arch, teste de velocidade no Ubuntu)
-    repositorios.go         #   atualização, repositórios/Chaotic-AUR+yay, pacotes base
-    apps.go                 #   Solaar, LibreOffice, Flatpaks, Tailscale, PHP, Chrome+GCM, Bitwarden
-    desktop.go              #   temas/ícones, ambiente do usuário, Rust, Ruby, Claude Code, deploy-dev, Nautilus/Dolphin
+    module.go               #   tipo Module, grupos, ordem de execução (All) e helpers
+    pins.go                 #   commits fixados dos repositórios pessoais executados
+    sistema.go              #   Sistema e Finalização: atualização, limpeza
+    mirrors.go              #   mirrors (teste de velocidade dos mirrors do Ubuntu)
+    terminal.go             #   Terminal: ferramentas (gh, tea...), Zsh e dotfiles
+    apps.go                 #   Aplicativos: Chrome, Bitwarden, LibreOffice, Flatpaks, Solaar
+    mozilla.go              #   Firefox e Thunderbird (repositório da Mozilla, remoção dos snaps)
+    dev.go                  #   Desenvolvimento: GCM, Docker, VSCode, Go, Node, PHP/SQL Server, Rust, Ruby, Claude Code, deploy-dev
+    rede.go                 #   Rede e virtualização: Tailscale, firewall, OpenVPN, virt-manager
+    aparencia.go            #   temas Yaru (+ sincronização com o Flatpak) e Nautilus
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
     gnome_apps.go           #   favoritos e pastas do menu de apps (por categoria)
-    cinnamon.go             #   atalhos (dconf) e painel do Cinnamon (applets + apps fixados)
-    sistema.go              #   OpenVPN, virt-manager, limpeza
-  config/flatpaks.go        # listas de Flatpaks (GTK, KDE, jogos)
+  config/flatpaks.go        # listas de Flatpaks (apps e jogos)
   update/                   # verificação e aplicação de versão nova (release do GitHub)
   tui/                      # interface Bubble Tea
   plain/                    # saída em texto simples
@@ -231,13 +254,14 @@ internal/
 
 ## Adicionando ou editando um módulo
 
-1. Declare o módulo em um dos arquivos de `internal/modules/` (ou num novo):
+1. Declare o módulo no arquivo do grupo dele, em `internal/modules/`:
    ```go
    var meuModulo = Module{
        ID:    "meu_modulo",
+       Grupo: GrupoDesenvolvimento,
        Title: "Título no menu",
        Desc:  "Descrição de uma linha",
-       Deps:  []string{"pacotes_base"}, // opcional
+       Deps:  []string{"docker"}, // opcional
        Run: func(c *Ctx) error {
            c.Log.Infof("Fazendo algo...")
            if err := c.install("pacote"); err != nil {
@@ -248,7 +272,8 @@ internal/
        },
    }
    ```
-2. Inclua-o em `All()` (`internal/modules/module.go`) na posição de execução.
+2. Inclua-o em `All()` (`internal/modules/module.go`) entre os módulos do
+   mesmo grupo — um teste garante que cada grupo fica junto e na ordem.
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -257,25 +282,25 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 - `c.Try(...)` — comando que altera o sistema, silencioso, devolve `bool`
 - `c.Probe(...)`/`c.Output(...)` — consultas somente-leitura (rodam mesmo no dry-run)
 - `c.AsUser(script)` — shell como o usuário alvo (`su - usuario -c`)
-- `c.install(...)`, `c.installAUR(...)`, `c.flatpakInstall(...)`
+- `c.install(...)`, `c.garantir(comando, pacote)`, `c.flatpakInstall(...)`
+- `instalarChaveAPT(c, url, destino, fingerprints...)` — chave de repositório conferida
 - `c.Download(url, destino)`, `c.Temp(nome)`, `c.WriteFile(...)`, `c.AppendFile(...)`
 - `c.Log.Infof/Successf/Warnf(...)` — avisos marcam o módulo como "concluído com avisos"
 
 ## Detecção de sistema (`internal/sysinfo`)
 
-`sysinfo.Detect` lê `/etc/os-release` (e `/etc/upstream-release/lsb-release`
-no Mint) e preenche:
+`sysinfo.Detect` lê `/etc/os-release`, recusa o que não for suportado (veja
+[Sistemas suportados](#sistemas-suportados)) e preenche:
 
-- `Family` — `fedora`, `rhel`, `arch` ou `debian`; `PkgMgr` — `dnf`, `pacman` ou `apt`
-- `RHELVersion` — só família `rhel` (ex.: `9`)
-- `Arch`, `BaseCodename`, `DistroVersion`, `DockerDistro` (`ubuntu`/`debian`)
-  — só família `debian`
-- `MSRepoSupported` — se a Microsoft publica repositório (msodbcsql/mssql-tools)
-  para essa distro+versão; se não, os módulos pulam essa parte com um aviso
-- `Desktop` — `kde` se `XDG_CURRENT_DESKTOP` contém KDE ou o `plasmashell`
-  está instalado (o sudo costuma limpar a variável); `cinnamon` se ela contém
-  Cinnamon ou o `cinnamon` está instalado; senão `gtk`. Os módulos do GNOME
-  só rodam em `gtk`, e os do Cinnamon só em `cinnamon`
+- `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`), usado
+  nas URLs dos repositórios (Docker, Tailscale) e no teste de mirrors
+- `MSRepoVersion` — a versão nas URLs do repositório da Microsoft
+  (msodbcsql/mssql-tools): a própria versão nas LTS suportadas, `26.04` nas
+  mais novas
+- `Arch` — `dpkg --print-architecture`
+
+O GNOME é conferido pelo binário `gnome-shell`, e não por
+`XDG_CURRENT_DESKTOP`: o sudo costuma limpar essa variável.
 
 ## Papel de parede
 
@@ -287,9 +312,7 @@ recompilar. O módulo `papel_parede`, como o usuário alvo:
    onde o GNOME guarda as imagens escolhidas em Configurações → Plano de
    fundo);
 2. aplica com `gsettings` (`picture-uri`, `picture-uri-dark` e
-   `picture-options 'zoom'`) — no Cinnamon, nas chaves equivalentes de
-   `org.cinnamon.desktop.background`; no Plasma, com
-   `plasma-apply-wallpaperimage`.
+   `picture-options 'zoom'`).
 
 Os scripts que rodam como o usuário (`su - usuario`) usam a sessão D-Bus dele
 quando há uma sessão gráfica aberta; sem isso o `gsettings` descarta as
@@ -309,7 +332,7 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
 - `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
   `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
 
-O módulo `extensoes_gnome` (pulado no Plasma e no Cinnamon), como o usuário alvo:
+O módulo `extensoes_gnome`, como o usuário alvo:
 
 1. para cada extensão que não vem com o sistema (`/usr/share/gnome-shell/extensions`),
    consulta o [extensions.gnome.org](https://extensions.gnome.org) pela versão
@@ -343,7 +366,7 @@ janela).
 
 ## Atalhos do GNOME
 
-O módulo `atalhos_gnome` (pulado no Plasma e no Cinnamon) aplica `GNOME/atalhos.dconf` com
+O módulo `atalhos_gnome` aplica `GNOME/atalhos.dconf` com
 `dconf load /org/gnome/`:
 
 - `Print` e `Shift+Super+S` abrem a captura interativa do Gradia (Flatpak,
@@ -359,16 +382,16 @@ para ficarem relativos a `/org/gnome/`.
 
 ## Favoritos e pastas do menu de apps
 
-O módulo `apps_gnome` (pulado no Plasma e no Cinnamon) roda perto do fim, depois de tudo
-instalado, e organiza o que existir de fato na máquina — por isso funciona em
-qualquer distro, mesmo com apps diferentes dos do Ubuntu:
+O módulo `apps_gnome` roda perto do fim, depois de tudo instalado, e organiza
+o que existir de fato na máquina — por isso funciona mesmo com módulos
+desmarcados ou apps instalados à mão:
 
 - **Favoritos** — fixa na barra de favoritos os apps de
   `GNOME/favoritos.txt`, na ordem do arquivo. Cada linha aceita alternativas
   separadas por `|` (ex.: `org.gnome.Ptyxis.desktop | org.gnome.Terminal.desktop`),
   e entra a primeira instalada; o que não existir é pulado.
-- **Pastas** — apaga as pastas atuais do menu de apps (inclusive as da distro,
-  como System/Utilities do Ubuntu) e recria as de `GNOME/pastas.txt`: Games,
+- **Pastas** — apaga as pastas atuais do menu de apps (inclusive as do Ubuntu,
+  como System/Utilities) e recria as de `GNOME/pastas.txt`: Games,
   Development, Office, Communication, Internet, Multimedia, System e
   Utilities. Os nomes seguem o idioma do sistema: cada pasta aponta um
   `.directory` padrão (`Game.directory`, `Office.directory`...), cuja tradução
@@ -390,86 +413,41 @@ Um app instalado depois que se encaixe em duas pastas aparece nas duas, já
 que as exclusões são calculadas na hora da execução; basta rodar de novo
 `sudo ./post-install --modules apps_gnome` para reorganizar.
 
-## Cinnamon
+## Temas Yaru nos apps Flatpak
 
-A pasta `CINNAMON/` define a configuração do Cinnamon (Linux Mint), editável
-sem recompilar. Os módulos só rodam com o Cinnamon detectado.
+O Flatpak não expõe o `/usr` do host ao sandbox, então os apps Flatpak não
+enxergam os temas de `/usr/share/themes`: só os publicados no Flathub
+(`org.gtk.Gtk3theme.*`), onde faltam as variantes de cor do Yaru
+(`Yaru-blue-dark`, `Yaru-sage`...). Com uma delas escolhida, os apps Flatpak
+caíam no Adwaita. O módulo `temas_yaru`:
 
-### Atalhos
+1. instala `yaru-theme-gtk` e `yaru-theme-icon`;
+2. instala o script `/usr/local/sbin/yaru-flatpak-sync`, que copia todos os
+   `/usr/share/themes/Yaru*` para `/var/lib/yaru-flatpak/themes`, resolvendo
+   os links (que apontam para fora da pasta e não existiriam no sandbox), e
+   troca a cópia de uma vez;
+3. instala o hook `/etc/apt/apt.conf.d/99yaru-flatpak`, que roda o script
+   depois de cada execução do `dpkg`. O script só copia de novo quando a
+   versão do `yaru-theme-gtk` muda, então nas outras vezes sai na hora: uma
+   atualização do Yaru pelo `apt` chega sozinha aos apps Flatpak;
+4. libera a cópia e o `~/.local/share/themes` para todos os apps
+   (`flatpak override --system --filesystem=xdg-data/themes:ro
+   --filesystem=/var/lib/yaru-flatpak/themes:ro`);
+5. cria, para o usuário alvo, um link em `~/.local/share/themes` para cada
+   tema da cópia (sem mexer em uma pasta de mesmo nome que já esteja lá). É
+   por ele que o GTK de dentro do sandbox encontra o tema.
+6. aplica os ícones `Yaru-dark` para o usuário alvo.
 
-O módulo `atalhos_cinnamon` aplica `CINNAMON/atalhos.dconf` com
-`dconf load /org/cinnamon/desktop/keybindings/`:
-
-- `Super+L` bloqueia a tela (junto do `Ctrl+Alt+L` padrão); o Looking Glass,
-  que usava `Super+L`, fica sem atalho;
-- `Print` e `Shift+Super+S` abrem a captura do
-  [Flameshot](https://flameshot.org/) (`flameshot gui`: seleção de área com
-  anotação), instalado pelo módulo se ainda não estiver. No Cinnamon ele
-  substitui o Gradia, que fica fora dos Flatpaks: o portal de captura do
-  Cinnamon ignora o modo interativo do Gradia e devolve a tela inteira. A
-  captura nativa de tela inteira sai do `Print` (as variações com `Shift`,
-  `Alt` e `Ctrl` ficam);
-- `Shift+Super+R` inicia e para a gravação do
-  [vokoscreenNG](https://linuxecke.volkoh.de/vokoscreen/vokoscreen.html)
-  (tela inteira, janela ou área, com áudio; o modo e o áudio escolhe-se na
-  janela dele). O vokoscreenNG não tem linha de comando para gravar, então o
-  atalho é global dele, não do Cinnamon: o módulo o instala, põe no início
-  da sessão minimizado na bandeja (o atalho só funciona com ele aberto) e
-  grava o atalho no `~/.config/vokoscreenNG/vokoscreenNG.ini`, mudando só
-  essas opções. O gravador nativo do Cinnamon fica no `Ctrl+Shift+Alt+R`;
-- `Super+V` abre o histórico da área de transferência, como no Windows: o
-  menu do [CopyQ](https://hluk.github.io/CopyQ/) aparece no cursor e o item
-  escolhido é colado na janela atual. O módulo instala o CopyQ (pacote
-  nativo), põe no início da sessão e, se ainda não houver configuração dele,
-  liga a colagem automática (`tray_item_paste`);
-- `Super+.` abre o seletor de emojis [Smile](https://smile.mijorus.it/)
-  (Flatpak): o emoji escolhido vai para a área de transferência. O atalho
-  igual do seletor do IBus é desligado;
-- as teclas de volume sobem e descem de 2 em 2%. O Cinnamon não tem um
-  `volume-step` como o GNOME (o passo é fixo em 5%), então elas saem das
-  media-keys e chamam `/usr/local/bin/cinnamon-volume-step +2`/`-2`,
-  instalado pelo módulo: muda o volume com `wpctl` (ou `pactl`), respeita o
-  teto de 100% (150% com o volume amplificado) e mostra o OSD do Cinnamon.
-  O passo é o número no comando, em `CINNAMON/atalhos.dconf`.
-
-Para atualizar a partir de uma máquina já configurada:
-`dconf dump /org/cinnamon/desktop/keybindings/` (fica só com o que mudou do
-padrão).
-
-### Preferências
-
-O módulo `preferencias_cinnamon` aplica `CINNAMON/preferencias.dconf` com
-`dconf load /org/cinnamon/`: por enquanto, tira o som que o Cinnamon toca a
-cada notificação (`sounds/notification-enabled`). Para achar a chave de outra
-opção, mude-a em Configurações do Sistema com `dconf watch /org/cinnamon/`
-aberto num terminal.
-
-### Painel
-
-O módulo `painel_cinnamon` roda perto do fim, depois de tudo instalado:
-
-- **Applets** — aplica `CINNAMON/painel.dconf` (`enabled-applets`: menu,
-  lista de janelas, bandeja, rede, som, relógio...). Para atualizar:
-  `gsettings get org.cinnamon enabled-applets`.
-- **Apps fixados** — fixa na lista de janelas (`grouped-window-list`) os apps
-  de `CINNAMON/fixados.txt`, na ordem do arquivo, no mesmo formato do
-  `GNOME/favoritos.txt` (alternativas com `|`; o que não estiver instalado é
-  pulado). Os Flatpaks ganham sozinhos o sufixo `:flatpak` que o Cinnamon
-  usa. A lista vai para `pinned-apps` em
-  `~/.config/cinnamon/spices/grouped-window-list@cinnamon.org/<instância>.json`
-  (a instância vem do `painel.dconf`), mantendo as outras opções do applet.
-
-O Cinnamon só relê os apps fixados ao iniciar, então o módulo o reinicia
-no fim (no X11 as janelas continuam abertas, como no `Ctrl+Alt+Esc`). No
-Wayland reiniciar derrubaria a sessão: os fixados aparecem no próximo login.
+Vale para apps GTK 3. Apps em GTK 4 com libadwaita não usam temas GTK, só o
+modo claro/escuro. Uma variante de cor nova do Yaru precisa de mais um link:
+basta rodar de novo `sudo ./post-install --modules temas_yaru`. Para forçar
+a cópia à mão: `sudo yaru-flatpak-sync --force`.
 
 ## Ruby, Bundler e Jekyll
 
 O módulo `ruby` instala o Ruby com os headers de desenvolvimento e o que as
 gems nativas precisam para compilar (`ruby-full`, `ruby-dev`,
-`build-essential` e `zlib1g-dev` no Debian/Ubuntu; `ruby`, `ruby-devel`,
-`rubygems` e compiladores no Fedora/RHEL; `ruby`, `rubygems` e `base-devel`
-no Arch). O Bundler e o Jekyll são instalados **como gems do usuário**, como
+`build-essential` e `zlib1g-dev`). O Bundler e o Jekyll são instalados **como gems do usuário**, como
 recomenda a documentação do Jekyll, e nada de Ruby exige `sudo` depois:
 
 - `GEM_HOME=~/.local/share/gem` (com `~/.local/share/gem/bin` no `PATH`) é
@@ -534,11 +512,9 @@ Tudo o que é fixado tem quem avise quando sai versão nova — com um PR na
 - **Actions e módulos Go** — o Dependabot (`.github/dependabot.yml`), toda
   semana. As actions ficam fixadas pelo SHA do commit, com a tag num
   comentário.
-- **Commits dos repositórios pessoais, Now Bar, Yaru e regra UDEV do
-  Solaar** — o workflow `.github/workflows/pins.yml`, todo dia (ou à mão
+- **Commits dos repositórios pessoais, Now Bar e regra UDEV do Solaar** — o workflow `.github/workflows/pins.yml`, todo dia (ou à mão
   em Actions → Pins → Run workflow). Ele roda `scripts/atualizar-pins.sh`,
-  que confere o último commit/tag de cada um, atualiza o pin (recalculando o
-  SHA-256 do Yaru) e abre o PR `fix: atualiza versões fixadas` com links de
+  que confere o último commit/tag de cada um, atualiza o pin e abre o PR `fix: atualiza versões fixadas` com links de
   comparação para revisar o que mudou. Se a regra do Solaar mudar, o PR
   destaca isso (ela roda como root). Precisa de *Settings → Actions → General
   → Allow GitHub Actions to create and approve pull requests*.
@@ -548,31 +524,30 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 ## Segurança
 
 - **Grupos com poder de root.** O usuário alvo entra nos grupos `docker`
-  (módulo `ambiente_usuario`) e `libvirt`/`kvm` (módulo `virt_manager`).
+  (módulo `docker`) e `libvirt`/`kvm` (módulo `virt_manager`).
   Quem está no `docker` ou no `libvirt` consegue virar root (ex.: montando
   `/` num contêiner ou numa VM) — é o comportamento normal dessas
   ferramentas numa workstation de desenvolvimento, mas vale saber.
 - **Chaves de repositório conferidas.** As chaves de Docker, Microsoft,
   GitHub CLI, Mozilla, Google e Tailscale são baixadas e comparadas com o
-  fingerprint esperado antes de entrarem no sistema; a do Chaotic-AUR é
-  buscada pelo fingerprint completo.
+  fingerprint esperado antes de entrarem no sistema.
 - **Versões fixadas.** Os repositórios pessoais executados (Dotfiles,
-  vscode_nautilus, nautilus-copypath) ficam fixados num commit e os ícones
-  Yaru numa tag com SHA-256 (constantes no topo de
-  `internal/modules/desktop.go`); a regra UDEV do Solaar vem embutida no
+  vscode_nautilus, nautilus-copypath) ficam fixados num commit (constantes
+  em `internal/modules/pins.go`); a regra UDEV do Solaar vem embutida no
   binário (`internal/modules/42-logitech-unify-permissions.rules`). Assets de release do GitHub
-  (GCM, adw-gtk3, deploy-dev) são conferidos pelo SHA-256 que o GitHub
+  (GCM, deploy-dev) são conferidos pelo SHA-256 que o GitHub
   publica.
 - **Scripts de instalação remotos.** fnm, rustup e Claude Code ainda são
   instalados pelo `curl | sh` oficial de cada um, como o usuário alvo (não
   como root). O Tailscale vem do repositório oficial assinado.
-- **O que não é verificado.** O `.deb` do Chrome e os pacotes do Bitwarden
+- **O que não é verificado.** O `.deb` do Chrome e o do Bitwarden
   são baixados por HTTPS dos sites oficiais, sem conferência de assinatura
   pelo post-install (o Chrome passa a se atualizar pelo repositório assinado
-  do Google depois de instalado; no Fedora/RHEL ele já é instalado pelo
-  repositório).
+  do Google depois de instalado).
 
 ## Requisitos
 
+- Ubuntu 22.04, 24.04 ou 26.04 (ou mais novo) com GNOME — veja
+  [Sistemas suportados](#sistemas-suportados).
 - Acesso root (`sudo`) — exceto em `--dry-run`.
 - Terminal interativo para a TUI (sem ele, o modo texto é usado).

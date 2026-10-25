@@ -1,4 +1,4 @@
-// post-install configura uma workstation Linux recém-instalada: mirrors,
+// post-install configura uma workstation Ubuntu recém-instalada: mirrors,
 // atualização, repositórios, Docker/VSCode/PHP/SQL Server, Flatpaks,
 // Tailscale, Chrome, Bitwarden, temas, ambiente do usuário, Rust, Claude Code,
 // OpenVPN e virt-manager — com uma TUI para escolher o que rodar.
@@ -53,7 +53,6 @@ type options struct {
 	wallDir  string
 	wall     string
 	gnomeDir string
-	cinnDir  string
 	forceExt string
 	noUpdate bool
 }
@@ -73,7 +72,6 @@ func parseFlags() options {
 	flag.StringVar(&o.wallDir, "wallpapers-dir", "", "pasta com as imagens de papel de parede (padrão: Wallpapers/ ao lado do binário)")
 	flag.StringVar(&o.wall, "wallpaper", "", "papel de parede a aplicar: nome do arquivo em --wallpapers-dir, ou \"none\" para não alterar (padrão: perguntar)")
 	flag.StringVar(&o.gnomeDir, "gnome-dir", "", "pasta com extensoes.txt e extensoes.dconf (padrão: GNOME/ ao lado do binário)")
-	flag.StringVar(&o.cinnDir, "cinnamon-dir", "", "pasta com atalhos.dconf, preferencias.dconf, painel.dconf e fixados.txt do Cinnamon (padrão: CINNAMON/ ao lado do binário)")
 	flag.StringVar(&o.forceExt, "force-extensions", "", "extensões do GNOME sem versão compatível a instalar mesmo assim (UUIDs separados por vírgula, ou \"none\"); sem ela, pergunta")
 	flag.BoolVar(&o.noUpdate, "no-update-check", false, "não verificar se há uma versão mais nova do post-install")
 	flag.StringVar(&o.logDir, "log-dir", "", "pasta onde os logs da execução são gravados (padrão: logs/ ao lado do binário)")
@@ -83,7 +81,7 @@ func parseFlags() options {
 	}
 	flag.Parse()
 
-	// Por padrão, OVPN/, Wallpapers/, GNOME/, CINNAMON/ e logs/ ficam ao lado do binário (estrutura do
+	// Por padrão, OVPN/, Wallpapers/, GNOME/ e logs/ ficam ao lado do binário (estrutura do
 	// pacote .tar.gz da release), para funcionar de qualquer diretório.
 	base := exeDir()
 	if o.ovpnDir == "" {
@@ -98,12 +96,9 @@ func parseFlags() options {
 	if o.gnomeDir == "" {
 		o.gnomeDir = filepath.Join(base, "GNOME")
 	}
-	if o.cinnDir == "" {
-		o.cinnDir = filepath.Join(base, "CINNAMON")
-	}
 	// Absolutos: os scripts como usuário rodam via "su -", que muda o
 	// diretório atual para a home dele.
-	for _, d := range []*string{&o.ovpnDir, &o.wallDir, &o.gnomeDir, &o.cinnDir, &o.logDir} {
+	for _, d := range []*string{&o.ovpnDir, &o.wallDir, &o.gnomeDir, &o.logDir} {
 		if abs, err := filepath.Abs(*d); err == nil {
 			*d = abs
 		}
@@ -195,12 +190,18 @@ func run() int {
 		return 0
 	}
 	if o.list {
-		for _, m := range all {
+		for i, m := range all {
+			if i == 0 || m.Grupo != all[i-1].Grupo {
+				if i > 0 {
+					fmt.Println()
+				}
+				fmt.Println(m.Grupo + ":")
+			}
 			deps := ""
 			if len(m.Deps) > 0 {
 				deps = " (requer: " + strings.Join(m.Deps, ", ") + ")"
 			}
-			fmt.Printf("%-20s %s%s\n", m.ID, m.Title, deps)
+			fmt.Printf("  %-20s %s%s\n", m.ID, m.Title, deps)
 		}
 		return 0
 	}
@@ -218,14 +219,6 @@ func run() int {
 	sys, err := sysinfo.Detect()
 	if err != nil {
 		return fail("%v", err)
-	}
-
-	// A regra temporária de sudo sem senha para o pacman (Arch) equivale a
-	// root completo: some no início (sobra de uma execução interrompida) e
-	// no fim de toda execução, com qualquer resultado.
-	if !o.dryRun {
-		removerRegraSudo(out)
-		defer removerRegraSudo(out)
 	}
 
 	sel, err := initialSelection(all, o.modules, o.skip)
@@ -269,7 +262,7 @@ func run() int {
 	}
 	// Consulta antes da interface quais extensões do GNOME não têm versão
 	// para o GNOME Shell da máquina, para perguntar se instala mesmo assim.
-	if sys.IsGNOME() && !p.extChosen && isSelected(all, sel, "extensoes_gnome") {
+	if !p.extChosen && isSelected(all, sel, "extensoes_gnome") {
 		out.Info("Verificando a compatibilidade das extensões do GNOME...")
 		p.shell, p.incompat = modules.VerificarExtensoes(o.gnomeDir)
 	}
@@ -292,7 +285,6 @@ func run() int {
 			OVPNDir:         o.ovpnDir,
 			Wallpaper:       esc.Wallpaper,
 			GNOMEDir:        o.gnomeDir,
-			CinnamonDir:     o.cinnDir,
 			ForcarExtensoes: esc.ForcarExtensoes,
 		}
 		return engine.Run(ctx, mods, c, engine.Options{FailFast: o.failFast}, emit)
@@ -527,18 +519,6 @@ func initialSelection(all []modules.Module, only, skip string) ([]bool, error) {
 		sel[i] = (len(onlyIDs) == 0 || slices.Contains(onlyIDs, id)) && !slices.Contains(skipIDs, id)
 	}
 	return sel, nil
-}
-
-// removerRegraSudo apaga a regra temporária de sudo do pacman, avisando se
-// havia uma.
-func removerRegraSudo(out *plain.Printer) {
-	removida, err := modules.RemoverRegraSudoTemporaria()
-	switch {
-	case err != nil:
-		out.Handle(runlog.Entry{Level: runlog.Error, Text: fmt.Sprintf("Falha ao remover a regra temporária de sudo do pacman: %v — apague-a à mão.", err)})
-	case removida:
-		out.Info("Regra temporária de sudo sem senha para o pacman removida.")
-	}
 }
 
 // chownLogs passa os logs desta execução para o usuário alvo.

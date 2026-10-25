@@ -1,21 +1,34 @@
-// Package modules contém as etapas da pós-instalação. Cada arquivo define um
-// módulo; a ordem de execução é a ordem da lista em All.
+// Package modules contém as etapas da pós-instalação. Cada módulo pertence a
+// um grupo e é autocontido (configura o próprio repositório, se precisar);
+// a ordem de execução é a ordem da lista em All.
 package modules
 
 import (
 	"fmt"
-	"strings"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/vinicgobbi/post-install/internal/runner"
 	"github.com/vinicgobbi/post-install/internal/sysinfo"
 )
 
+// Grupos, na ordem em que aparecem na interface e rodam.
+const (
+	GrupoSistema         = "Sistema"
+	GrupoTerminal        = "Terminal"
+	GrupoAplicativos     = "Aplicativos"
+	GrupoDesenvolvimento = "Desenvolvimento"
+	GrupoRede            = "Rede e virtualização"
+	GrupoGNOME           = "GNOME e aparência"
+	GrupoFinalizacao     = "Finalização"
+)
+
 type Module struct {
 	ID    string
+	Grupo string
 	Title string
 	Desc  string
-	// Deps são IDs de módulos que precisam rodar antes deste (ex.: as
-	// extensões PHP precisam dos headers do driver ODBC de "pacotes_base").
+	// Deps são IDs de módulos que precisam rodar antes deste.
 	Deps []string
 	Run  func(c *Ctx) error
 }
@@ -29,9 +42,6 @@ type Ctx struct {
 	Wallpaper string
 	// GNOMEDir guarda extensoes.txt, extensoes.dconf e atalhos.dconf.
 	GNOMEDir string
-	// CinnamonDir guarda atalhos.dconf, preferencias.dconf, painel.dconf e
-	// fixados.txt.
-	CinnamonDir string
 	// ForcarExtensoes são as extensões sem versão compatível que o usuário
 	// pediu para instalar mesmo assim.
 	ForcarExtensoes []string
@@ -45,66 +55,95 @@ type Escolhas struct {
 	ForcarExtensoes []string
 }
 
-// All devolve todos os módulos, na ordem de execução.
+// All devolve todos os módulos, na ordem de execução (agrupados por Grupo).
 func All() []Module {
 	return []Module{
+		// Sistema
 		mirrors,
 		atualizacao,
-		repositorios,
-		pacotesBase,
-		solaar,
+		// Terminal. O shell vem antes dos módulos que escrevem no ~/.zshrc
+		// (node, ruby): o instalador do Oh My Zsh troca o arquivo.
+		ferramentas,
+		shell,
+		// Aplicativos
+		firefoxThunderbird,
+		chrome,
+		bitwarden,
 		removerLibreoffice,
 		flatpaks,
 		flatpaksJogos,
-		tailscale,
-		phpExtensoes,
-		chromeGCM,
-		bitwarden,
-		temasIcones,
-		ambienteUsuario,
-		papelParede,
-		extensoesGnome,
-		atalhosGnome,
-		atalhosCinnamon,
-		preferenciasCinnamon,
-		rustTools,
+		solaar,
+		// Desenvolvimento
+		gitGCM,
+		docker,
+		vscode,
+		golang,
+		node,
+		phpSQLServer,
+		rust,
 		ruby,
 		claudeCode,
 		deployDev,
-		vscodeNautilus,
+		// Rede e virtualização
+		tailscale,
+		firewall,
 		ovpn,
 		virtManager,
+		// GNOME e aparência
+		temasYaru,
+		papelParede,
+		extensoesGnome,
+		atalhosGnome,
+		nautilus,
 		// Depois de tudo instalado: organiza o que existir na máquina.
 		appsGnome,
-		painelCinnamon,
+		// Finalização
 		limpeza,
 	}
 }
 
-// ---- Helpers por gerenciador de pacotes ----
+// ---- Helpers de pacotes ----
 
-// install instala pacotes com o gerenciador nativo, de forma não interativa.
+// install instala pacotes com o apt, de forma não interativa.
 func (c *Ctx) install(pkgs ...string) error {
 	return c.installEnv(nil, pkgs...)
 }
 
 func (c *Ctx) installEnv(env []string, pkgs ...string) error {
-	switch c.Sys.PkgMgr {
-	case "dnf":
-		return c.RunEnv(env, "dnf", append([]string{"install", "-y"}, pkgs...)...)
-	case "pacman":
-		return c.RunEnv(env, "pacman", append([]string{"-S", "--needed", "--noconfirm"}, pkgs...)...)
-	default:
-		return c.RunEnv(env, "apt", append([]string{"install", "-y"}, pkgs...)...)
-	}
+	return c.RunEnv(env, "apt", append([]string{"install", "-y"}, pkgs...)...)
 }
 
-// installAUR instala pacotes via yay como o usuário alvo — o makepkg recusa
-// rodar como root. Resolve tanto binários do Chaotic-AUR quanto pacotes que
-// só existem na AUR (compila). Depende do módulo "repositorios" ter liberado
-// sudo sem senha para o pacman nesse usuário.
-func (c *Ctx) installAUR(pkgs ...string) error {
-	return c.AsUser("yay -S --needed --noconfirm " + strings.Join(pkgs, " "))
+// garantir instala pkg se o comando bin ainda não existir (ex.: o curl, que
+// não vem no Ubuntu Desktop e os instaladores oficiais usam).
+func (c *Ctx) garantir(bin, pkg string) error {
+	if runner.Exists(bin) {
+		return nil
+	}
+	return c.install(pkg)
+}
+
+// Fingerprints das chaves primárias que assinam cada repositório. As chaves
+// são baixadas dos sites oficiais e conferidas contra estes valores antes de
+// serem instaladas, para um download adulterado não virar repositório
+// confiável do sistema.
+const (
+	fprDocker    = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+	fprMicrosoft = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+	// O keyring do GitHub CLI traz a chave atual e a anterior (expirada).
+	fprGitHubCLI    = "7F38BBB59D064DBCB3D84D725612B36462313325"
+	fprGitHubCLIOld = "2C6106201985B60E6C7AC87323F3D4EA75716059"
+	fprTailscale    = "2596A99EAAB33821893C0A79458CA832957F5868"
+)
+
+// instalarChaveAPT baixa uma chave para /etc/apt/keyrings (ou outro destino)
+// só depois de conferir o fingerprint.
+func instalarChaveAPT(c *Ctx, url, destino string, fprs ...string) error {
+	tmp := c.Temp(filepath.Base(destino))
+	return step(
+		func() error { return c.Download(url, tmp) },
+		func() error { return c.VerifyKey(tmp, fprs...) },
+		func() error { return c.Run("install", "-D", "-m", "0644", tmp, destino) },
+	)
 }
 
 func (c *Ctx) ensureFlathub() error {
@@ -137,3 +176,5 @@ func step(fns ...func() error) error {
 }
 
 func errorf(format string, a ...any) error { return fmt.Errorf(format, a...) }
+
+var lookPath = exec.LookPath

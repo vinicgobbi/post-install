@@ -9,7 +9,7 @@
 #                (se não houver commit feat/fix/BREAKING, não há release)
 #   3. build   — compila o binário estático para amd64, empacota um
 #                .tar.gz com o binário + estrutura de pastas (OVPN/,
-#                Wallpapers/, GNOME/, CINNAMON/, logs/), gera o atestado de
+#                Wallpapers/, GNOME/, logs/), gera o atestado de
 #                proveniência (verificável com
 #                "gh attestation verify") e sobe tudo como artefato
 #   4. release — publica a release da tag (binários soltos + pacotes .tar.gz)
@@ -43,7 +43,7 @@ jobs:
       - run: go test ./...
       - run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
-      - run: shellcheck scripts/*.sh
+      - run: shellcheck scripts/*.sh internal/modules/*.sh
 
   bump:
     needs: test
@@ -114,16 +114,14 @@ jobs:
           #   OVPN/README.md    pasta onde ficam os .ovpn a importar
           #   Wallpapers/       papéis de parede oferecidos na TUI
           #   GNOME/            extensões, atalhos, favoritos e pastas do GNOME
-          #   CINNAMON/         atalhos, applets e apps fixados do painel do Cinnamon
           #   logs/             logs de cada execução
           #   README.md
           pkg="pkg/post-install"
-          mkdir -p "$pkg/OVPN" "$pkg/Wallpapers" "$pkg/GNOME" "$pkg/CINNAMON" "$pkg/logs"
+          mkdir -p "$pkg/OVPN" "$pkg/Wallpapers" "$pkg/GNOME" "$pkg/logs"
           install -m 0755 "dist/post-install-linux-$GOARCH" "$pkg/post-install"
           install -m 0644 OVPN/README.md "$pkg/OVPN/README.md"
           install -m 0644 Wallpapers/* "$pkg/Wallpapers/"
           install -m 0644 GNOME/* "$pkg/GNOME/"
-          install -m 0644 CINNAMON/* "$pkg/CINNAMON/"
           install -m 0644 README.md "$pkg/README.md"
           tar -C pkg --owner=0 --group=0 -czf "dist/post-install-linux-$GOARCH.tar.gz" post-install
           cd dist

@@ -2,7 +2,6 @@ package modules
 
 import (
 	"bufio"
-	"errors"
 	"io"
 	"math/rand/v2"
 	"net/http"
@@ -12,85 +11,17 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/vinicgobbi/post-install/internal/runner"
 )
 
 var mirrors = Module{
 	ID:    "mirrors",
+	Grupo: GrupoSistema,
 	Title: "Otimizar mirrors",
-	Desc:  "Ajusta o gerenciador de pacotes para baixar dos espelhos mais rápidos",
+	Desc:  "Aponta o APT para o mirror do Ubuntu mais rápido medido nesta rede",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Otimizando a seleção de espelhos (mirrors) para o gerenciador de pacotes...")
-		switch {
-		case c.Sys.PkgMgr == "dnf":
-			return otimizarDNF(c)
-		case c.Sys.PkgMgr == "pacman":
-			return otimizarMirrorsArch(c)
-		case c.Sys.ID == "ubuntu":
-			return otimizarMirrorsUbuntu(c)
-		case c.Sys.ID == "debian":
-			c.Log.Infof("Debian detectado. O sistema já utiliza o redirecionador global por CDN (deb.debian.org) por padrão.")
-		}
-		return nil
+		c.Log.Infof("Otimizando a seleção de espelhos (mirrors) do APT...")
+		return otimizarMirrorsUbuntu(c)
 	},
-}
-
-func otimizarDNF(c *Ctx) error {
-	const conf = "/etc/dnf/dnf.conf"
-	data, err := os.ReadFile(conf)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	if err := c.WriteFile(conf, ajustarDNFConf(string(data)), 0o644); err != nil {
-		return err
-	}
-	c.Log.Successf("DNF otimizado: fastestmirror ativado e downloads paralelos definidos para 10.")
-	return nil
-}
-
-// ajustarDNFConf põe fastestmirror e max_parallel_downloads logo abaixo de
-// [main] (criando a seção se o arquivo não existir ou não a tiver): fora
-// dela, o dnf ignora as opções.
-func ajustarDNFConf(conteudo string) string {
-	opcoes := []string{"fastestmirror=True", "max_parallel_downloads=10"}
-	var linhas []string
-	temMain := false
-	for _, l := range strings.Split(strings.TrimRight(conteudo, "\n"), "\n") {
-		if l == "" && len(linhas) == 0 {
-			continue
-		}
-		k, _, _ := strings.Cut(l, "=")
-		if k = strings.TrimSpace(k); k == "fastestmirror" || k == "max_parallel_downloads" {
-			continue
-		}
-		linhas = append(linhas, l)
-		if strings.TrimSpace(l) == "[main]" && !temMain {
-			temMain = true
-			linhas = append(linhas, opcoes...)
-		}
-	}
-	if !temMain {
-		linhas = append(append([]string{"[main]"}, opcoes...), linhas...)
-	}
-	return strings.Join(linhas, "\n") + "\n"
-}
-
-// No Arch, o reflector já mede de verdade os mirrors da lista oficial.
-// --latest 20 limita a amostra aos mirrors sincronizados mais recentemente
-// antes de medir a velocidade de cada um.
-func otimizarMirrorsArch(c *Ctx) error {
-	if !runner.Exists("reflector") {
-		if err := c.Run("pacman", "-Sy", "--needed", "--noconfirm", "reflector"); err != nil {
-			return err
-		}
-	}
-	if err := c.Run("reflector", "--latest", "20", "--protocol", "https", "--sort", "rate", "--save", "/etc/pacman.d/mirrorlist"); err != nil {
-		c.Log.Warnf("Falha ao rodar o reflector (sem rede?). Mantendo a mirrorlist atual.")
-		return nil
-	}
-	c.Log.Successf("Mirrorlist do pacman otimizada com o reflector (20 mirrors HTTPS mais recentes, ordenados por velocidade).")
-	return nil
 }
 
 func otimizarMirrorsUbuntu(c *Ctx) error {
@@ -217,7 +148,7 @@ func mirrorUbuntuMaisRapido(c *Ctx) (string, bool) {
 		wg.Add(1)
 		go func(cand string) {
 			defer wg.Done()
-			url := strings.TrimSuffix(cand, "/") + "/dists/" + c.Sys.BaseCodename + "/Release"
+			url := strings.TrimSuffix(cand, "/") + "/dists/" + c.Sys.Codename + "/Release"
 			req, err := http.NewRequestWithContext(c.Ctx, http.MethodGet, url, nil)
 			if err != nil {
 				return

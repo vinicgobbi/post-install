@@ -20,12 +20,6 @@ const (
 	mozillaList        = "/etc/apt/sources.list.d/mozilla.list"
 )
 
-// usaRepoMozilla diz se o sistema usa o repositório da Mozilla (só Ubuntu e
-// sabores com ID=ubuntu; Mint e Debian já trazem .deb de verdade).
-func usaRepoMozilla(c *Ctx) bool {
-	return c.Sys.PkgMgr == "apt" && c.Sys.ID == "ubuntu"
-}
-
 const mozillaPreferences = `Package: *
 Pin: origin packages.mozilla.org
 Pin-Priority: 1000
@@ -71,25 +65,17 @@ func configurarRepoMozilla(c *Ctx) error {
 	)
 }
 
-// instalarFirefoxThunderbird instala os dois como pacotes nativos.
+// instalarFirefoxThunderbird instala os .deb da Mozilla e remove os snaps.
 func instalarFirefoxThunderbird(c *Ctx) error {
-	c.Log.Infof("Instalando Firefox e Thunderbird (pacotes nativos)...")
-	switch {
-	case usaRepoMozilla(c):
-		// --allow-downgrades: o .deb da Mozilla substitui o pacote de transição
-		// do Ubuntu, que tem epoch maior (ex.: 1:1snap1); sem ele o "apt -y"
-		// recusa a troca.
-		if err := c.Run("apt", "install", "-y", "--allow-downgrades", "firefox", "thunderbird"); err != nil {
-			return err
-		}
-		removerSnapsMozilla(c)
-		return nil
-	case c.Sys.PkgMgr == "apt" && !c.Probe("apt-cache", "show", "firefox"):
-		// Debian puro só tem o Firefox ESR.
-		return c.install("firefox-esr", "thunderbird")
-	default:
-		return c.install("firefox", "thunderbird")
+	c.Log.Infof("Instalando Firefox e Thunderbird (.deb da Mozilla)...")
+	// --allow-downgrades: o .deb da Mozilla substitui o pacote de transição
+	// do Ubuntu, que tem epoch maior (ex.: 1:1snap1); sem ele o "apt -y"
+	// recusa a troca.
+	if err := c.Run("apt", "install", "-y", "--allow-downgrades", "firefox", "thunderbird"); err != nil {
+		return err
 	}
+	removerSnapsMozilla(c)
+	return nil
 }
 
 // removerSnapsMozilla remove as versões snap, depois de os .deb já estarem
@@ -123,4 +109,23 @@ fi`); err != nil {
 		}
 		c.Log.Successf("Snap do %s removido (versão .deb da Mozilla instalada no lugar).", nome)
 	}
+}
+
+var firefoxThunderbird = Module{
+	ID:    "firefox_thunderbird",
+	Grupo: GrupoAplicativos,
+	Title: "Firefox e Thunderbird (sem snap)",
+	Desc:  "Repositório APT da Mozilla e os .deb do Firefox e do Thunderbird, removendo as versões snap (o perfil do snap é copiado antes)",
+	Run: func(c *Ctx) error {
+		err := step(
+			func() error { return configurarRepoMozilla(c) },
+			func() error { return c.Run("apt", "update") },
+			func() error { return instalarFirefoxThunderbird(c) },
+		)
+		if err != nil {
+			return err
+		}
+		c.Log.Successf("Firefox e Thunderbird instalados pelos .deb da Mozilla.")
+		return nil
+	},
 }

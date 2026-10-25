@@ -2,7 +2,6 @@ package modules
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,6 +20,22 @@ func TestIDsUnicos(t *testing.T) {
 		if m.Run == nil {
 			t.Errorf("%s sem função Run", m.ID)
 		}
+	}
+}
+
+func TestGruposContiguos(t *testing.T) {
+	ordem := []string{GrupoSistema, GrupoTerminal, GrupoAplicativos, GrupoDesenvolvimento, GrupoRede, GrupoGNOME, GrupoFinalizacao}
+	pos := -1
+	for _, m := range All() {
+		g := slices.Index(ordem, m.Grupo)
+		if g < 0 {
+			t.Errorf("%s: grupo desconhecido %q", m.ID, m.Grupo)
+			continue
+		}
+		if g < pos {
+			t.Errorf("%s: grupo %q fora de ordem (os módulos de cada grupo precisam ficar juntos)", m.ID, m.Grupo)
+		}
+		pos = g
 	}
 }
 
@@ -139,19 +154,6 @@ func TestConexoesNM(t *testing.T) {
 	for k, v := range want {
 		if got[k] != v {
 			t.Errorf("conexoesNM[%q] = %q, esperado %q", k, got[k], v)
-		}
-	}
-}
-
-func TestAjustarDNFConf(t *testing.T) {
-	tests := []struct{ in, want string }{
-		{"", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\n"},
-		{"[main]\ngpgcheck=1\nfastestmirror=False\n", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\ngpgcheck=1\n"},
-		{"# comentário\n", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\n# comentário\n"},
-	}
-	for _, tt := range tests {
-		if got := ajustarDNFConf(tt.in); got != tt.want {
-			t.Errorf("ajustarDNFConf(%q) = %q, esperado %q", tt.in, got, tt.want)
 		}
 	}
 }
@@ -287,7 +289,7 @@ func TestEscolherFavoritos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Debian: GNOME Terminal no lugar do Ptyxis, sem loja nem Spotify.
+	// GNOME Terminal no lugar do Ptyxis, sem loja nem Spotify.
 	apps := map[string][]string{
 		"org.gnome.Settings.desktop": nil, "org.gnome.Nautilus.desktop": nil,
 		"org.gnome.Terminal.desktop": nil, "google-chrome.desktop": nil,
@@ -307,167 +309,40 @@ func TestIdPasta(t *testing.T) {
 	}
 }
 
-func TestInstanciaApplet(t *testing.T) {
-	conf, err := os.ReadFile("../../CINNAMON/painel.dconf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := instanciaApplet(string(conf), gwlApplet); got != "2" {
-		t.Errorf("instância no painel.dconf = %q, esperado 2", got)
-	}
-	// Saída do gsettings; o uuid é comparado inteiro.
-	applets := "['panel1:left:0:menu@cinnamon.org:0', 'panel1:left:1:my-grouped-window-list@cinnamon.org:7', 'panel2:left:0:grouped-window-list@cinnamon.org:12']"
-	if got := instanciaApplet(applets, gwlApplet); got != "12" {
-		t.Errorf("instância = %q, esperado 12", got)
-	}
-	if got := instanciaApplet("@as []", gwlApplet); got != "" {
-		t.Errorf("instância sem o applet = %q", got)
-	}
-}
+func TestYaruFlatpakSync(t *testing.T) {
+	origem, base := t.TempDir(), filepath.Join(t.TempDir(), "yaru")
+	os.MkdirAll(filepath.Join(origem, "Yaru", "gtk-3.0"), 0o755)
+	os.WriteFile(filepath.Join(origem, "Yaru", "gtk-3.0", "gtk.css"), []byte("css"), 0o644)
+	os.MkdirAll(filepath.Join(origem, "Yaru-blue-dark", "gtk-3.0"), 0o755)
+	// Link para outro tema: a cópia precisa ter o arquivo de verdade.
+	os.Symlink(filepath.Join(origem, "Yaru", "gtk-3.0", "gtk.css"), filepath.Join(origem, "Yaru-blue-dark", "gtk-3.0", "gtk.css"))
+	os.MkdirAll(filepath.Join(origem, "Adwaita"), 0o755)
 
-func TestIdsCinnamon(t *testing.T) {
-	home := t.TempDir()
-	dirs := dirsAplicativos(home)
-	for _, f := range []string{
-		".local/share/flatpak/exports/share/applications/com.spotify.Client.desktop",
-		".local/share/applications/nemo.desktop",
-	} {
-		if err := os.MkdirAll(filepath.Join(home, filepath.Dir(f)), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(home, f), nil, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	got := idsCinnamon([]string{"nemo.desktop", "com.spotify.Client.desktop"}, dirs)
-	want := []string{"nemo.desktop", "com.spotify.Client.desktop:flatpak"}
-	if !slices.Equal(got, want) {
-		t.Errorf("idsCinnamon = %v, esperado %v", got, want)
-	}
-}
-
-func TestFixarApps(t *testing.T) {
-	atual := `{"group-apps": {"type": "switch", "default": true, "value": false},
-"pinned-apps": {"type": "generic", "default": ["nemo.desktop"], "value": ["firefox.desktop"]},
-"show-apps-order-hotkey": {"type": "keybinding", "value": "<Super>grave"},
-"__md5__": "abc"}`
-	out, err := fixarApps([]byte(atual), []string{"nemo.desktop", "x.desktop:flatpak"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var dados map[string]map[string]any
-	if err := json.Unmarshal([]byte(strings.Replace(string(out), `"__md5__": "abc"`, `"__md5__": {}`, 1)), &dados); err != nil {
-		t.Fatalf("JSON inválido: %v\n%s", err, out)
-	}
-	if v := dados["pinned-apps"]["value"]; !slices.Equal(toStrings(v), []string{"nemo.desktop", "x.desktop:flatpak"}) {
-		t.Errorf("pinned-apps = %v", v)
-	}
-	if !slices.Equal(toStrings(dados["pinned-apps"]["default"]), []string{"nemo.desktop"}) || dados["group-apps"]["value"] != false {
-		t.Errorf("outras opções alteradas:\n%s", out)
-	}
-	if !strings.Contains(string(out), `"__md5__": "abc"`) || !strings.Contains(string(out), `"<Super>grave"`) {
-		t.Errorf("__md5__ ou atalho alterados:\n%s", out)
-	}
-
-	// Sem arquivo: só a chave dos fixados, com o tipo.
-	out, err = fixarApps(nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := "{\n    \"pinned-apps\": {\n        \"type\": \"generic\",\n        \"value\": []\n    }\n}"; string(out) != want {
-		t.Errorf("fixarApps sem arquivo = %s", out)
-	}
-}
-
-func toStrings(v any) []string {
-	var out []string
-	for _, s := range v.([]any) {
-		out = append(out, s.(string))
-	}
-	return out
-}
-
-func TestLerFixadosCinnamon(t *testing.T) {
-	fixados, err := lerFavoritos("../../CINNAMON/fixados.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(fixados) != 9 || fixados[0][0] != "cinnamon-settings.desktop" {
-		t.Errorf("fixados = %v", fixados)
-	}
-}
-
-func TestVolumeStepCinnamon(t *testing.T) {
-	conf, err := os.ReadFile("../../CINNAMON/atalhos.dconf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, cmd := range []string{volumeStep + " +2", volumeStep + " -2"} {
-		if !strings.Contains(string(conf), "command='"+cmd+"'") {
-			t.Errorf("atalhos.dconf não chama %q", cmd)
-		}
-	}
-
-	script := filepath.Join(t.TempDir(), "cinnamon-volume-step")
-	if err := os.WriteFile(script, []byte(volumeStepScript), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if out, err := exec.Command("sh", "-n", script).CombinedOutput(); err != nil {
-		t.Fatalf("sintaxe: %v\n%s", err, out)
-	}
-	// Argumentos inválidos saem antes de mexer no áudio.
-	for _, arg := range []string{"2", "+", "+x", "-2a", ""} {
-		err := exec.Command(script, arg).Run()
-		var ee *exec.ExitError
-		if !errors.As(err, &ee) || ee.ExitCode() != 2 {
-			t.Errorf("cinnamon-volume-step %q: %v, esperado saída 2", arg, err)
-		}
-	}
-}
-
-func TestConfigVokoscreen(t *testing.T) {
-	want := []string{"checkBoxStartsMinimized=true", "checkBox_shortcut_start_strg=false",
-		"checkBox_shortcut_start_alt=false", "checkBox_shortcut_start_shift=true",
-		"checkBox_shortcut_start_meta=true", "comboBox_shortcut_start=R"}
-	for nome, atual := range map[string]string{
-		"sem arquivo": "",
-		// Como o vokoscreenNG grava: as outras opções ficam.
-		"existente": "[General]\ncheckBoxStartsMinimized=false\ncheckBox_shortcut_start_strg=true\ncomboBox_shortcut_start=F10\nlineEditVideoPath=/home/x/Videos\n\n[Camera]\nX=1\n",
-	} {
-		home := t.TempDir()
-		ini := filepath.Join(home, ".config/vokoscreenNG/vokoscreenNG.ini")
-		if atual != "" {
-			if err := os.MkdirAll(filepath.Dir(ini), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(ini, []byte(atual), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		}
-		cmd := exec.Command("sh", "-c", "set -e\n"+configVokoscreen)
-		cmd.Env = append(os.Environ(), "HOME="+home)
+	script := filepath.Join(t.TempDir(), "yaru-flatpak-sync")
+	os.WriteFile(script, []byte(yaruFlatpakSync), 0o755)
+	rodar := func() {
+		cmd := exec.Command(script, "--force")
+		cmd.Env = append(os.Environ(), "YARU_FLATPAK_ORIGEM="+origem, "YARU_FLATPAK_BASE="+base)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("%s: %v\n%s", nome, err, out)
+			t.Fatalf("yaru-flatpak-sync: %v\n%s", err, out)
 		}
-		b, err := os.ReadFile(ini)
-		if err != nil {
-			t.Fatal(err)
-		}
-		geral, resto, _ := strings.Cut(string(b), "\n\n")
-		linhas := strings.Split(strings.TrimSpace(geral), "\n")
-		if linhas[0] != "[General]" {
-			t.Errorf("%s: sem [General] no início:\n%s", nome, b)
-		}
-		for _, kv := range want {
-			if !slices.Contains(linhas, kv) {
-				t.Errorf("%s: falta %q em [General]:\n%s", nome, kv, b)
-			}
-		}
-		if atual != "" && (!slices.Contains(linhas, "lineEditVideoPath=/home/x/Videos") || resto != "[Camera]\nX=1\n") {
-			t.Errorf("%s: outras opções alteradas:\n%s", nome, b)
-		}
-		if strings.Count(string(b), "comboBox_shortcut_start=") != 1 {
-			t.Errorf("%s: chave duplicada:\n%s", nome, b)
-		}
+	}
+	rodar()
+	rodar() // a segunda troca a cópia existente
+
+	css := filepath.Join(base, "themes", "Yaru-blue-dark", "gtk-3.0", "gtk.css")
+	if info, err := os.Lstat(css); err != nil || !info.Mode().IsRegular() {
+		t.Errorf("%s deveria ser um arquivo comum: %v", css, err)
+	}
+	entradas, _ := os.ReadDir(filepath.Join(base, "themes"))
+	var nomes []string
+	for _, e := range entradas {
+		nomes = append(nomes, e.Name())
+	}
+	if !slices.Equal(nomes, []string{"Yaru", "Yaru-blue-dark"}) {
+		t.Errorf("temas copiados = %v", nomes)
+	}
+	if sobras, _ := filepath.Glob(filepath.Join(base, ".themes.*")); len(sobras) > 0 {
+		t.Errorf("sobrou diretório temporário: %v", sobras)
 	}
 }

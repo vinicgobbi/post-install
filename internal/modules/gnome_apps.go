@@ -13,13 +13,10 @@ import (
 
 var appsGnome = Module{
 	ID:    "apps_gnome",
+	Grupo: GrupoGNOME,
 	Title: "Favoritos e pastas do menu de apps",
 	Desc:  "Fixa os apps de GNOME/favoritos.txt na barra de favoritos e recria as pastas do menu de apps por categoria (GNOME/pastas.txt), conforme os apps instalados na máquina",
 	Run: func(c *Ctx) error {
-		if !c.Sys.IsGNOME() {
-			c.Log.Infof("Ambiente %s detectado: pulando favoritos e pastas do GNOME.", c.Sys.DesktopName())
-			return nil
-		}
 		if _, err := lookPath("gnome-shell"); err != nil {
 			c.Log.Warnf("GNOME Shell não instalado: pulando favoritos e pastas.")
 			return nil

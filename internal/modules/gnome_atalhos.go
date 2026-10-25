@@ -10,13 +10,10 @@ const gradiaFlatpak = "be.alexandervanhee.gradia"
 
 var atalhosGnome = Module{
 	ID:    "atalhos_gnome",
+	Grupo: GrupoGNOME,
 	Title: "Atalhos do GNOME",
 	Desc:  "Aplica GNOME/atalhos.dconf: Print e Shift+Super+S abrem o Gradia, gravação de tela em Shift+Super+R e volume de 2 em 2%",
 	Run: func(c *Ctx) error {
-		if !c.Sys.IsGNOME() {
-			c.Log.Infof("Ambiente %s detectado: pulando atalhos do GNOME.", c.Sys.DesktopName())
-			return nil
-		}
 		conf := filepath.Join(c.GNOMEDir, "atalhos.dconf")
 		if !fileExists(conf) {
 			c.Log.Warnf("%s não encontrado: pulando atalhos.", conf)

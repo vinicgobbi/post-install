@@ -1,7 +1,7 @@
 # Todo dia (ou à mão): confere se saiu versão nova de algo fixado no
 # post-install fora do alcance do Dependabot — commits dos repositórios
-# pessoais (Dotfiles, extensões do Nautilus, Now Bar), tag do Yaru e regra
-# UDEV do Solaar — e abre/atualiza um PR na development com os pins novos e
+# pessoais (Dotfiles, extensões do Nautilus, Now Bar) e regra UDEV do
+# Solaar — e abre/atualiza um PR na development com os pins novos e
 # links de comparação para revisar o que mudou. O PR é a notificação.
 #
 # Requer, em Settings → Actions → General, "Allow GitHub Actions to create and

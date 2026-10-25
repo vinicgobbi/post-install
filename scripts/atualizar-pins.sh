@@ -5,8 +5,8 @@
 # roda à mão a partir da raiz do repositório.
 #
 # Pins conferidos:
-#   - internal/modules/desktop.go: pares <nome>Repo/<nome>Commit (último
-#     commit da branch principal) e yaruTag/yaruSHA256 (última tag numérica)
+#   - internal/modules/pins.go: pares <nome>Repo/<nome>Commit (último
+#     commit da branch principal)
 #   - GNOME/extensoes.txt: linhas "uuid url commit" (último commit)
 #   - internal/modules/apps.go + 42-logitech-unify-permissions.rules: regra
 #     UDEV do Solaar (última tag estável)
@@ -15,7 +15,7 @@
 # em $PINS_RESUMO (padrão: pins-resumo.md).
 set -euo pipefail
 
-DESKTOP="internal/modules/desktop.go"
+PINS="internal/modules/pins.go"
 APPS="internal/modules/apps.go"
 EXTENSOES="GNOME/extensoes.txt"
 REGRA="internal/modules/42-logitech-unify-permissions.rules"
@@ -37,19 +37,19 @@ ultima_tag() {
     git ls-remote --tags --refs "$1" | sed 's#.*refs/tags/##' | grep -E "$2" | sort -V | tail -1
 }
 
-# ---- Commits fixados em desktop.go ----
+# ---- Commits fixados em pins.go ----
 while read -r nome atual; do
-    repo="$(sed -nE "s/^\s*${nome}Repo\s*=\s*\"([^\"]+)\".*/\1/p" "$DESKTOP")"
+    repo="$(sed -nE "s/^\s*${nome}Repo\s*=\s*\"([^\"]+)\".*/\1/p" "$PINS")"
     if [[ -z "$repo" ]]; then
-        echo "aviso: ${nome}Repo não encontrado em $DESKTOP" >&2
+        echo "aviso: ${nome}Repo não encontrado em $PINS" >&2
         continue
     fi
     novo="$(ultimo_commit "$repo")"
     if [[ -n "$novo" && "$novo" != "$atual" ]]; then
-        sed -i "s/$atual/$novo/" "$DESKTOP"
+        sed -i "s/$atual/$novo/" "$PINS"
         anotar "**${nome}**: [\`${atual:0:7}...${novo:0:7}\`]($(web "$repo")/compare/$atual...$novo)"
     fi
-done < <(sed -nE 's/^\s*(\w+)Commit\s*=\s*"([0-9a-f]{40})".*/\1 \2/p' "$DESKTOP")
+done < <(sed -nE 's/^\s*(\w+)Commit\s*=\s*"([0-9a-f]{40})".*/\1 \2/p' "$PINS")
 
 # ---- Commits fixados em extensoes.txt ----
 while read -r uuid repo atual; do
@@ -59,16 +59,6 @@ while read -r uuid repo atual; do
         anotar "**${uuid}**: [\`${atual:0:7}...${novo:0:7}\`]($(web "$repo")/compare/$atual...$novo)"
     fi
 done < <(grep -E '^[^#-]\S*\s+https://\S+\s+[0-9a-f]{40}\s*$' "$EXTENSOES" || true)
-
-# ---- Yaru (tag + SHA-256 do tarball) ----
-yaru_atual="$(sed -nE 's/^\s*yaruTag\s*=\s*"([^"]+)".*/\1/p' "$DESKTOP")"
-yaru_novo="$(ultima_tag https://github.com/ubuntu/yaru.git '^[0-9]+\.[0-9]+(\.[0-9]+)?$')"
-if [[ -n "$yaru_novo" && "$yaru_novo" != "$yaru_atual" ]]; then
-    curl -fsSL --proto '=https' "https://github.com/ubuntu/yaru/archive/refs/tags/$yaru_novo.tar.gz" -o "$TMP/yaru.tar.gz"
-    sha="$(sha256sum "$TMP/yaru.tar.gz" | cut -d' ' -f1)"
-    sed -i -E "s/^(\s*yaruTag\s*=\s*)\"[^\"]+\"/\1\"$yaru_novo\"/; s/^(\s*yaruSHA256\s*=\s*)\"[0-9a-f]+\"/\1\"$sha\"/" "$DESKTOP"
-    anotar "**Yaru**: [\`$yaru_atual...$yaru_novo\`](https://github.com/ubuntu/yaru/compare/$yaru_atual...$yaru_novo)"
-fi
 
 # ---- Regra UDEV do Solaar ----
 solaar_atual="$(sed -nE 's/^const solaarTag = "([^"]+)".*/\1/p' "$APPS")"

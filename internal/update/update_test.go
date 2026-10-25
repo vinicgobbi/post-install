@@ -73,7 +73,6 @@ var pacoteTeste = []entrada{
 	{"post-install/README.md", "readme novo", tar.TypeReg},
 	{"post-install/OVPN/README.md", "ovpn readme novo", tar.TypeReg},
 	{"post-install/GNOME/extensoes.txt", "extensões novas", tar.TypeReg},
-	{"post-install/CINNAMON/fixados.txt", "fixados novos", tar.TypeReg},
 	{"post-install/Wallpapers/novo.jpg", "jpg", tar.TypeReg},
 	// Nada disto pode ser escrito:
 	{"post-install/OVPN/empresa.ovpn", "ovpn falso", tar.TypeReg},
@@ -94,7 +93,7 @@ func TestExtrair(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"post-install", "README.md", "OVPN/README.md", "GNOME/extensoes.txt", "CINNAMON/fixados.txt", "Wallpapers/novo.jpg"}
+	want := []string{"post-install", "README.md", "OVPN/README.md", "GNOME/extensoes.txt", "Wallpapers/novo.jpg"}
 	if len(got) != len(want) {
 		t.Errorf("extrair = %v, esperado só %v", got, want)
 	}
