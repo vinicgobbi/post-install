@@ -1,6 +1,7 @@
 package modules
 
 import (
+	_ "embed"
 	"strings"
 	"time"
 
@@ -29,16 +30,58 @@ func clonarFixado(repo, ref, dir string) string {
 		"git -C " + dir + " -c advice.detachedHead=false checkout --quiet " + shQuote(ref) + "\n"
 }
 
+// O Flatpak não expõe o /usr do host, então os apps Flatpak só enxergam os
+// temas publicados no Flathub (org.gtk.Gtk3theme.*), onde faltam as
+// variantes de cor do Yaru. O script embutido mantém uma cópia dos temas em
+// yaruFlatpakDir (sincronizada por um hook do APT a cada atualização), que é
+// exposta a todos os apps; os links em ~/.local/share/themes fazem o GTK de
+// dentro do sandbox encontrá-la pelo xdg-data/themes.
+const (
+	yaruFlatpakDir    = "/var/lib/yaru-flatpak/themes"
+	yaruFlatpakScript = "/usr/local/sbin/yaru-flatpak-sync"
+	yaruFlatpakHook   = "/etc/apt/apt.conf.d/99yaru-flatpak"
+)
+
+//go:embed yaru-flatpak-sync.sh
+var yaruFlatpakSync string
+
+const yaruFlatpakHookConf = `// Sincroniza os temas Yaru com a cópia que os apps Flatpak enxergam — post-install
+DPkg::Post-Invoke { "if [ -x ` + yaruFlatpakScript + ` ]; then ` + yaruFlatpakScript + ` || true; fi"; };
+`
+
+// scriptLinksYaru liga cada tema da cópia em ~/.local/share/themes, sem
+// mexer em temas de mesmo nome que o usuário tenha posto ali de verdade.
+const scriptLinksYaru = `mkdir -p "$HOME/.local/share/themes"
+for tema in ` + yaruFlatpakDir + `/Yaru*; do
+    [ -d "$tema" ] || continue
+    link="$HOME/.local/share/themes/$(basename "$tema")"
+    if [ -L "$link" ] || [ ! -e "$link" ]; then
+        ln -sfn "$tema" "$link"
+    fi
+done
+`
+
 var temasIcones = Module{
 	ID:    "temas_icones",
-	Title: "Ícones Yaru",
-	Desc:  "Instala os ícones Yaru (aplicados em Yaru-dark pelo módulo de ambiente do usuário)",
+	Title: "Temas Yaru (com Flatpak)",
+	Desc:  "Instala os temas e ícones Yaru e um hook do APT que sincroniza todas as variantes do tema com os apps Flatpak",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando os ícones Yaru...")
-		if err := c.install("yaru-theme-icon"); err != nil {
+		c.Log.Infof("Instalando os temas e ícones Yaru...")
+		err := step(
+			func() error { return c.install("yaru-theme-gtk", "yaru-theme-icon", "flatpak") },
+			func() error { return c.WriteFile(yaruFlatpakScript, yaruFlatpakSync, 0o755) },
+			func() error { return c.WriteFile(yaruFlatpakHook, yaruFlatpakHookConf, 0o644) },
+			func() error { return c.Run(yaruFlatpakScript, "--force") },
+			func() error {
+				return c.Run("flatpak", "override", "--system",
+					"--filesystem=xdg-data/themes:ro", "--filesystem="+yaruFlatpakDir+":ro")
+			},
+			func() error { return c.AsUser(scriptLinksYaru) },
+		)
+		if err != nil {
 			return err
 		}
-		c.Log.Successf("Ícones Yaru instalados.")
+		c.Log.Successf("Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.")
 		return nil
 	},
 }

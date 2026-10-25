@@ -5,7 +5,8 @@ workstation Ubuntu recém-instalada: mirrors, atualização do sistema, Docker,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
-ícones Yaru, extensões e atalhos do GNOME, o ambiente do usuário (zsh,
+temas e ícones Yaru (com todas as variantes do tema nos apps Flatpak),
+extensões e atalhos do GNOME, o ambiente do usuário (zsh,
 Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update),
 Ruby (Bundler e Jekyll), Claude Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
 VSCode"/"Copiar caminho" no Nautilus.
@@ -187,7 +188,7 @@ internal/
     repositorios.go         #   atualização, repositórios, pacotes base
     mozilla.go              #   repositório APT da Mozilla e remoção dos snaps
     apps.go                 #   Solaar, LibreOffice, Flatpaks, Tailscale, PHP, Chrome+GCM, Bitwarden
-    desktop.go              #   ícones, ambiente do usuário, Rust, Ruby, Claude Code, deploy-dev, Nautilus
+    desktop.go              #   temas Yaru (+ sincronização com o Flatpak), ambiente do usuário, Rust, Ruby, Claude Code, deploy-dev, Nautilus
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
@@ -358,6 +359,35 @@ disposição do menu é zerada, para o GNOME reordenar tudo.
 Um app instalado depois que se encaixe em duas pastas aparece nas duas, já
 que as exclusões são calculadas na hora da execução; basta rodar de novo
 `sudo ./post-install --modules apps_gnome` para reorganizar.
+
+## Temas Yaru nos apps Flatpak
+
+O Flatpak não expõe o `/usr` do host ao sandbox, então os apps Flatpak não
+enxergam os temas de `/usr/share/themes`: só os publicados no Flathub
+(`org.gtk.Gtk3theme.*`), onde faltam as variantes de cor do Yaru
+(`Yaru-blue-dark`, `Yaru-sage`...). Com uma delas escolhida, os apps Flatpak
+caíam no Adwaita. O módulo `temas_icones`:
+
+1. instala `yaru-theme-gtk` e `yaru-theme-icon`;
+2. instala o script `/usr/local/sbin/yaru-flatpak-sync`, que copia todos os
+   `/usr/share/themes/Yaru*` para `/var/lib/yaru-flatpak/themes`, resolvendo
+   os links (que apontam para fora da pasta e não existiriam no sandbox), e
+   troca a cópia de uma vez;
+3. instala o hook `/etc/apt/apt.conf.d/99yaru-flatpak`, que roda o script
+   depois de cada execução do `dpkg`. O script só copia de novo quando a
+   versão do `yaru-theme-gtk` muda, então nas outras vezes sai na hora: uma
+   atualização do Yaru pelo `apt` chega sozinha aos apps Flatpak;
+4. libera a cópia e o `~/.local/share/themes` para todos os apps
+   (`flatpak override --system --filesystem=xdg-data/themes:ro
+   --filesystem=/var/lib/yaru-flatpak/themes:ro`);
+5. cria, para o usuário alvo, um link em `~/.local/share/themes` para cada
+   tema da cópia (sem mexer em uma pasta de mesmo nome que já esteja lá). É
+   por ele que o GTK de dentro do sandbox encontra o tema.
+
+Vale para apps GTK 3. Apps em GTK 4 com libadwaita não usam temas GTK, só o
+modo claro/escuro. Uma variante de cor nova do Yaru precisa de mais um link:
+basta rodar de novo `sudo ./post-install --modules temas_icones`. Para forçar
+a cópia à mão: `sudo yaru-flatpak-sync --force`.
 
 ## Ruby, Bundler e Jekyll
 

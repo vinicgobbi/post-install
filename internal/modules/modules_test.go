@@ -3,6 +3,7 @@ package modules
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -289,5 +290,43 @@ func TestIdPasta(t *testing.T) {
 		if got := idPasta(nome); got != want {
 			t.Errorf("idPasta(%q) = %q, esperado %q", nome, got, want)
 		}
+	}
+}
+
+func TestYaruFlatpakSync(t *testing.T) {
+	origem, base := t.TempDir(), filepath.Join(t.TempDir(), "yaru")
+	os.MkdirAll(filepath.Join(origem, "Yaru", "gtk-3.0"), 0o755)
+	os.WriteFile(filepath.Join(origem, "Yaru", "gtk-3.0", "gtk.css"), []byte("css"), 0o644)
+	os.MkdirAll(filepath.Join(origem, "Yaru-blue-dark", "gtk-3.0"), 0o755)
+	// Link para outro tema: a cópia precisa ter o arquivo de verdade.
+	os.Symlink(filepath.Join(origem, "Yaru", "gtk-3.0", "gtk.css"), filepath.Join(origem, "Yaru-blue-dark", "gtk-3.0", "gtk.css"))
+	os.MkdirAll(filepath.Join(origem, "Adwaita"), 0o755)
+
+	script := filepath.Join(t.TempDir(), "yaru-flatpak-sync")
+	os.WriteFile(script, []byte(yaruFlatpakSync), 0o755)
+	rodar := func() {
+		cmd := exec.Command(script, "--force")
+		cmd.Env = append(os.Environ(), "YARU_FLATPAK_ORIGEM="+origem, "YARU_FLATPAK_BASE="+base)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("yaru-flatpak-sync: %v\n%s", err, out)
+		}
+	}
+	rodar()
+	rodar() // a segunda troca a cópia existente
+
+	css := filepath.Join(base, "themes", "Yaru-blue-dark", "gtk-3.0", "gtk.css")
+	if info, err := os.Lstat(css); err != nil || !info.Mode().IsRegular() {
+		t.Errorf("%s deveria ser um arquivo comum: %v", css, err)
+	}
+	entradas, _ := os.ReadDir(filepath.Join(base, "themes"))
+	var nomes []string
+	for _, e := range entradas {
+		nomes = append(nomes, e.Name())
+	}
+	if !slices.Equal(nomes, []string{"Yaru", "Yaru-blue-dark"}) {
+		t.Errorf("temas copiados = %v", nomes)
+	}
+	if sobras, _ := filepath.Glob(filepath.Join(base, ".themes.*")); len(sobras) > 0 {
+		t.Errorf("sobrou diretório temporário: %v", sobras)
 	}
 }
