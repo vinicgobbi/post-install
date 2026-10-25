@@ -2,9 +2,8 @@
 #   dconf load /org/cinnamon/desktop/keybindings/ < atalhos.dconf
 # - Super+L bloqueia a tela (o Looking Glass, que usava Super+L, fica sem
 #   atalho);
-# - Print e Shift+Super+S selecionam uma área da tela e abrem a captura no
-#   Gradia (Flatpak), pelo cinnamon-captura-gradia, instalado pelo
-#   post-install; a captura nativa de tela inteira sai do Print (as variações
+# - Print e Shift+Super+S abrem a captura do Flameshot (seleção de área com
+#   anotação); a captura nativa de tela inteira sai do Print (as variações
 #   com Shift/Alt/Ctrl continuam);
 # - Shift+Super+R liga e desliga o gravador de tela nativo (tela inteira,
 #   salva em ~/Vídeos), além do Ctrl+Shift+Alt+R padrão;
@@ -29,13 +28,13 @@ toggle-recording=['<Shift><Super>r', '<Control><Shift><Alt>r']
 
 [custom-keybindings/custom0]
 binding=['Print']
-command='/usr/local/bin/cinnamon-captura-gradia'
-name='Gradia'
+command='flameshot gui'
+name='Flameshot'
 
 [custom-keybindings/custom1]
 binding=['<Shift><Super>s']
-command='/usr/local/bin/cinnamon-captura-gradia'
-name='Gradia Like Windows'
+command='flameshot gui'
+name='Flameshot Like Windows'
 
 [custom-keybindings/custom2]
 binding=['<Super>v']

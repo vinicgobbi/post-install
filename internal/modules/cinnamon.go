@@ -17,15 +17,15 @@ const gwlApplet = "grouped-window-list@cinnamon.org"
 const (
 	smileFlatpak = "it.mijorus.smile"
 
-	// Scripts chamados pelos atalhos de CINNAMON/atalhos.dconf.
-	volumeStep    = "/usr/local/bin/cinnamon-volume-step"
-	capturaGradia = "/usr/local/bin/cinnamon-captura-gradia"
+	// volumeStep é o caminho do script das teclas de volume, referenciado
+	// em CINNAMON/atalhos.dconf.
+	volumeStep = "/usr/local/bin/cinnamon-volume-step"
 )
 
 var atalhosCinnamon = Module{
 	ID:    "atalhos_cinnamon",
 	Title: "Atalhos do Cinnamon",
-	Desc:  "Aplica CINNAMON/atalhos.dconf: Super+L bloqueia a tela, Print e Shift+Super+S capturam uma área para o Gradia, Shift+Super+R grava a tela, Super+V o histórico da área de transferência (CopyQ), Super+. os emojis (Smile) e volume de 2 em 2%",
+	Desc:  "Aplica CINNAMON/atalhos.dconf: Super+L bloqueia a tela, Print e Shift+Super+S abrem a captura do Flameshot, Shift+Super+R grava a tela, Super+V o histórico da área de transferência (CopyQ), Super+. os emojis (Smile) e volume de 2 em 2%",
 	Run: func(c *Ctx) error {
 		if !c.Sys.IsCinnamon() {
 			c.Log.Infof("Ambiente %s detectado: pulando atalhos do Cinnamon.", c.Sys.DesktopName())
@@ -40,24 +40,10 @@ var atalhosCinnamon = Module{
 		// Os atalhos chamam esses programas, então eles precisam existir
 		// mesmo quando os módulos de apps não foram marcados.
 		if err := step(
-			func() error { return garantirFlatpak(c, gradiaFlatpak, "Gradia") },
+			func() error { return garantirPacote(c, "flameshot", "Flameshot (captura de tela)") },
+			func() error { return garantirPacote(c, "copyq", "CopyQ (histórico da área de transferência)") },
 			func() error { return garantirFlatpak(c, smileFlatpak, "Smile") },
-			func() error {
-				if _, err := lookPath("copyq"); err == nil {
-					return nil
-				}
-				c.Log.Infof("Instalando o CopyQ (histórico da área de transferência)...")
-				return c.install("copyq")
-			},
-			func() error {
-				if _, err := lookPath("gnome-screenshot"); err == nil {
-					return nil
-				}
-				c.Log.Infof("Instalando o gnome-screenshot (seleção de área para o Gradia)...")
-				return c.install("gnome-screenshot")
-			},
 			func() error { return c.WriteFile(volumeStep, volumeStepScript, 0o755) },
-			func() error { return c.WriteFile(capturaGradia, capturaGradiaScript, 0o755) },
 		); err != nil {
 			return err
 		}
@@ -68,6 +54,17 @@ var atalhosCinnamon = Module{
 		c.Log.Successf("Atalhos do Cinnamon aplicados (o CopyQ inicia sozinho no próximo login).")
 		return nil
 	},
+}
+
+// garantirPacote instala, com o gerenciador nativo, o programa chamado por
+// um atalho se ele ainda não estiver no PATH (o pacote tem o nome do
+// binário).
+func garantirPacote(c *Ctx, bin, nome string) error {
+	if _, err := lookPath(bin); err == nil {
+		return nil
+	}
+	c.Log.Infof("Instalando o %s...", nome)
+	return c.install(bin)
 }
 
 // copyqAutostart inicia o CopyQ no login, só no ícone da bandeja.
@@ -98,23 +95,6 @@ if [ ! -f "$HOME/.config/copyq/copyq.conf" ]; then
 fi
 `
 }
-
-// capturaGradiaScript seleciona uma área com o gnome-screenshot e abre a
-// imagem no Gradia. O "--screenshot=INTERACTIVE" do Gradia não serve no
-// Cinnamon: o portal de captura dele ignora o modo interativo e devolve a
-// tela inteira.
-const capturaGradiaScript = `#!/bin/sh
-# Instalado pelo post-install (módulo atalhos_cinnamon). Seleciona uma área
-# da tela e abre a captura no Gradia (a imagem vai pela entrada padrão, sem
-# ficar salva em lugar nenhum até ser exportada no Gradia).
-set -eu
-arq=$(mktemp --suffix=.png -p "${XDG_RUNTIME_DIR:-/tmp}")
-trap 'rm -f "$arq"' EXIT
-gnome-screenshot --area --file="$arq"
-# Esc na seleção: o arquivo fica vazio.
-[ -s "$arq" ] || exit 0
-flatpak run be.alexandervanhee.gradia < "$arq"
-`
 
 // volumeStepScript muda o volume no passo pedido: as teclas de volume do
 // Cinnamon têm passo fixo de 5%, sem configuração como o volume-step do
