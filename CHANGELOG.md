@@ -1,3 +1,9 @@
+## v1.11.0 (2026-10-25)
+
+### Feat
+
+- suporte ao Cinnamon (atalhos, preferências e painel)
+
 ## v1.10.0 (2026-10-23)
 
 ### Feat
