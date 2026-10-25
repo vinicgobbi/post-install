@@ -402,10 +402,18 @@ func TestVolumeStepCinnamon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, cmd := range []string{volumeStep + " +2", volumeStep + " -2"} {
+	for _, cmd := range []string{volumeStep + " +2", volumeStep + " -2", capturaGradia} {
 		if !strings.Contains(string(conf), "command='"+cmd+"'") {
 			t.Errorf("atalhos.dconf não chama %q", cmd)
 		}
+	}
+
+	captura := filepath.Join(t.TempDir(), "cinnamon-captura-gradia")
+	if err := os.WriteFile(captura, []byte(capturaGradiaScript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("sh", "-n", captura).CombinedOutput(); err != nil {
+		t.Fatalf("sintaxe: %v\n%s", err, out)
 	}
 
 	script := filepath.Join(t.TempDir(), "cinnamon-volume-step")

@@ -402,9 +402,16 @@ O módulo `atalhos_cinnamon` aplica `CINNAMON/atalhos.dconf` com
 
 - `Super+L` bloqueia a tela (junto do `Ctrl+Alt+L` padrão); o Looking Glass,
   que usava `Super+L`, fica sem atalho;
-- `Print` e `Shift+Super+S` abrem a captura interativa do Gradia (Flatpak,
-  instalado pelo módulo se ainda não estiver); a captura nativa de tela
-  inteira sai do `Print` (as variações com `Shift`, `Alt` e `Ctrl` ficam).
+- `Print` e `Shift+Super+S` selecionam uma área da tela e abrem a captura
+  no Gradia (Flatpak, instalado pelo módulo se ainda não estiver), pelo
+  `/usr/local/bin/cinnamon-captura-gradia`: o `--screenshot=INTERACTIVE` do
+  Gradia não serve no Cinnamon, cujo portal de captura ignora o modo
+  interativo e devolve a tela inteira, então a seleção é do
+  `gnome-screenshot --area` e a imagem vai para o Gradia pela entrada
+  padrão. A captura nativa de tela inteira sai do `Print` (as variações com
+  `Shift`, `Alt` e `Ctrl` ficam);
+- `Shift+Super+R` liga e desliga o gravador de tela nativo do Cinnamon (tela
+  inteira, salva em `~/Vídeos`), além do `Ctrl+Shift+Alt+R` padrão;
 - `Super+V` abre o histórico da área de transferência, como no Windows: o
   menu do [CopyQ](https://hluk.github.io/CopyQ/) aparece no cursor e o item
   escolhido é colado na janela atual. O módulo instala o CopyQ (pacote
