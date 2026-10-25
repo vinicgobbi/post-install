@@ -6,7 +6,7 @@
 #
 # Pins conferidos:
 #   - internal/modules/desktop.go: pares <nome>Repo/<nome>Commit (último
-#     commit da branch principal) e yaruTag/yaruSHA256 (última tag numérica)
+#     commit da branch principal)
 #   - GNOME/extensoes.txt: linhas "uuid url commit" (último commit)
 #   - internal/modules/apps.go + 42-logitech-unify-permissions.rules: regra
 #     UDEV do Solaar (última tag estável)
@@ -59,16 +59,6 @@ while read -r uuid repo atual; do
         anotar "**${uuid}**: [\`${atual:0:7}...${novo:0:7}\`]($(web "$repo")/compare/$atual...$novo)"
     fi
 done < <(grep -E '^[^#-]\S*\s+https://\S+\s+[0-9a-f]{40}\s*$' "$EXTENSOES" || true)
-
-# ---- Yaru (tag + SHA-256 do tarball) ----
-yaru_atual="$(sed -nE 's/^\s*yaruTag\s*=\s*"([^"]+)".*/\1/p' "$DESKTOP")"
-yaru_novo="$(ultima_tag https://github.com/ubuntu/yaru.git '^[0-9]+\.[0-9]+(\.[0-9]+)?$')"
-if [[ -n "$yaru_novo" && "$yaru_novo" != "$yaru_atual" ]]; then
-    curl -fsSL --proto '=https' "https://github.com/ubuntu/yaru/archive/refs/tags/$yaru_novo.tar.gz" -o "$TMP/yaru.tar.gz"
-    sha="$(sha256sum "$TMP/yaru.tar.gz" | cut -d' ' -f1)"
-    sed -i -E "s/^(\s*yaruTag\s*=\s*)\"[^\"]+\"/\1\"$yaru_novo\"/; s/^(\s*yaruSHA256\s*=\s*)\"[0-9a-f]+\"/\1\"$sha\"/" "$DESKTOP"
-    anotar "**Yaru**: [\`$yaru_atual...$yaru_novo\`](https://github.com/ubuntu/yaru/compare/$yaru_atual...$yaru_novo)"
-fi
 
 # ---- Regra UDEV do Solaar ----
 solaar_atual="$(sed -nE 's/^const solaarTag = "([^"]+)".*/\1/p' "$APPS")"

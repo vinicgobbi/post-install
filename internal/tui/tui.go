@@ -203,7 +203,7 @@ func tick() tea.Cmd {
 }
 
 // listen espera o próximo evento do engine e já drena os que estiverem na
-// fila, para não redesenhar a tela a cada linha de saída do apt/dnf.
+// fila, para não redesenhar a tela a cada linha de saída do apt.
 func listen(ch chan any) tea.Cmd {
 	return func() tea.Msg {
 		ev, ok := <-ch

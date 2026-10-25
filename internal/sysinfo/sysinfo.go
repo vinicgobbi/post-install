@@ -1,10 +1,10 @@
-// Package sysinfo detecta a distribuição, a versão e o gerenciador de
-// pacotes, e confere se o GNOME está instalado.
+// Package sysinfo detecta a versão do Ubuntu e confere se o sistema é
+// suportado.
 //
-// A família "arch" é restrita ao Arch puro (ID=arch) de propósito: derivados
-// (Manjaro, EndeavourOS, CachyOS...) divergem de formas diferentes (repos,
-// versões de pacote, AUR helper padrão) e "parecer" Arch não garante que o
-// Chaotic-AUR e o yay funcionem sem ajuste.
+// Só o Ubuntu puro (ID=ubuntu) com GNOME é suportado de propósito: derivados
+// (Mint, Pop!_OS, Zorin...) e sabores com outro desktop (Kubuntu, Xubuntu...)
+// divergem em repositórios, pacotes e configurações do desktop, e "parecer"
+// Ubuntu não garante que os módulos funcionem sem ajuste.
 package sysinfo
 
 import (
@@ -13,148 +13,98 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
 type Info struct {
 	ID         string
-	IDLike     string
 	PrettyName string
 	VersionID  string
 
-	Family string // fedora | rhel | arch | debian
-	PkgMgr string // dnf | pacman | apt
+	Arch          string // dpkg --print-architecture
+	Codename      string // jammy, noble, resolute, ...
+	MSRepoVersion string // versão do Ubuntu nas URLs do repositório da Microsoft
 
-	RHELVersion string // só família rhel
-
-	// Só família debian.
-	Arch            string // dpkg --print-architecture
-	BaseCodename    string // jammy, bookworm, ...
-	DistroVersion   string // 22.04, 12, ...
-	DockerDistro    string // "ubuntu" ou "debian", para as URLs do repo Docker
-	MSRepoSupported bool   // a Microsoft publica repo empacotado para essa combinação
-
-	// Avisos gerados durante a detecção (ex.: fallback de versão do Ubuntu).
+	// Avisos gerados durante a detecção (ex.: fallback do repositório da
+	// Microsoft).
 	Warnings []string
 }
 
-// Detect lê /etc/os-release (e, no Mint, /etc/upstream-release/lsb-release)
-// e devolve as informações do sistema atual.
+// msRepo mapeia as versões suportadas para a versão usada nas URLs do
+// repositório da Microsoft (msodbcsql/mssql-tools).
+var msRepo = map[string]string{
+	"jammy":    "22.04",
+	"noble":    "24.04",
+	"resolute": "26.04",
+}
+
+// Detect lê /etc/os-release e devolve as informações do sistema atual.
 func Detect() (*Info, error) {
 	rel, err := readKV("/etc/os-release")
 	if err != nil {
 		return nil, fmt.Errorf("lendo /etc/os-release: %w", err)
 	}
-	upstream, _ := readKV("/etc/upstream-release/lsb-release")
-
-	info, err := fromRelease(rel, upstream)
+	info, err := fromRelease(rel)
 	if err != nil {
 		return nil, err
-	}
-	if info.Family == "debian" {
-		info.Arch = dpkgArch()
 	}
 	// O sudo costuma limpar XDG_CURRENT_DESKTOP (env_reset), então confere
 	// pelo binário do GNOME Shell.
 	if _, err := exec.LookPath("gnome-shell"); err != nil {
-		return nil, fmt.Errorf("%s sem o GNOME Shell não é suportado (só o GNOME)", info.PrettyName)
+		return nil, fmt.Errorf("%s sem o GNOME Shell não é suportado (só o Ubuntu com GNOME)", info.PrettyName)
 	}
+	info.Arch = dpkgArch()
 	return info, nil
 }
 
-func fromRelease(rel, upstream map[string]string) (*Info, error) {
+func fromRelease(rel map[string]string) (*Info, error) {
 	info := &Info{
 		ID:         rel["ID"],
-		IDLike:     rel["ID_LIKE"],
 		PrettyName: rel["PRETTY_NAME"],
 		VersionID:  rel["VERSION_ID"],
+		Codename:   rel["UBUNTU_CODENAME"],
 	}
-	like := func(s string) bool { return strings.Contains(info.IDLike, s) }
-
-	switch {
-	case info.ID == "fedora":
-		info.Family, info.PkgMgr = "fedora", "dnf"
-
-	case info.ID == "almalinux" || like("rhel") || like("centos"):
-		info.Family, info.PkgMgr = "rhel", "dnf"
-		info.RHELVersion, _, _ = strings.Cut(info.VersionID, ".")
-
-	case info.ID == "arch":
-		info.Family, info.PkgMgr = "arch", "pacman"
-
-	case info.ID == "ubuntu" || info.ID == "debian" || like("ubuntu") || like("debian"):
-		info.Family, info.PkgMgr = "debian", "apt"
-
-		if info.ID == "ubuntu" || like("ubuntu") {
-			info.DockerDistro = "ubuntu"
-			// O Mint guarda o codinome do Ubuntu base em upstream-release;
-			// Ubuntu puro e outros derivados expõem direto no os-release.
-			if c := upstream["DISTRIB_CODENAME"]; c != "" {
-				info.BaseCodename = c
-			} else if c := rel["UBUNTU_CODENAME"]; c != "" {
-				info.BaseCodename = c
-			} else {
-				info.BaseCodename = rel["VERSION_CODENAME"]
-			}
-
-			info.MSRepoSupported = true
-			switch info.BaseCodename {
-			case "bionic":
-				info.DistroVersion = "18.04"
-			case "focal":
-				info.DistroVersion = "20.04"
-			case "jammy":
-				info.DistroVersion = "22.04"
-			case "noble":
-				info.DistroVersion = "24.04"
-			case "resolute":
-				info.DistroVersion = "26.04"
-			default:
-				// Versão ainda sem "prod.repo" publicado pela Microsoft (ex.: a
-				// LTS recém-lançada). Os pacotes msodbcsql/mssql-tools da última
-				// LTS suportada são compatíveis na prática.
-				info.DistroVersion = "26.04"
-				info.Warnings = append(info.Warnings, fmt.Sprintf(
-					"Ubuntu %s ainda não tem repositório oficial da Microsoft; usando o repositório do Ubuntu 26.04 (compatível) para msodbcsql/mssql-tools.",
-					info.BaseCodename))
-			}
-		} else {
-			// Debian puro e derivados diretos (ex.: LMDE).
-			info.DockerDistro = "debian"
-			info.BaseCodename = rel["VERSION_CODENAME"]
-			if info.BaseCodename == "" {
-				info.BaseCodename = info.VersionID
-			}
-			switch info.BaseCodename {
-			case "bullseye":
-				info.DistroVersion, info.MSRepoSupported = "11", true
-			case "bookworm":
-				info.DistroVersion, info.MSRepoSupported = "12", true
-			case "trixie":
-				info.DistroVersion, info.MSRepoSupported = "13", true
-			default:
-				info.DistroVersion = info.VersionID
-			}
-		}
-
-	default:
-		return nil, fmt.Errorf("distribuição não suportada: %s", info.PrettyName)
+	if info.PrettyName == "" {
+		info.PrettyName = info.ID
 	}
+	if info.ID != "ubuntu" {
+		return nil, fmt.Errorf("distribuição não suportada: %s (só o Ubuntu)", info.PrettyName)
+	}
+	if info.Codename == "" {
+		info.Codename = rel["VERSION_CODENAME"]
+	}
+
+	if v, ok := msRepo[info.Codename]; ok {
+		info.MSRepoVersion = v
+		return info, nil
+	}
+	if !versaoMaiorQue(info.VersionID, 26, 4) {
+		return nil, fmt.Errorf("versão não suportada: %s (só o Ubuntu 22.04, 24.04, 26.04 e mais novos)", info.PrettyName)
+	}
+	// Versão ainda sem "prod.repo" publicado pela Microsoft. Os pacotes
+	// msodbcsql/mssql-tools da última LTS suportada são compatíveis na prática.
+	info.MSRepoVersion = "26.04"
+	info.Warnings = append(info.Warnings, fmt.Sprintf(
+		"Ubuntu %s ainda não tem repositório oficial da Microsoft; usando o repositório do Ubuntu 26.04 (compatível) para msodbcsql/mssql-tools.",
+		info.VersionID))
 	return info, nil
+}
+
+// versaoMaiorQue diz se uma versão "AA.MM" é posterior a maior.menor.
+func versaoMaiorQue(versao string, maior, menor int) bool {
+	a, m, _ := strings.Cut(versao, ".")
+	ma, err1 := strconv.Atoi(a)
+	mi, err2 := strconv.Atoi(m)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return ma > maior || (ma == maior && mi > menor)
 }
 
 // Summary é a linha "Sistema detectado: ..." mostrada no início.
 func (i *Info) Summary() string {
-	switch i.Family {
-	case "debian":
-		return fmt.Sprintf("%s (Base: %s %s / %s)", i.PrettyName, i.DockerDistro, i.DistroVersion, i.BaseCodename)
-	case "rhel":
-		return fmt.Sprintf("%s (Base: RHEL %s)", i.PrettyName, i.RHELVersion)
-	case "arch":
-		return fmt.Sprintf("%s (rolling release, pacman + Chaotic-AUR/yay)", i.PrettyName)
-	default:
-		return i.PrettyName
-	}
+	return fmt.Sprintf("%s (%s)", i.PrettyName, i.Codename)
 }
 
 func dpkgArch() string {

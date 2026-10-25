@@ -1,4 +1,4 @@
-// post-install configura uma workstation Linux recém-instalada: mirrors,
+// post-install configura uma workstation Ubuntu recém-instalada: mirrors,
 // atualização, repositórios, Docker/VSCode/PHP/SQL Server, Flatpaks,
 // Tailscale, Chrome, Bitwarden, temas, ambiente do usuário, Rust, Claude Code,
 // OpenVPN e virt-manager — com uma TUI para escolher o que rodar.
@@ -213,14 +213,6 @@ func run() int {
 	sys, err := sysinfo.Detect()
 	if err != nil {
 		return fail("%v", err)
-	}
-
-	// A regra temporária de sudo sem senha para o pacman (Arch) equivale a
-	// root completo: some no início (sobra de uma execução interrompida) e
-	// no fim de toda execução, com qualquer resultado.
-	if !o.dryRun {
-		removerRegraSudo(out)
-		defer removerRegraSudo(out)
 	}
 
 	sel, err := initialSelection(all, o.modules, o.skip)
@@ -521,18 +513,6 @@ func initialSelection(all []modules.Module, only, skip string) ([]bool, error) {
 		sel[i] = (len(onlyIDs) == 0 || slices.Contains(onlyIDs, id)) && !slices.Contains(skipIDs, id)
 	}
 	return sel, nil
-}
-
-// removerRegraSudo apaga a regra temporária de sudo do pacman, avisando se
-// havia uma.
-func removerRegraSudo(out *plain.Printer) {
-	removida, err := modules.RemoverRegraSudoTemporaria()
-	switch {
-	case err != nil:
-		out.Handle(runlog.Entry{Level: runlog.Error, Text: fmt.Sprintf("Falha ao remover a regra temporária de sudo do pacman: %v — apague-a à mão.", err)})
-	case removida:
-		out.Info("Regra temporária de sudo sem senha para o pacman removida.")
-	}
 }
 
 // chownLogs passa os logs desta execução para o usuário alvo.

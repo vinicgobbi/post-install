@@ -112,7 +112,7 @@ func (r *Runner) Try(name string, args ...string) bool {
 	return r.quiet(name, args...) == nil
 }
 
-// Probe executa uma consulta somente-leitura (ex.: "rpm -q pacote") e devolve
+// Probe executa uma consulta somente-leitura (ex.: "dpkg -s pacote") e devolve
 // se ela teve sucesso. Roda mesmo em DryRun.
 func (r *Runner) Probe(name string, args ...string) bool {
 	return r.quiet(name, args...) == nil

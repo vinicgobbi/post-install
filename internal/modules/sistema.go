@@ -106,26 +106,12 @@ func avisarPermissaoOVPN(c *Ctx, arquivo string) {
 	}
 }
 
-// O pacote "-gnome" traz o diálogo de autenticação GTK. No Arch o pacote
-// oficial já o inclui.
+// O pacote "-gnome" traz o diálogo de autenticação GTK.
 func instalarPluginOpenVPN(c *Ctx) error {
-	switch c.Sys.PkgMgr {
-	case "dnf":
-		if c.Probe("rpm", "-q", "NetworkManager-openvpn") {
-			return nil
-		}
-		return c.install("NetworkManager-openvpn", "NetworkManager-openvpn-gnome")
-	case "pacman":
-		if c.Probe("pacman", "-Qq", "networkmanager-openvpn") {
-			return nil
-		}
-		return c.install("networkmanager-openvpn")
-	default:
-		if c.Probe("dpkg", "-s", "network-manager-openvpn") {
-			return nil
-		}
-		return c.install("network-manager-openvpn", "network-manager-openvpn-gnome")
+	if c.Probe("dpkg", "-s", "network-manager-openvpn") {
+		return nil
 	}
+	return c.install("network-manager-openvpn", "network-manager-openvpn-gnome")
 }
 
 var (
@@ -157,17 +143,9 @@ var virtManager = Module{
 			c.Log.Warnf("CPU sem suporte a virtualização por hardware (VT-x/AMD-V) ou não habilitado na BIOS/UEFI — o KVM pode não funcionar.")
 		}
 
-		var pkgs []string
-		switch c.Sys.PkgMgr {
-		case "dnf":
-			pkgs = []string{"qemu-kvm", "libvirt", "virt-install", "virt-manager"}
-		case "pacman":
-			pkgs = []string{"qemu-desktop", "libvirt", "virt-manager"}
-		default:
-			// "qemu-kvm" virou pacote virtual em versões recentes do Ubuntu;
-			// "qemu-system-x86" é o pacote real que o provê.
-			pkgs = []string{"qemu-system-x86", "libvirt-daemon-system", "libvirt-clients", "bridge-utils", "virt-manager"}
-		}
+		// "qemu-kvm" virou pacote virtual em versões recentes do Ubuntu;
+		// "qemu-system-x86" é o pacote real que o provê.
+		pkgs := []string{"qemu-system-x86", "libvirt-daemon-system", "libvirt-clients", "bridge-utils", "virt-manager"}
 		err := step(
 			func() error { return c.install(pkgs...) },
 			func() error { return c.Run("systemctl", "enable", "--now", "libvirtd") },
@@ -185,29 +163,13 @@ var virtManager = Module{
 var limpeza = Module{
 	ID:    "limpeza",
 	Title: "Limpeza final",
-	Desc:  "Remove pacotes órfãos e limpa o cache do gerenciador de pacotes",
+	Desc:  "Remove pacotes órfãos e limpa o cache do APT",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Limpando o sistema...")
-		var err error
-		switch c.Sys.PkgMgr {
-		case "dnf":
-			err = step(
-				func() error { return c.Run("dnf", "autoremove", "-y") },
-				func() error { return c.Run("dnf", "clean", "all") },
-			)
-		case "pacman":
-			if orfaos, _ := c.Output("pacman", "-Qtdq"); strings.TrimSpace(orfaos) != "" {
-				err = c.Run("pacman", append([]string{"-Rns", "--noconfirm"}, strings.Fields(orfaos)...)...)
-			}
-			if err == nil {
-				err = c.Run("pacman", "-Sc", "--noconfirm")
-			}
-		default:
-			err = step(
-				func() error { return c.Run("apt", "autoremove", "-y") },
-				func() error { return c.Run("apt", "clean") },
-			)
-		}
+		err := step(
+			func() error { return c.Run("apt", "autoremove", "-y") },
+			func() error { return c.Run("apt", "clean") },
+		)
 		if err != nil {
 			return err
 		}

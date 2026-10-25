@@ -6,7 +6,7 @@
 //	<prefixo>_<timestamp>.log      só as mensagens info/aviso/erro/sucesso/passo,
 //	                               com hora e nível, sem código de cor.
 //	<prefixo>_<timestamp>.raw.log  transcrição bruta e completa, incluindo a
-//	                               saída crua de apt/dnf/curl/flatpak etc.
+//	                               saída crua de apt/curl/flatpak etc.
 package runlog
 
 import (

@@ -4,7 +4,6 @@ package modules
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/vinicgobbi/post-install/internal/runner"
 	"github.com/vinicgobbi/post-install/internal/sysinfo"
@@ -75,30 +74,15 @@ func All() []Module {
 	}
 }
 
-// ---- Helpers por gerenciador de pacotes ----
+// ---- Helpers de pacotes ----
 
-// install instala pacotes com o gerenciador nativo, de forma não interativa.
+// install instala pacotes com o apt, de forma não interativa.
 func (c *Ctx) install(pkgs ...string) error {
 	return c.installEnv(nil, pkgs...)
 }
 
 func (c *Ctx) installEnv(env []string, pkgs ...string) error {
-	switch c.Sys.PkgMgr {
-	case "dnf":
-		return c.RunEnv(env, "dnf", append([]string{"install", "-y"}, pkgs...)...)
-	case "pacman":
-		return c.RunEnv(env, "pacman", append([]string{"-S", "--needed", "--noconfirm"}, pkgs...)...)
-	default:
-		return c.RunEnv(env, "apt", append([]string{"install", "-y"}, pkgs...)...)
-	}
-}
-
-// installAUR instala pacotes via yay como o usuário alvo — o makepkg recusa
-// rodar como root. Resolve tanto binários do Chaotic-AUR quanto pacotes que
-// só existem na AUR (compila). Depende do módulo "repositorios" ter liberado
-// sudo sem senha para o pacman nesse usuário.
-func (c *Ctx) installAUR(pkgs ...string) error {
-	return c.AsUser("yay -S --needed --noconfirm " + strings.Join(pkgs, " "))
+	return c.RunEnv(env, "apt", append([]string{"install", "-y"}, pkgs...)...)
 }
 
 func (c *Ctx) ensureFlathub() error {

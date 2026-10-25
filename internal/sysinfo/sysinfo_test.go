@@ -12,50 +12,46 @@ func kv(s string) map[string]string {
 
 func TestFromRelease(t *testing.T) {
 	tests := []struct {
-		name        string
-		osRelease   string
-		upstream    string
-		family      string
-		codename    string
-		version     string
-		msSupported bool
-		warnings    int
-		wantErr     bool
+		name      string
+		osRelease string
+		codename  string
+		msVersion string
+		warnings  int
+		wantErr   bool
 	}{
-		{name: "fedora", osRelease: `ID=fedora
-VERSION_ID=42
-PRETTY_NAME="Fedora Linux 42"`, family: "fedora"},
-		{name: "alma", osRelease: `ID="almalinux"
-ID_LIKE="rhel centos fedora"
-VERSION_ID="9.4"`, family: "rhel"},
-		{name: "arch", osRelease: "ID=arch", family: "arch"},
-		{name: "manjaro nao suportado", osRelease: "ID=manjaro\nID_LIKE=arch", wantErr: true},
+		{name: "ubuntu jammy", osRelease: `ID=ubuntu
+ID_LIKE=debian
+VERSION_ID="22.04"
+VERSION_CODENAME=jammy
+UBUNTU_CODENAME=jammy`, codename: "jammy", msVersion: "22.04"},
 		{name: "ubuntu noble", osRelease: `ID=ubuntu
 ID_LIKE=debian
+VERSION_ID="24.04"
 VERSION_CODENAME=noble
-UBUNTU_CODENAME=noble`, family: "debian", codename: "noble", version: "24.04", msSupported: true},
-		{name: "ubuntu futuro usa fallback", osRelease: `ID=ubuntu
-UBUNTU_CODENAME=zesty2`, family: "debian", codename: "zesty2", version: "26.04", msSupported: true, warnings: 1},
+UBUNTU_CODENAME=noble`, codename: "noble", msVersion: "24.04"},
 		{name: "ubuntu resolute", osRelease: `ID=ubuntu
-ID_LIKE=debian
-VERSION_CODENAME=resolute
-UBUNTU_CODENAME=resolute`, family: "debian", codename: "resolute", version: "26.04", msSupported: true},
-		{name: "mint usa upstream", osRelease: `ID=linuxmint
+VERSION_ID="26.04"
+UBUNTU_CODENAME=resolute`, codename: "resolute", msVersion: "26.04"},
+		{name: "ubuntu futuro usa fallback", osRelease: `ID=ubuntu
+VERSION_ID="26.10"
+UBUNTU_CODENAME=zesty2`, codename: "zesty2", msVersion: "26.04", warnings: 1},
+		{name: "ubuntu focal nao suportado", osRelease: `ID=ubuntu
+VERSION_ID="20.04"
+UBUNTU_CODENAME=focal`, wantErr: true},
+		{name: "ubuntu interina antiga nao suportada", osRelease: `ID=ubuntu
+VERSION_ID="25.04"
+UBUNTU_CODENAME=plucky`, wantErr: true},
+		{name: "mint nao suportado", osRelease: `ID=linuxmint
 ID_LIKE="ubuntu debian"
-VERSION_CODENAME=wilma`, upstream: "DISTRIB_CODENAME=noble", family: "debian", codename: "noble", version: "24.04", msSupported: true},
-		{name: "debian bookworm", osRelease: `ID=debian
+UBUNTU_CODENAME=noble`, wantErr: true},
+		{name: "debian nao suportado", osRelease: `ID=debian
 VERSION_ID="12"
-VERSION_CODENAME=bookworm`, family: "debian", codename: "bookworm", version: "12", msSupported: true},
-		{name: "debian trixie", osRelease: `ID=debian
-VERSION_ID="13"
-VERSION_CODENAME=trixie`, family: "debian", codename: "trixie", version: "13", msSupported: true},
-		{name: "debian forky sem repo MS", osRelease: `ID=debian
-VERSION_ID="14"
-VERSION_CODENAME=forky`, family: "debian", codename: "forky", version: "14"},
+VERSION_CODENAME=bookworm`, wantErr: true},
+		{name: "fedora nao suportado", osRelease: "ID=fedora\nVERSION_ID=42", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			info, err := fromRelease(kv(tt.osRelease), kv(tt.upstream))
+			info, err := fromRelease(kv(tt.osRelease))
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("esperava erro, veio %+v", info)
@@ -65,20 +61,9 @@ VERSION_CODENAME=forky`, family: "debian", codename: "forky", version: "14"},
 			if err != nil {
 				t.Fatal(err)
 			}
-			if info.Family != tt.family || info.BaseCodename != tt.codename ||
-				info.DistroVersion != tt.version || info.MSRepoSupported != tt.msSupported ||
-				len(info.Warnings) != tt.warnings {
+			if info.Codename != tt.codename || info.MSRepoVersion != tt.msVersion || len(info.Warnings) != tt.warnings {
 				t.Errorf("resultado inesperado: %+v", info)
 			}
 		})
-	}
-}
-
-func TestRHELVersion(t *testing.T) {
-	info, err := fromRelease(kv(`ID=rocky
-ID_LIKE="rhel centos fedora"
-VERSION_ID="9.4"`), nil)
-	if err != nil || info.RHELVersion != "9" {
-		t.Fatalf("got %+v, %v", info, err)
 	}
 }

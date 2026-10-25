@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 // Código de terceiros e dos repositórios pessoais que este programa executa
 // fica fixado numa versão conhecida: uma conta comprometida ou um push errado
 // na branch principal não chega sozinho às próximas instalações. Para
-// atualizar, troque o commit/tag (e o SHA-256, quando houver) aqui.
+// atualizar, troque o commit aqui.
 const (
 	dotfilesRepo   = "https://github.com/vinicgobbi/Dotfiles.git"
 	dotfilesCommit = "1e9a97699b70582f87e768f1fe6aa1dde9b58fd6"
@@ -21,9 +20,6 @@ const (
 
 	copypathRepo   = "https://github.com/vinicgobbi/nautilus-copypath.git"
 	copypathCommit = "f2e1c9d0a3b5ed2584539dd9d127cf6121fba599"
-
-	yaruTag    = "26.10.3"
-	yaruSHA256 = "ac396932559dd1b515ee4d94d470093dfac407027d9609e756299df9e06c3f7b"
 )
 
 // clonarFixado devolve as linhas de shell que clonam repo em dir (expressão
@@ -35,103 +31,16 @@ func clonarFixado(repo, ref, dir string) string {
 
 var temasIcones = Module{
 	ID:    "temas_icones",
-	Title: "Temas e ícones",
-	Desc:  "Instala o tema adw-gtk3 e os ícones Yaru",
+	Title: "Ícones Yaru",
+	Desc:  "Instala os ícones Yaru (aplicados em Yaru-dark pelo módulo de ambiente do usuário)",
 	Run: func(c *Ctx) error {
-		if c.Sys.PkgMgr == "pacman" {
-			c.Log.Infof("Instalando adw-gtk-theme (oficial) e ícones Yaru (AUR/Chaotic-AUR)...")
-			if err := step(
-				func() error { return c.install("adw-gtk-theme") },
-				func() error { return c.installAUR("yaru-icon-theme") },
-			); err != nil {
-				return err
-			}
-			c.Log.Successf("Temas e ícones implantados no sistema.")
-			return nil
-		}
-
-		c.Log.Infof("Configurando temas e ícones globais em /usr/share...")
-		if err := step(
-			func() error { return c.MkdirAll("/usr/share/themes", 0o755) },
-			func() error { return c.MkdirAll("/usr/share/icons", 0o755) },
-		); err != nil {
+		c.Log.Infof("Instalando os ícones Yaru...")
+		if err := c.install("yaru-theme-icon"); err != nil {
 			return err
 		}
-
-		if c.Sys.ID != "ubuntu" {
-			if err := instalarAdwGtk3(c); err != nil {
-				return err
-			}
-		}
-		if err := instalarYaru(c); err != nil {
-			return err
-		}
-		c.Log.Successf("Temas e ícones implantados no sistema.")
+		c.Log.Successf("Ícones Yaru instalados.")
 		return nil
 	},
-}
-
-func instalarAdwGtk3(c *Ctx) error {
-	c.Log.Infof("Verificando adw-gtk3 nos repositórios...")
-	pkg := ""
-	if c.Sys.PkgMgr == "dnf" {
-		if c.Probe("dnf", "list", "available", "adw-gtk3-theme") {
-			pkg = "adw-gtk3-theme"
-		}
-	} else if c.Probe("apt-cache", "show", "adw-gtk3") {
-		pkg = "adw-gtk3"
-	}
-
-	if pkg != "" {
-		c.Log.Infof("Instalando adw-gtk3 via gerenciador de pacotes nativo...")
-		return c.install(pkg)
-	}
-
-	c.Log.Infof("adw-gtk3 ausente dos repositórios. Baixando tarball oficial do GitHub...")
-	asset, err := latestReleaseAsset(c, "lassekongo83/adw-gtk3", func(n string) bool { return strings.HasSuffix(n, ".tar.xz") })
-	if err != nil {
-		c.Log.Warnf("Não foi possível localizar o tarball do adw-gtk3: %v", err)
-		return nil
-	}
-	tarball := c.Temp("adw-gtk3.tar.xz")
-	return step(
-		func() error { return downloadAsset(c, asset, tarball) },
-		func() error { return c.Run("tar", "-xJf", tarball, "-C", "/usr/share/themes/") },
-	)
-}
-
-func instalarYaru(c *Ctx) error {
-	c.Log.Infof("Verificando ícones Yaru nos repositórios...")
-	pkg := ""
-	if c.Sys.PkgMgr == "dnf" {
-		if c.Probe("dnf", "list", "available", "yaru-icon-theme") {
-			pkg = "yaru-icon-theme"
-		}
-	} else if c.Probe("apt-cache", "show", "yaru-theme-icon") {
-		pkg = "yaru-theme-icon"
-	}
-
-	if pkg != "" {
-		c.Log.Infof("Instalando ícones Yaru via gerenciador de pacotes nativo...")
-		return c.install(pkg)
-	}
-
-	c.Log.Infof("Ícones Yaru ausentes dos repositórios. Baixando a versão %s do repositório oficial do Ubuntu...", yaruTag)
-	tarball, dir := c.Temp("yaru.tar.gz"), c.Temp("yaru")
-	err := step(
-		func() error {
-			return c.DownloadVerified("https://github.com/ubuntu/yaru/archive/refs/tags/"+yaruTag+".tar.gz", tarball, yaruSHA256)
-		},
-		func() error { return c.MkdirAll(dir, 0o755) },
-		func() error { return c.Run("tar", "-xzf", tarball, "-C", dir) },
-	)
-	if err != nil {
-		return err
-	}
-	if err := c.Run("cp", "-r", dir+"/yaru-"+yaruTag+"/icons/.", "/usr/share/icons/"); err != nil {
-		c.Log.Warnf("Falha ao copiar os ícones Yaru: %v", err)
-	}
-	return nil
 }
 
 var ambienteUsuario = Module{
@@ -175,7 +84,7 @@ var ambienteUsuario = Module{
 			c.Log.Warnf("Falha ao aplicar os dotfiles: %v", err)
 		}
 
-		if err := c.AsUser(scriptAmbienteUsuario(c)); err != nil {
+		if err := c.AsUser(scriptAmbienteUsuario); err != nil {
 			c.Log.Warnf("Parte dos ajustes do ambiente do usuário falhou: %v", err)
 		}
 		c.Log.Successf("Ambiente de usuário configurado.")
@@ -186,14 +95,7 @@ var ambienteUsuario = Module{
 // scriptAmbienteUsuario roda depois do bootstrap dos dotfiles (que cria o
 // ~/.zshrc via Oh My Zsh): instala o Node LTS via fnm, cria o diretório de
 // projetos e aplica os ajustes visuais.
-func scriptAmbienteUsuario(c *Ctx) string {
-	visual := `gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark" 2>/dev/null || true`
-	if c.Sys.ID != "ubuntu" {
-		visual = `gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' && gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
-` + visual
-	}
-
-	return fmt.Sprintf(`
+const scriptAmbienteUsuario = `
 # Node LTS via fnm
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env --shell zsh)"
@@ -231,9 +133,8 @@ for desktop in /usr/share/applications/solaar.desktop \
 done
 
 # Ajustes visuais
-%s
-`, visual)
-}
+gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark" 2>/dev/null || true
+`
 
 var rustTools = Module{
 	ID:    "rust_tools",
@@ -244,15 +145,7 @@ var rustTools = Module{
 		// O cargo-update compila com libgit2/libcurl/libssh2 (embutidos se
 		// faltarem no sistema), o que exige CMake, pkg-config e os cabeçalhos
 		// do OpenSSL.
-		var buildPkgs []string
-		switch c.Sys.PkgMgr {
-		case "dnf":
-			buildPkgs = []string{"gcc", "make", "cmake", "pkgconf-pkg-config", "openssl-devel"}
-		case "pacman":
-			buildPkgs = []string{"base-devel", "cmake", "openssl"}
-		default:
-			buildPkgs = []string{"build-essential", "cmake", "pkg-config", "libssl-dev"}
-		}
+		buildPkgs := []string{"build-essential", "cmake", "pkg-config", "libssl-dev"}
 		err := step(
 			func() error { return c.install(buildPkgs...) },
 			func() error {
@@ -300,16 +193,7 @@ var ruby = Module{
 	Desc:  "Ruby com headers de desenvolvimento e, como gems do usuário (sem sudo), Bundler e Jekyll; o Bundler instala as gems de cada projeto em vendor/bundle",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando Ruby e compiladores para gems nativas...")
-		var pkgs []string
-		switch c.Sys.PkgMgr {
-		case "dnf":
-			pkgs = []string{"ruby", "ruby-devel", "rubygems", "gcc", "gcc-c++", "make", "redhat-rpm-config", "zlib-devel"}
-		case "pacman":
-			// No Arch os headers já vêm no pacote ruby.
-			pkgs = []string{"ruby", "rubygems", "base-devel"}
-		default:
-			pkgs = []string{"ruby-full", "ruby-dev", "build-essential", "zlib1g-dev"}
-		}
+		pkgs := []string{"ruby-full", "ruby-dev", "build-essential", "zlib1g-dev"}
 		if err := c.install(pkgs...); err != nil {
 			return err
 		}
@@ -401,15 +285,7 @@ var vscodeNautilus = Module{
 	Desc:  "Adiciona 'Abrir com o VSCode' e 'Copiar caminho' ao menu de contexto do Nautilus",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando extensões do VSCode e de copiar caminho para o Nautilus...")
-		var deps []string
-		switch c.Sys.PkgMgr {
-		case "dnf":
-			deps = []string{"nautilus-python", "python3-gobject", "wl-clipboard", "xclip"}
-		case "pacman":
-			deps = []string{"nautilus-python", "python-gobject", "wl-clipboard", "xclip"}
-		default:
-			deps = []string{"python3-nautilus", "python3-gi", "wl-clipboard", "xclip"}
-		}
+		deps := []string{"python3-nautilus", "python3-gi", "wl-clipboard", "xclip"}
 		err := step(
 			func() error { return c.install(deps...) },
 			func() error {

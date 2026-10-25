@@ -141,19 +141,6 @@ func TestConexoesNM(t *testing.T) {
 	}
 }
 
-func TestAjustarDNFConf(t *testing.T) {
-	tests := []struct{ in, want string }{
-		{"", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\n"},
-		{"[main]\ngpgcheck=1\nfastestmirror=False\n", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\ngpgcheck=1\n"},
-		{"# comentário\n", "[main]\nfastestmirror=True\nmax_parallel_downloads=10\n# comentário\n"},
-	}
-	for _, tt := range tests {
-		if got := ajustarDNFConf(tt.in); got != tt.want {
-			t.Errorf("ajustarDNFConf(%q) = %q, esperado %q", tt.in, got, tt.want)
-		}
-	}
-}
-
 func TestLerDesktop(t *testing.T) {
 	dir := t.TempDir()
 	escrever := func(nome, conteudo string) string {
@@ -285,7 +272,7 @@ func TestEscolherFavoritos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Debian: GNOME Terminal no lugar do Ptyxis, sem loja nem Spotify.
+	// GNOME Terminal no lugar do Ptyxis, sem loja nem Spotify.
 	apps := map[string][]string{
 		"org.gnome.Settings.desktop": nil, "org.gnome.Nautilus.desktop": nil,
 		"org.gnome.Terminal.desktop": nil, "google-chrome.desktop": nil,
