@@ -1,3 +1,9 @@
+## v1.11.1 (2026-10-25)
+
+### Fix
+
+- captura de área do Gradia e gravação de tela no Cinnamon
+
 ## v1.11.0 (2026-10-25)
 
 ### Feat
