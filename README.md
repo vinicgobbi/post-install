@@ -2,7 +2,7 @@
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
 workstation Ubuntu recém-instalada: mirrors, atualização do sistema, Docker,
-VSCode, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
+VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
 ícones Yaru, extensões e atalhos do GNOME, o ambiente do usuário (zsh,

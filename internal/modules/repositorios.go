@@ -193,7 +193,7 @@ func instalarTea(c *Ctx) error {
 var pacotesBase = Module{
 	ID:    "pacotes_base",
 	Title: "Instalar pacotes base",
-	Desc:  "Docker, VSCode, PHP, Zsh, Firefox/Thunderbird (.deb da Mozilla, removendo os snaps), ferramentas de SQL Server e de terminal (gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2 para AppImages)",
+	Desc:  "Docker, VSCode, PHP, Go, Zsh, Firefox/Thunderbird (.deb da Mozilla, removendo os snaps), ferramentas de SQL Server e de terminal (gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2 para AppImages)",
 	Deps:  []string{"repositorios"},
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando pacotes base e utilitários...")
@@ -201,7 +201,7 @@ var pacotesBase = Module{
 			func() error {
 				return c.install("flatpak", "zsh", "git", "curl", "jq",
 					"docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin", "php", "composer",
-					"php-dev", "php-xml", "php-pear", "bat", "code",
+					"php-dev", "php-xml", "php-pear", "bat", "code", "golang",
 					"gnome-software", "gnome-software-plugin-flatpak", "gnome-software-plugin-snap")
 			},
 			func() error {
