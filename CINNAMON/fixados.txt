@@ -1,0 +1,20 @@
+# Apps fixados na lista de janelas do painel (applet grouped-window-list),
+# aplicados pelo módulo "painel_cinnamon" do post-install, na ordem abaixo.
+#
+# Um app por linha (ID do .desktop). Alternativas separadas por "|": entra o
+# primeiro que estiver instalado. Apps que não existirem na máquina são
+# pulados. Os Flatpaks são reconhecidos sozinhos (o Cinnamon os identifica
+# como "<id>.desktop:flatpak").
+#
+# Para atualizar a partir de uma máquina já configurada, veja "pinned-apps" em
+#   ~/.config/cinnamon/spices/grouped-window-list@cinnamon.org/<instância>.json
+
+cinnamon-settings.desktop
+nemo.desktop
+mintinstall.desktop | org.gnome.Software.desktop
+org.gnome.Terminal.desktop | org.gnome.Ptyxis.desktop
+google-chrome.desktop
+dev.vencord.Vesktop.desktop
+org.telegram.desktop.desktop
+com.rtosta.zapzap.desktop
+com.spotify.Client.desktop

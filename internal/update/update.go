@@ -1,7 +1,7 @@
 // Package update confere se há uma release mais nova do post-install no
 // GitHub e, se o usuário quiser, substitui o binário (e, quando ele roda de
-// dentro do pacote da release, também GNOME/, Wallpapers/ e os READMEs) pela
-// versão nova. O processo atual continua com a versão antiga: é preciso
+// dentro do pacote da release, também GNOME/, CINNAMON/, Wallpapers/ e os
+// READMEs) pela versão nova. O processo atual continua com a versão antiga: é preciso
 // executar de novo depois de atualizar.
 package update
 
@@ -147,7 +147,7 @@ func Newer(a, b string) bool {
 
 // Apply baixa a release, confere o SHA-256 e substitui o executável exe. Se
 // exe estiver dentro da estrutura do pacote da release (com GNOME/ ao lado),
-// atualiza também GNOME/, Wallpapers/, README.md e OVPN/README.md — os .ovpn
+// atualiza também GNOME/, CINNAMON/, Wallpapers/, README.md e OVPN/README.md — os .ovpn
 // e os logs nunca são tocados. Os arquivos novos ficam com o dono do
 // executável atual (o programa roda como root, mas o pacote é do usuário).
 func Apply(ctx context.Context, r *Release, exe string) error {
@@ -267,7 +267,7 @@ func permitido(rel string, completo bool) bool {
 		return false
 	}
 	return rel == "README.md" || rel == "OVPN/README.md" ||
-		strings.HasPrefix(rel, "GNOME/") || strings.HasPrefix(rel, "Wallpapers/")
+		strings.HasPrefix(rel, "GNOME/") || strings.HasPrefix(rel, "CINNAMON/") || strings.HasPrefix(rel, "Wallpapers/")
 }
 
 // extrair descompacta os arquivos permitidos do pacote em dir e devolve
