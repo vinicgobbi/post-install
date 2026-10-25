@@ -23,6 +23,22 @@ func TestIDsUnicos(t *testing.T) {
 	}
 }
 
+func TestGruposContiguos(t *testing.T) {
+	ordem := []string{GrupoSistema, GrupoTerminal, GrupoAplicativos, GrupoDesenvolvimento, GrupoRede, GrupoGNOME, GrupoFinalizacao}
+	pos := -1
+	for _, m := range All() {
+		g := slices.Index(ordem, m.Grupo)
+		if g < 0 {
+			t.Errorf("%s: grupo desconhecido %q", m.ID, m.Grupo)
+			continue
+		}
+		if g < pos {
+			t.Errorf("%s: grupo %q fora de ordem (os módulos de cada grupo precisam ficar juntos)", m.ID, m.Grupo)
+		}
+		pos = g
+	}
+}
+
 func TestOpcoesDNS(t *testing.T) {
 	dns, dom := opcoesDNS(`client
 remote vpn.example.com 1194

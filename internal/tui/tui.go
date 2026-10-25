@@ -463,9 +463,21 @@ func (m Model) viewSelect() string {
 	detail := m.moduleDetail(mods[m.cursor])
 	fixed := lipgloss.Height(m.header()) + 3 + lipgloss.Height(detail) + 3
 	rows := max(3, m.h-fixed)
-	start, end := window(m.cursor, len(mods), rows)
+	linhas := linhasSelecao(mods)
+	cur := 0
+	for j, l := range linhas {
+		if l.mod == m.cursor {
+			cur = j
+		}
+	}
+	start, end := window(cur, len(linhas), rows)
 
-	for i := start; i < end; i++ {
+	for _, l := range linhas[start:end] {
+		if l.mod < 0 {
+			b.WriteString(accentStyle.Render(l.grupo) + "\n")
+			continue
+		}
+		i := l.mod
 		check := subtleStyle.Render("[ ]")
 		if m.sel[i] {
 			check = okStyle.Render("[✓]")
@@ -478,8 +490,14 @@ func (m Model) viewSelect() string {
 		}
 		b.WriteString(pointer + check + " " + title + "\n")
 	}
-	if end < len(mods) {
-		b.WriteString(subtleStyle.Render(fmt.Sprintf("   ↓ mais %d", len(mods)-end)) + "\n")
+	restantes := 0
+	for _, l := range linhas[end:] {
+		if l.mod >= 0 {
+			restantes++
+		}
+	}
+	if restantes > 0 {
+		b.WriteString(subtleStyle.Render(fmt.Sprintf("   ↓ mais %d", restantes)) + "\n")
 	} else {
 		b.WriteString("\n")
 	}
@@ -488,6 +506,25 @@ func (m Model) viewSelect() string {
 	b.WriteString(lipgloss.NewStyle().Width(max(20, m.w)).Render(m.status) + "\n")
 	b.WriteString(help("↑/↓", "mover", "espaço", "marcar", "a", "todos", "enter", "continuar", "q", "sair"))
 	return b.String()
+}
+
+// linhaSelecao é uma linha do checklist: um módulo (índice em mod) ou o
+// cabeçalho de um grupo (mod < 0).
+type linhaSelecao struct {
+	mod   int
+	grupo string
+}
+
+// linhasSelecao intercala os módulos com um cabeçalho antes de cada grupo.
+func linhasSelecao(mods []modules.Module) []linhaSelecao {
+	var out []linhaSelecao
+	for i, mod := range mods {
+		if i == 0 || mod.Grupo != mods[i-1].Grupo {
+			out = append(out, linhaSelecao{mod: -1, grupo: mod.Grupo})
+		}
+		out = append(out, linhaSelecao{mod: i})
+	}
+	return out
 }
 
 func (m Model) moduleDetail(mod modules.Module) string {

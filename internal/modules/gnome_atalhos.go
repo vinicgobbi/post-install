@@ -10,6 +10,7 @@ const gradiaFlatpak = "be.alexandervanhee.gradia"
 
 var atalhosGnome = Module{
 	ID:    "atalhos_gnome",
+	Grupo: GrupoGNOME,
 	Title: "Atalhos do GNOME",
 	Desc:  "Aplica GNOME/atalhos.dconf: Print e Shift+Super+S abrem o Gradia, gravação de tela em Shift+Super+R e volume de 2 em 2%",
 	Run: func(c *Ctx) error {

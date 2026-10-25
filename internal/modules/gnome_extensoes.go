@@ -22,6 +22,7 @@ import (
 
 var extensoesGnome = Module{
 	ID:    "extensoes_gnome",
+	Grupo: GrupoGNOME,
 	Title: "Extensões do GNOME",
 	Desc:  "Instala (extensions.gnome.org ou repositório git), ativa e configura as extensões de GNOME/extensoes.txt e GNOME/extensoes.dconf",
 	Run: func(c *Ctx) error {

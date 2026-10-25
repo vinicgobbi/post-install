@@ -2,12 +2,7 @@ package modules
 
 import (
 	_ "embed"
-	"encoding/json"
 	"path/filepath"
-	"strings"
-	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/vinicgobbi/post-install/internal/config"
 	"github.com/vinicgobbi/post-install/internal/runner"
@@ -15,8 +10,9 @@ import (
 
 var solaar = Module{
 	ID:    "solaar",
-	Title: "Instalar e configurar Solaar",
-	Desc:  "Instala o Solaar (PPA solaar-unifying/stable, com fallback para Flatpak) e as regras UDEV do receptor Logitech Unifying",
+	Grupo: GrupoAplicativos,
+	Title: "Solaar (Logitech)",
+	Desc:  "Instala o Solaar (PPA solaar-unifying/stable, com fallback para Flatpak), as regras UDEV do receptor Logitech Unifying e o início junto da sessão, só na bandeja",
 	Run: func(c *Ctx) error {
 		if err := instalarSolaar(c); err != nil {
 			return err
@@ -29,6 +25,9 @@ var solaar = Module{
 		}
 		if err := c.Run("usermod", "-aG", "plugdev", c.User); err != nil {
 			return err
+		}
+		if err := c.AsUser(scriptAutostartSolaar); err != nil {
+			c.Log.Warnf("Não foi possível pôr o Solaar para iniciar com a sessão: %v", err)
 		}
 
 		// O pacote da PPA já traz a regra em /usr/lib/udev/rules.d; só
@@ -51,6 +50,21 @@ var solaar = Module{
 		return nil
 	},
 }
+
+// scriptAutostartSolaar põe o Solaar (pacote, ou Flatpak como alternativa)
+// para iniciar com a sessão só no ícone da bandeja ("-w hide"), sem abrir a
+// janela.
+const scriptAutostartSolaar = `mkdir -p "$HOME/.config/autostart"
+for desktop in /usr/share/applications/solaar.desktop \
+    /var/lib/flatpak/exports/share/applications/io.github.pwr_solaar.solaar.desktop; do
+    if [ -f "$desktop" ]; then
+        destino="$HOME/.config/autostart/$(basename "$desktop")"
+        cp "$desktop" "$destino"
+        sed -i -E '/^Exec=/{/ -w hide$/! s/$/ -w hide/}' "$destino"
+        break
+    fi
+done
+`
 
 const regraSolaarNome = "42-logitech-unify-permissions.rules"
 
@@ -104,6 +118,7 @@ func instalarSolaar(c *Ctx) error {
 
 var removerLibreoffice = Module{
 	ID:    "remover_libreoffice",
+	Grupo: GrupoAplicativos,
 	Title: "Remover LibreOffice nativo",
 	Desc:  "Remove o LibreOffice do sistema (será substituído pela versão Flatpak)",
 	Run: func(c *Ctx) error {
@@ -118,11 +133,16 @@ var removerLibreoffice = Module{
 
 var flatpaks = Module{
 	ID:    "flatpaks",
-	Title: "Instalar Flatpaks",
-	Desc:  "Instala a lista de aplicativos Flatpak (Postman, Spotify, Obsidian, etc.)",
+	Grupo: GrupoAplicativos,
+	Title: "Flatpaks",
+	Desc:  "Flathub, GNOME Software com suporte a Flatpak e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Configurando Flatpak e instalando apps...")
-		if err := step(c.ensureFlathub, func() error { return c.flatpakInstall(config.Flatpaks...) }); err != nil {
+		if err := step(
+			func() error {
+				return c.install("flatpak", "gnome-software", "gnome-software-plugin-flatpak", "gnome-software-plugin-snap")
+			},
+			c.ensureFlathub, func() error { return c.flatpakInstall(config.Flatpaks...) }); err != nil {
 			return err
 		}
 		c.Log.Successf("Aplicativos Flatpak instalados.")
@@ -132,11 +152,16 @@ var flatpaks = Module{
 
 var flatpaksJogos = Module{
 	ID:    "flatpaks_jogos",
-	Title: "Instalar Flatpaks de jogos",
+	Grupo: GrupoAplicativos,
+	Title: "Flatpaks de jogos",
 	Desc:  "Steam, Heroic Games Launcher, ProtonPlus e PrismLauncher",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando Flatpaks de jogos...")
-		if err := step(c.ensureFlathub, func() error { return c.flatpakInstall(config.FlatpaksJogos...) }); err != nil {
+		if err := step(
+			func() error { return c.garantir("flatpak", "flatpak") },
+			c.ensureFlathub,
+			func() error { return c.flatpakInstall(config.FlatpaksJogos...) },
+		); err != nil {
 			return err
 		}
 		c.Log.Successf("Flatpaks de jogos instalados.")
@@ -144,171 +169,10 @@ var flatpaksJogos = Module{
 	},
 }
 
-// Chave que assina os repositórios de pacotes do Tailscale.
-const fprTailscale = "2596A99EAAB33821893C0A79458CA832957F5868"
-
-// instalarTailscalePacote configura o repositório oficial do Tailscale
-// (pkgs.tailscale.com, assinado) e instala o pacote — o mesmo que o
-// install.sh deles faz, mas sem executar um script baixado como root.
-func instalarTailscalePacote(c *Ctx) error {
-	const (
-		base    = "https://pkgs.tailscale.com/stable/ubuntu"
-		keyring = "/usr/share/keyrings/tailscale-archive-keyring.gpg"
-	)
-	codename := c.Sys.Codename
-	return step(
-		func() error {
-			err := instalarChaveAPT(c, base+"/"+codename+".noarmor.gpg", keyring, fprTailscale)
-			if err != nil {
-				return errorf("repositório do Tailscale indisponível para o Ubuntu %s: %w", codename, err)
-			}
-			return nil
-		},
-		func() error {
-			return c.WriteFile("/etc/apt/sources.list.d/tailscale.list",
-				"deb [signed-by="+keyring+"] "+base+" "+codename+" main\n", 0o644)
-		},
-		func() error { return c.Run("apt", "update") },
-		func() error { return c.install("tailscale") },
-	)
-}
-
-var tailscale = Module{
-	ID:    "tailscale",
-	Title: "Instalar Tailscale + Trayscale",
-	Desc:  "Tailscale (VPN mesh, pelo repositório oficial) e o cliente gráfico Trayscale via Flatpak",
-	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando o Tailscale e o Trayscale...")
-		err := step(
-			func() error { return instalarTailscalePacote(c) },
-			func() error { return c.Run("systemctl", "enable", "--now", "tailscaled") },
-			c.ensureFlathub,
-			func() error { return c.flatpakInstall("dev.deedles.Trayscale") },
-			func() error { return c.Run("tailscale", "set", "--operator="+c.User) },
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Tailscale instalado e '%s' definido como operator.", c.User)
-		return nil
-	},
-}
-
-var phpExtensoes = Module{
-	ID:    "php_extensoes",
-	Title: "Extensões PHP (SQL Server)",
-	Desc:  "Compila e habilita sqlsrv/pdo_sqlsrv via PECL",
-	Deps:  []string{"pacotes_base"},
-	Run: func(c *Ctx) error {
-		c.Log.Infof("Configurando extensões PHP (sqlsrv)...")
-		err := step(
-			func() error { return c.Run("pecl", "install", "sqlsrv", "pdo_sqlsrv") },
-			func() error {
-				out, err := c.Output("php", "-r", `echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;`)
-				if err != nil {
-					return err
-				}
-				dir := "/etc/php/" + strings.TrimSpace(out) + "/mods-available/"
-				return step(
-					func() error { return c.WriteFile(dir+"sqlsrv.ini", "; priority=20\nextension=sqlsrv.so\n", 0o644) },
-					func() error {
-						return c.WriteFile(dir+"pdo_sqlsrv.ini", "; priority=20\nextension=pdo_sqlsrv.so\n", 0o644)
-					},
-					func() error { return c.Run("phpenmod", "sqlsrv", "pdo_sqlsrv") },
-				)
-			},
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Extensões PHP configuradas.")
-		return nil
-	},
-}
-
-// releaseAsset é um arquivo de uma release do GitHub. SHA256 vem do campo
-// "digest" que o GitHub calcula no upload (vazio em releases antigas).
-type releaseAsset struct {
-	Name   string
-	URL    string
-	SHA256 string
-}
-
-// latestReleaseAsset devolve o primeiro asset da última release de um
-// repositório do GitHub que satisfaça match.
-func latestReleaseAsset(c *Ctx, repo string, match func(name string) bool) (releaseAsset, error) {
-	body, err := c.Get("https://api.github.com/repos/"+repo+"/releases/latest", 30*time.Second)
-	if err != nil {
-		return releaseAsset{}, err
-	}
-	var rel struct {
-		Assets []struct {
-			Name   string `json:"name"`
-			URL    string `json:"browser_download_url"`
-			Digest string `json:"digest"`
-		} `json:"assets"`
-	}
-	if err := json.Unmarshal(body, &rel); err != nil {
-		return releaseAsset{}, err
-	}
-	for _, a := range rel.Assets {
-		if match(a.Name) {
-			sha, _ := strings.CutPrefix(a.Digest, "sha256:")
-			return releaseAsset{Name: a.Name, URL: a.URL, SHA256: sha}, nil
-		}
-	}
-	return releaseAsset{}, errorf("nenhum asset compatível na última release de %s", repo)
-}
-
-// downloadAsset baixa um asset de release conferindo o SHA-256 publicado
-// pelo GitHub, quando houver.
-func downloadAsset(c *Ctx, a releaseAsset, dest string) error {
-	if a.SHA256 == "" {
-		c.Log.Warnf("%s não tem SHA-256 publicado na release: baixando sem conferência de integridade.", a.Name)
-		return c.Download(a.URL, dest)
-	}
-	return c.DownloadVerified(a.URL, dest, a.SHA256)
-}
-
-func gcmDeb(name string) bool {
-	return strings.HasSuffix(name, ".deb") && strings.Contains(name, "linux-x64")
-}
-
-var chromeGCM = Module{
-	ID:    "chrome_gcm",
-	Title: "Chrome + Git Credential Manager",
-	Desc:  "Instala o Google Chrome e o Git Credential Manager",
-	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando Git Credential Manager e Google Chrome...")
-		const gcmRepo = "git-ecosystem/git-credential-manager"
-		asset, err := latestReleaseAsset(c, gcmRepo, gcmDeb)
-		if err != nil {
-			return err
-		}
-		gcm, chrome := c.Temp("gcm.deb"), c.Temp("chrome.deb")
-		// Baixa os dois .deb em paralelo e instala ambos numa única chamada
-		// do apt (evita duas resoluções de dependência). O .deb do Chrome não
-		// é assinado individualmente, mas ao ser instalado ele configura o
-		// repositório assinado do Google, por onde vêm as atualizações.
-		var g errgroup.Group
-		g.Go(func() error { return downloadAsset(c, asset, gcm) })
-		g.Go(func() error {
-			return c.Download("https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", chrome)
-		})
-		if err := g.Wait(); err != nil {
-			return err
-		}
-		if err := c.install(gcm, chrome); err != nil {
-			return err
-		}
-		c.Log.Successf("Chrome e GCM instalados.")
-		return nil
-	},
-}
-
 var bitwarden = Module{
 	ID:    "bitwarden",
-	Title: "Instalar Bitwarden nativo",
+	Grupo: GrupoAplicativos,
+	Title: "Bitwarden",
 	Desc:  "Instala o Bitwarden desktop (necessário para integração nativa com o navegador)",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando Bitwarden nativo (integração com navegador)...")
@@ -323,6 +187,31 @@ var bitwarden = Module{
 			return err
 		}
 		c.Log.Successf("Bitwarden instalado nativamente.")
+		return nil
+	},
+}
+
+var chrome = Module{
+	ID:    "chrome",
+	Grupo: GrupoAplicativos,
+	Title: "Google Chrome",
+	Desc:  "Instala o Google Chrome pelo .deb oficial, que configura o repositório assinado do Google para as atualizações",
+	Run: func(c *Ctx) error {
+		c.Log.Infof("Instalando o Google Chrome...")
+		// O .deb do Chrome não é assinado individualmente, mas ao ser
+		// instalado ele configura o repositório assinado do Google, por onde
+		// vêm as atualizações.
+		deb := c.Temp("chrome.deb")
+		err := step(
+			func() error {
+				return c.Download("https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", deb)
+			},
+			func() error { return c.install(deb) },
+		)
+		if err != nil {
+			return err
+		}
+		c.Log.Successf("Google Chrome instalado.")
 		return nil
 	},
 }

@@ -110,3 +110,22 @@ fi`); err != nil {
 		c.Log.Successf("Snap do %s removido (versão .deb da Mozilla instalada no lugar).", nome)
 	}
 }
+
+var firefoxThunderbird = Module{
+	ID:    "firefox_thunderbird",
+	Grupo: GrupoAplicativos,
+	Title: "Firefox e Thunderbird (sem snap)",
+	Desc:  "Repositório APT da Mozilla e os .deb do Firefox e do Thunderbird, removendo as versões snap (o perfil do snap é copiado antes)",
+	Run: func(c *Ctx) error {
+		err := step(
+			func() error { return configurarRepoMozilla(c) },
+			func() error { return c.Run("apt", "update") },
+			func() error { return instalarFirefoxThunderbird(c) },
+		)
+		if err != nil {
+			return err
+		}
+		c.Log.Successf("Firefox e Thunderbird instalados pelos .deb da Mozilla.")
+		return nil
+	},
+}

@@ -5,7 +5,7 @@
 # roda à mão a partir da raiz do repositório.
 #
 # Pins conferidos:
-#   - internal/modules/desktop.go: pares <nome>Repo/<nome>Commit (último
+#   - internal/modules/pins.go: pares <nome>Repo/<nome>Commit (último
 #     commit da branch principal)
 #   - GNOME/extensoes.txt: linhas "uuid url commit" (último commit)
 #   - internal/modules/apps.go + 42-logitech-unify-permissions.rules: regra
@@ -15,7 +15,7 @@
 # em $PINS_RESUMO (padrão: pins-resumo.md).
 set -euo pipefail
 
-DESKTOP="internal/modules/desktop.go"
+PINS="internal/modules/pins.go"
 APPS="internal/modules/apps.go"
 EXTENSOES="GNOME/extensoes.txt"
 REGRA="internal/modules/42-logitech-unify-permissions.rules"
@@ -37,19 +37,19 @@ ultima_tag() {
     git ls-remote --tags --refs "$1" | sed 's#.*refs/tags/##' | grep -E "$2" | sort -V | tail -1
 }
 
-# ---- Commits fixados em desktop.go ----
+# ---- Commits fixados em pins.go ----
 while read -r nome atual; do
-    repo="$(sed -nE "s/^\s*${nome}Repo\s*=\s*\"([^\"]+)\".*/\1/p" "$DESKTOP")"
+    repo="$(sed -nE "s/^\s*${nome}Repo\s*=\s*\"([^\"]+)\".*/\1/p" "$PINS")"
     if [[ -z "$repo" ]]; then
-        echo "aviso: ${nome}Repo não encontrado em $DESKTOP" >&2
+        echo "aviso: ${nome}Repo não encontrado em $PINS" >&2
         continue
     fi
     novo="$(ultimo_commit "$repo")"
     if [[ -n "$novo" && "$novo" != "$atual" ]]; then
-        sed -i "s/$atual/$novo/" "$DESKTOP"
+        sed -i "s/$atual/$novo/" "$PINS"
         anotar "**${nome}**: [\`${atual:0:7}...${novo:0:7}\`]($(web "$repo")/compare/$atual...$novo)"
     fi
-done < <(sed -nE 's/^\s*(\w+)Commit\s*=\s*"([0-9a-f]{40})".*/\1 \2/p' "$DESKTOP")
+done < <(sed -nE 's/^\s*(\w+)Commit\s*=\s*"([0-9a-f]{40})".*/\1 \2/p' "$PINS")
 
 # ---- Commits fixados em extensoes.txt ----
 while read -r uuid repo atual; do

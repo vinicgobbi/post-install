@@ -29,7 +29,7 @@ aviso.
 No Ubuntu, os pacotes `firefox` e `thunderbird` do repositório oficial são só
 pacotes de transição que instalam a versão snap. Por isso:
 
-- o módulo `repositorios` segue a instrução oficial da Mozilla para o
+- o módulo `firefox_thunderbird` segue a instrução oficial da Mozilla para o
   [repositório APT](https://packages.mozilla.org/apt) dela: chave em
   `/etc/apt/keyrings/packages.mozilla.org.asc`, conferência do fingerprint
   (`35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3`), repositório com as suítes
@@ -37,12 +37,58 @@ pacotes de transição que instalam a versão snap. Por isso:
   `mozilla.sources` (deb822) do Ubuntu 26.04 em diante, ou `mozilla.list` no
   24.04 e anteriores — e `/etc/apt/preferences.d/mozilla` com prioridade 1000
   para `packages.mozilla.org`;
-- o módulo `pacotes_base` instala os `.deb` da Mozilla (com
+- em seguida, instala os `.deb` da Mozilla (com
   `--allow-downgrades`, já que o pacote de transição tem epoch maior) e, depois,
   remove os snaps de ambos, se instalados. Antes de remover, copia o perfil do
   snap para `~/.mozilla/firefox` / `~/.thunderbird` quando o usuário ainda não
   tem um. A remoção é sem `--purge`, então o snapd guarda um snapshot por
   alguns dias.
+
+## Módulos
+
+Os módulos ficam em grupos, mostrados nessa ordem na TUI e no `--list`, e
+rodam de cima para baixo. Cada um é autocontido: configura o próprio
+repositório, se precisar, e instala o que usa, então pode ser marcado ou
+desmarcado sozinho.
+
+| Grupo | ID | O que faz |
+|-------|----|-----------|
+| Sistema | `mirrors` | aponta o APT para o mirror do Ubuntu mais rápido medido na rede |
+| | `atualizacao` | `apt update` + `apt upgrade` |
+| Terminal | `ferramentas` | git, curl, jq, bat, gh (repositório oficial), tea, nmap, pipx, ffmpeg, bashtop, FUSE 2 |
+| | `shell` | Zsh como shell padrão e os dotfiles (Oh My Zsh, plugins, tema, fontes) |
+| Aplicativos | `firefox_thunderbird` | `.deb` da Mozilla no lugar dos snaps |
+| | `chrome` | Google Chrome |
+| | `bitwarden` | Bitwarden desktop nativo |
+| | `remover_libreoffice` | remove o LibreOffice nativo (vem como Flatpak) |
+| | `flatpaks` | Flathub, GNOME Software com Flatpak e a lista de apps |
+| | `flatpaks_jogos` | Steam, Heroic, ProtonPlus, PrismLauncher |
+| | `solaar` | Solaar (PPA), regras UDEV e início com a sessão |
+| Desenvolvimento | `git_gcm` | Git Credential Manager, com o chaveiro do GNOME |
+| | `docker` | Docker Engine, Buildx e Compose; usuário no grupo `docker` |
+| | `vscode` | VSCode (repositório da Microsoft) |
+| | `go` | Go (`golang`) |
+| | `node` | fnm + Node LTS |
+| | `php_sqlserver` | PHP, Composer, msodbcsql18/mssql-tools18 e sqlsrv/pdo_sqlsrv |
+| | `rust` | rustup, eza, topgrade, cargo-update |
+| | `ruby` | Ruby, Bundler e Jekyll |
+| | `claude_code` | Claude Code |
+| | `deploy_dev` | deploy-dev |
+| Rede e virtualização | `tailscale` | Tailscale (repositório oficial) + Trayscale |
+| | `firewall` | ufw + gufw (não ativa o firewall) |
+| | `ovpn` | importa os `.ovpn` de `OVPN/` no NetworkManager |
+| | `virt_manager` | QEMU/KVM, libvirt e virt-manager |
+| GNOME e aparência | `temas_yaru` | temas e ícones Yaru, sincronizados com os apps Flatpak |
+| | `papel_parede` | aplica o papel de parede escolhido |
+| | `extensoes_gnome` | extensões de `GNOME/extensoes.txt` e as preferências delas |
+| | `atalhos_gnome` | atalhos de `GNOME/atalhos.dconf` |
+| | `nautilus` | "Abrir com o VSCode", "Copiar caminho" e a pasta Projetos |
+| | `apps_gnome` | favoritos e pastas do menu de apps |
+| Finalização | `limpeza` | `apt autoremove` + `apt clean` |
+
+O `shell` roda antes de `node` e `ruby` porque o instalador do Oh My Zsh troca
+o `~/.zshrc`, e eles acrescentam linhas nele. Desmarcado o `shell`, os dois
+escrevem só nos arquivos que existirem (`.zshrc`/`.bashrc`).
 
 ## Como usar
 
@@ -106,7 +152,8 @@ Releases anteriores a essa mudança não têm atestado.
    [Extensões do GNOME](#extensões-do-gnome).
 5. Checklist com todos os módulos, já marcados:
    - `↑`/`↓` (ou `j`/`k`) — mover · `espaço` — marcar/desmarcar · `a` — todos
-   - o painel abaixo mostra a descrição do módulo e as dependências
+   - os módulos aparecem agrupados (veja [Módulos](#módulos)); o painel
+     abaixo mostra a descrição do módulo e as dependências
    - marcar um módulo marca as dependências dele; desmarcar uma dependência
      desmarca quem depende dela (com aviso na tela)
 6. Confirmação com a lista do que vai rodar (e o papel de parede e as extensões forçadas).
@@ -183,17 +230,20 @@ internal/
   runlog/                   # logs .log/.raw.log e repasse das mensagens à interface
   engine/                   # dependências entre módulos e execução em ordem
   modules/                  # os módulos (um arquivo por grupo)
-    module.go               #   tipo Module, ordem de execução (All) e helpers
+    module.go               #   tipo Module, grupos, ordem de execução (All) e helpers
+    pins.go                 #   commits fixados dos repositórios pessoais executados
+    sistema.go              #   Sistema e Finalização: atualização, limpeza
     mirrors.go              #   mirrors (teste de velocidade dos mirrors do Ubuntu)
-    repositorios.go         #   atualização, repositórios, pacotes base
-    mozilla.go              #   repositório APT da Mozilla e remoção dos snaps
-    apps.go                 #   Solaar, LibreOffice, Flatpaks, Tailscale, PHP, Chrome+GCM, Bitwarden
-    desktop.go              #   temas Yaru (+ sincronização com o Flatpak), ambiente do usuário, Rust, Ruby, Claude Code, deploy-dev, Nautilus
+    terminal.go             #   Terminal: ferramentas (gh, tea...), Zsh e dotfiles
+    apps.go                 #   Aplicativos: Chrome, Bitwarden, LibreOffice, Flatpaks, Solaar
+    mozilla.go              #   Firefox e Thunderbird (repositório da Mozilla, remoção dos snaps)
+    dev.go                  #   Desenvolvimento: GCM, Docker, VSCode, Go, Node, PHP/SQL Server, Rust, Ruby, Claude Code, deploy-dev
+    rede.go                 #   Rede e virtualização: Tailscale, firewall, OpenVPN, virt-manager
+    aparencia.go            #   temas Yaru (+ sincronização com o Flatpak) e Nautilus
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
     gnome_apps.go           #   favoritos e pastas do menu de apps (por categoria)
-    sistema.go              #   OpenVPN, virt-manager, limpeza
   config/flatpaks.go        # listas de Flatpaks (apps e jogos)
   update/                   # verificação e aplicação de versão nova (release do GitHub)
   tui/                      # interface Bubble Tea
@@ -204,13 +254,14 @@ internal/
 
 ## Adicionando ou editando um módulo
 
-1. Declare o módulo em um dos arquivos de `internal/modules/` (ou num novo):
+1. Declare o módulo no arquivo do grupo dele, em `internal/modules/`:
    ```go
    var meuModulo = Module{
        ID:    "meu_modulo",
+       Grupo: GrupoDesenvolvimento,
        Title: "Título no menu",
        Desc:  "Descrição de uma linha",
-       Deps:  []string{"pacotes_base"}, // opcional
+       Deps:  []string{"docker"}, // opcional
        Run: func(c *Ctx) error {
            c.Log.Infof("Fazendo algo...")
            if err := c.install("pacote"); err != nil {
@@ -221,7 +272,8 @@ internal/
        },
    }
    ```
-2. Inclua-o em `All()` (`internal/modules/module.go`) na posição de execução.
+2. Inclua-o em `All()` (`internal/modules/module.go`) entre os módulos do
+   mesmo grupo — um teste garante que cada grupo fica junto e na ordem.
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -230,7 +282,8 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 - `c.Try(...)` — comando que altera o sistema, silencioso, devolve `bool`
 - `c.Probe(...)`/`c.Output(...)` — consultas somente-leitura (rodam mesmo no dry-run)
 - `c.AsUser(script)` — shell como o usuário alvo (`su - usuario -c`)
-- `c.install(...)`, `c.flatpakInstall(...)`
+- `c.install(...)`, `c.garantir(comando, pacote)`, `c.flatpakInstall(...)`
+- `instalarChaveAPT(c, url, destino, fingerprints...)` — chave de repositório conferida
 - `c.Download(url, destino)`, `c.Temp(nome)`, `c.WriteFile(...)`, `c.AppendFile(...)`
 - `c.Log.Infof/Successf/Warnf(...)` — avisos marcam o módulo como "concluído com avisos"
 
@@ -366,7 +419,7 @@ O Flatpak não expõe o `/usr` do host ao sandbox, então os apps Flatpak não
 enxergam os temas de `/usr/share/themes`: só os publicados no Flathub
 (`org.gtk.Gtk3theme.*`), onde faltam as variantes de cor do Yaru
 (`Yaru-blue-dark`, `Yaru-sage`...). Com uma delas escolhida, os apps Flatpak
-caíam no Adwaita. O módulo `temas_icones`:
+caíam no Adwaita. O módulo `temas_yaru`:
 
 1. instala `yaru-theme-gtk` e `yaru-theme-icon`;
 2. instala o script `/usr/local/sbin/yaru-flatpak-sync`, que copia todos os
@@ -383,10 +436,11 @@ caíam no Adwaita. O módulo `temas_icones`:
 5. cria, para o usuário alvo, um link em `~/.local/share/themes` para cada
    tema da cópia (sem mexer em uma pasta de mesmo nome que já esteja lá). É
    por ele que o GTK de dentro do sandbox encontra o tema.
+6. aplica os ícones `Yaru-dark` para o usuário alvo.
 
 Vale para apps GTK 3. Apps em GTK 4 com libadwaita não usam temas GTK, só o
 modo claro/escuro. Uma variante de cor nova do Yaru precisa de mais um link:
-basta rodar de novo `sudo ./post-install --modules temas_icones`. Para forçar
+basta rodar de novo `sudo ./post-install --modules temas_yaru`. Para forçar
 a cópia à mão: `sudo yaru-flatpak-sync --force`.
 
 ## Ruby, Bundler e Jekyll
@@ -470,7 +524,7 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 ## Segurança
 
 - **Grupos com poder de root.** O usuário alvo entra nos grupos `docker`
-  (módulo `ambiente_usuario`) e `libvirt`/`kvm` (módulo `virt_manager`).
+  (módulo `docker`) e `libvirt`/`kvm` (módulo `virt_manager`).
   Quem está no `docker` ou no `libvirt` consegue virar root (ex.: montando
   `/` num contêiner ou numa VM) — é o comportamento normal dessas
   ferramentas numa workstation de desenvolvimento, mas vale saber.
@@ -479,7 +533,7 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
   fingerprint esperado antes de entrarem no sistema.
 - **Versões fixadas.** Os repositórios pessoais executados (Dotfiles,
   vscode_nautilus, nautilus-copypath) ficam fixados num commit (constantes
-  no topo de `internal/modules/desktop.go`); a regra UDEV do Solaar vem embutida no
+  em `internal/modules/pins.go`); a regra UDEV do Solaar vem embutida no
   binário (`internal/modules/42-logitech-unify-permissions.rules`). Assets de release do GitHub
   (GCM, deploy-dev) são conferidos pelo SHA-256 que o GitHub
   publica.

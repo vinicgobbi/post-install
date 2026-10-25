@@ -10,6 +10,7 @@ import (
 
 var papelParede = Module{
 	ID:    "papel_parede",
+	Grupo: GrupoGNOME,
 	Title: "Papel de parede",
 	Desc:  "Copia o papel de parede escolhido para ~/.local/share/backgrounds e aplica no GNOME",
 	Run: func(c *Ctx) error {

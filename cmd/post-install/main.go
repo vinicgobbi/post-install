@@ -190,12 +190,18 @@ func run() int {
 		return 0
 	}
 	if o.list {
-		for _, m := range all {
+		for i, m := range all {
+			if i == 0 || m.Grupo != all[i-1].Grupo {
+				if i > 0 {
+					fmt.Println()
+				}
+				fmt.Println(m.Grupo + ":")
+			}
 			deps := ""
 			if len(m.Deps) > 0 {
 				deps = " (requer: " + strings.Join(m.Deps, ", ") + ")"
 			}
-			fmt.Printf("%-20s %s%s\n", m.ID, m.Title, deps)
+			fmt.Printf("  %-20s %s%s\n", m.ID, m.Title, deps)
 		}
 		return 0
 	}

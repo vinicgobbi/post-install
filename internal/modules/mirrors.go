@@ -15,6 +15,7 @@ import (
 
 var mirrors = Module{
 	ID:    "mirrors",
+	Grupo: GrupoSistema,
 	Title: "Otimizar mirrors",
 	Desc:  "Aponta o APT para o mirror do Ubuntu mais rápido medido nesta rede",
 	Run: func(c *Ctx) error {
