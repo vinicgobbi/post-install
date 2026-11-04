@@ -1,3 +1,9 @@
+## v2.0.1 (2026-11-04)
+
+### Fix
+
+- atualiza versões fixadas
+
 ## v2.0.0 (2026-10-25)
 
 ### BREAKING CHANGE
