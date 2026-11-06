@@ -1,0 +1,281 @@
+# Cenário ubuntu-26.04-configurado: Ubuntu 26.04.1 LTS, usuário ana, dry-run
+
+== mirrors (Otimizar mirrors)
+[INFO] Otimizando a seleção de espelhos (mirrors) do APT...
+[AVISO] Não foi possível testar a velocidade dos mirrors (sem rede?). Mantendo o redirecionador automático (mirror://) do Ubuntu.
+[INFO] [dry-run] escrever /etc/apt/sources.list (70 bytes)
+[INFO] [dry-run] escrever /etc/apt/sources.list.d/ubuntu.sources (119 bytes)
+[OK] APT otimizado: repositórios apontando para o mirror com melhor tempo de resposta medido agora.
+
+== atualizacao (Atualizar sistema)
+[INFO] Atualizando pacotes do sistema...
+[INFO] [dry-run] apt update
+[INFO] [dry-run] apt upgrade -y
+[OK] Sistema atualizado.
+
+== ferramentas (Ferramentas de terminal)
+[INFO] Instalando ferramentas de terminal...
+[INFO] [dry-run] apt install -y git curl jq bat
+[INFO] [dry-run] baixar https://cli.github.com/packages/githubcli-archive-keyring.gpg -> /tmp/post-install-teste/githubcli-archive-keyring.gpg
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/githubcli-archive-keyring.gpg /etc/apt/keyrings/githubcli-archive-keyring.gpg
+[INFO] [dry-run] escrever /etc/apt/sources.list.d/github-cli.list (119 bytes)
+[INFO] [dry-run] apt update
+[INFO] Instalando ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2)...
+[INFO] [dry-run] apt install -y gh nmap pipx ffmpeg bashtop libfuse2t64
+[INFO] Instalando o Gitea CLI (tea)...
+[AVISO] Não foi possível instalar o tea: GET https://gitea.com/api/v1/repos/gitea/tea/releases/latest: HTTP 404
+[INFO] [dry-run] ln -sf /usr/bin/batcat /usr/local/bin/bat
+[OK] Ferramentas de terminal instaladas.
+
+== shell (Zsh e dotfiles)
+[INFO] Configurando o Zsh e os dotfiles para ana...
+[INFO] [dry-run] apt install -y zsh git curl
+[AVISO] 'ana' é uma conta de domínio (AD/LDAP), não local: pulando 'chsh' (não dá para trocar o shell padrão por aqui nesse caso).
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git clone --quiet 'https://github.com/vinicgobbi/Dotfiles.git' "$dir"; git -C "$dir" -c advice.detachedHead=false checkout --quiet '<dotfilesCommit>'; bash "$dir/bootstrap.sh"'
+[OK] Zsh e dotfiles configurados para ana.
+
+== firefox_thunderbird (Firefox e Thunderbird (sem snap))
+[INFO] Configurando o repositório APT da Mozilla (Firefox e Thunderbird sem snap)...
+[INFO] [dry-run] baixar https://packages.mozilla.org/apt/repo-signing-key.gpg -> /tmp/post-install-teste/packages.mozilla.org.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/packages.mozilla.org.asc /etc/apt/keyrings/packages.mozilla.org.asc
+[INFO] [dry-run] rm -rf /etc/apt/sources.list.d/mozilla.list
+[INFO] [dry-run] escrever /etc/apt/sources.list.d/mozilla.sources (153 bytes)
+[INFO] [dry-run] escrever /etc/apt/preferences.d/mozilla (63 bytes)
+[INFO] [dry-run] apt update
+[INFO] Instalando Firefox e Thunderbird (.deb da Mozilla)...
+[INFO] [dry-run] apt install -y --allow-downgrades firefox thunderbird
+[OK] Firefox e Thunderbird instalados pelos .deb da Mozilla.
+
+== chrome (Google Chrome)
+[INFO] Instalando o Google Chrome...
+[INFO] [dry-run] baixar https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -> /tmp/post-install-teste/chrome.deb
+[INFO] [dry-run] apt install -y /tmp/post-install-teste/chrome.deb
+[OK] Google Chrome instalado.
+
+== bitwarden (Bitwarden)
+[INFO] Instalando Bitwarden nativo (integração com navegador)...
+[INFO] [dry-run] baixar https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=deb -> /tmp/post-install-teste/bitwarden.deb
+[INFO] [dry-run] apt install -y /tmp/post-install-teste/bitwarden.deb
+[OK] Bitwarden instalado nativamente.
+
+== remover_libreoffice (Remover LibreOffice nativo)
+[INFO] Removendo LibreOffice pré-instalado...
+[INFO] [dry-run] apt remove --purge -y libreoffice*
+[OK] LibreOffice nativo removido.
+
+== flatpaks (Flatpaks)
+[INFO] Configurando Flatpak e instalando apps...
+[INFO] [dry-run] apt install -y flatpak gnome-software gnome-software-plugin-flatpak gnome-software-plugin-snap
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak install -y flathub com.getpostman.Postman com.github.tchx84.Flatseal com.mattjakeman.ExtensionManager com.obsproject.Studio com.spotify.Client dev.vencord.Vesktop io.dbeaver.DBeaverCommunity io.ente.auth io.github.flattool.Ignition io.github.flattool.Warehouse io.missioncenter.MissionCenter md.obsidian.Obsidian org.filezillaproject.Filezilla org.gaphor.Gaphor org.gnome.Boxes org.libreoffice.LibreOffice org.onlyoffice.desktopeditors org.qbittorrent.qBittorrent org.remmina.Remmina org.telegram.desktop org.videolan.VLC me.iepure.devtoolbox com.rtosta.zapzap be.alexandervanhee.gradia org.gnome.Snapshot org.gnome.Weather net.blip.Blip
+[OK] Aplicativos Flatpak instalados.
+
+== flatpaks_jogos (Flatpaks de jogos)
+[INFO] Instalando Flatpaks de jogos...
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak install -y flathub com.heroicgameslauncher.hgl com.valvesoftware.Steam com.vysp3r.ProtonPlus org.prismlauncher.PrismLauncher
+[OK] Flatpaks de jogos instalados.
+
+== solaar (Solaar (Logitech))
+[INFO] Instalando Solaar pela PPA solaar-unifying/stable (sempre atualizada)...
+[INFO] [dry-run] apt install -y software-properties-common
+[INFO] [dry-run] add-apt-repository -y ppa:solaar-unifying/stable
+[INFO] [dry-run] apt update
+[INFO] [dry-run] apt install -y solaar
+[OK] Solaar instalado via PPA solaar-unifying/stable.
+[INFO] [dry-run] groupadd plugdev
+[INFO] [dry-run] usermod -aG plugdev ana
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; mkdir -p "$HOME/.config/autostart"; for desktop in /usr/share/applications/solaar.desktop \; /var/lib/flatpak/exports/share/applications/io.github.pwr_solaar.solaar.desktop; do; if [ -f "$desktop" ]; then; destino="$HOME/.config/autostart/$(basename "$desktop")"; cp "$desktop" "$destino"; sed -i -E '/^Exec=/{/ -w hide$/! s/$/ -w hide/}' "$destino"; break; fi; done'
+[INFO] Regra UDEV do Solaar já instalada pelo pacote.
+
+== git_gcm (Git Credential Manager)
+[INFO] Instalando o Git Credential Manager...
+[INFO] [dry-run] baixar https://github.com/git-ecosystem/git-credential-manager/releases/download/v2.6.1/gcm-linux-x64-2.6.1.deb -> /tmp/post-install-teste/gcm.deb
+[INFO] [dry-run] apt install -y git /tmp/post-install-teste/gcm.deb
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; git-credential-manager configure && git config --global credential.credentialStore secretservice'
+[OK] Git Credential Manager instalado e configurado para ana.
+
+== podman (Podman)
+[INFO] Instalando o Podman e o podman-compose...
+[INFO] [dry-run] apt install -y podman podman-compose uidmap
+[INFO] Criando a faixa de IDs subordinados de ana em /etc/subuid (ana:165536:65536).
+[INFO] [dry-run] acrescentar a /etc/subuid: "ana:165536:65536\n"
+[INFO] Criando a faixa de IDs subordinados de ana em /etc/subgid (ana:100000:65536).
+[INFO] [dry-run] acrescentar a /etc/subgid: "ana:100000:65536\n"
+[INFO] [dry-run] mkdir -p /etc/containers/registries.conf.d
+[INFO] [dry-run] escrever /etc/containers/registries.conf.d/50-post-install.conf (146 bytes)
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; podman system migrate'
+[OK] Podman e podman-compose instalados para ana (rootless).
+
+== vscode (Visual Studio Code)
+[INFO] Instalando o VSCode pelo repositório da Microsoft...
+[INFO] [dry-run] baixar https://packages.microsoft.com/keys/microsoft.asc -> /tmp/post-install-teste/microsoft.asc
+[INFO] [dry-run] mkdir -p /etc/apt/keyrings
+[INFO] [dry-run] gpg --batch --yes --dearmor -o /etc/apt/keyrings/packages.microsoft.gpg /tmp/post-install-teste/microsoft.asc
+[INFO] [dry-run] escrever /etc/apt/sources.list.d/vscode.list (134 bytes)
+[INFO] [dry-run] apt update
+[INFO] [dry-run] apt install -y code
+[OK] VSCode instalado.
+
+== go (Go)
+[INFO] Instalando o Go...
+[INFO] [dry-run] apt install -y golang
+[OK] Go instalado.
+
+== mise (mise)
+[INFO] Instalando o mise pela PPA jdxcode/mise...
+[INFO] [dry-run] apt install -y software-properties-common
+[INFO] [dry-run] add-apt-repository -y ppa:jdxcode/mise
+[INFO] [dry-run] apt update
+[INFO] [dry-run] apt install -y mise
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sh=$(basename "$rc" rc | tr -d .); grep -qF 'mise activate' "$rc" || printf '\n# mise (Node, pnpm, Ruby, Rust) — post-install\neval "$(mise activate %s)"\n' "$sh" >> "$rc"; done'
+[OK] mise instalado e ativado no shell de ana.
+
+== node (Node.js e pnpm (mise))
+[INFO] Instalando o Node LTS e o pnpm pelo mise para ana...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; mise use -g node@lts pnpm@latest; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sed -i -e '/^# fnm (Node) — post-install$/d' \; -e '/^export PATH="\$HOME\/\.local\/share\/fnm:\$PATH"$/d' \; -e '/^eval "\$(fnm env --shell [a-z]*)"$/d' "$rc"; done'
+[OK] Node LTS e pnpm instalados pelo mise para ana.
+
+== php_sqlserver (PHP e SQL Server)
+[INFO] Instalando PHP, Composer e as ferramentas do SQL Server...
+[INFO] [dry-run] baixar https://packages.microsoft.com/config/ubuntu/26.04/packages-microsoft-prod.deb -> /tmp/post-install-teste/packages-microsoft-prod.deb
+[INFO] [dry-run] dpkg -i /tmp/post-install-teste/packages-microsoft-prod.deb
+[INFO] [dry-run] apt update
+[INFO] [dry-run] apt install -y php composer php-dev php-xml php-pear
+[INFO] [dry-run] ACCEPT_EULA=Y apt install -y msodbcsql18 mssql-tools18 unixodbc-dev
+[INFO] [dry-run] escrever /etc/profile.d/mssql-tools.sh (43 bytes)
+[INFO] Compilando e habilitando as extensões sqlsrv/pdo_sqlsrv...
+[INFO] [dry-run] pecl install sqlsrv pdo_sqlsrv
+[INFO] [dry-run] escrever /etc/php/8.4/mods-available/sqlsrv.ini (34 bytes)
+[INFO] [dry-run] escrever /etc/php/8.4/mods-available/pdo_sqlsrv.ini (38 bytes)
+[INFO] [dry-run] phpenmod sqlsrv pdo_sqlsrv
+[OK] PHP, Composer, ferramentas e extensões do SQL Server instalados.
+
+== rust (Rust, eza, topgrade e cargo-update)
+[INFO] Instalando o Rust pelo mise e compilando eza/topgrade/cargo-update via cargo...
+[INFO] [dry-run] apt install -y build-essential cmake pkg-config libssl-dev
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; mise use -g rust@stable; mise exec -- cargo install --locked eza topgrade cargo-update'
+[OK] Rust (mise), eza, topgrade e cargo-update instalados para ana.
+
+== ruby (Ruby, Bundler e Jekyll)
+[INFO] Instalando as dependências de compilação do Ruby...
+[INFO] [dry-run] apt install -y build-essential autoconf patch libssl-dev libyaml-dev libreadline-dev zlib1g-dev libgmp-dev libncurses-dev libffi-dev libgdbm-dev uuid-dev
+[INFO] Instalando Ruby, Bundler e Jekyll pelo mise para ana (o Ruby é compilado; leva alguns minutos)...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sed -i -e '/^# Gems do Ruby na home do usuário (gem\/bundle sem sudo) — post-install$/d' \; -e '/^export GEM_HOME="\$HOME\/\.local\/share\/gem"$/d' \; -e '/^export PATH="\$GEM_HOME\/bin:\$PATH"$/d' "$rc"; done; unset GEM_HOME; for gem in bundler jekyll; do; grep -qxF "$gem" "$HOME/.default-gems" 2>/dev/null || echo "$gem" >> "$HOME/.default-gems"; done; mise use -g ruby@latest; mise exec -- gem install --no-document bundler jekyll; mise exec -- bundle config set --global path vendor/bundle'
+[OK] Ruby (mise), Bundler e Jekyll instalados para ana (projetos em vendor/bundle).
+
+== claude_code (Claude Code)
+[INFO] Instalando o Claude Code...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; curl -fsSL https://claude.ai/install.sh | bash'
+[OK] Claude Code instalado para ana.
+
+== deploy_dev (deploy-dev)
+[INFO] Instalando o deploy-dev (última release do deploy-tools)...
+[INFO] [dry-run] baixar https://github.com/vinicgobbi/deploy-tools/releases/download/v1.0.0/deploy-dev-linux-amd64 -> /tmp/post-install-teste/deploy-dev-linux-amd64
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; install -m 0755 '/tmp/post-install-teste/deploy-dev-linux-amd64' "$dir/deploy-dev"; "$dir/deploy-dev" install --add-to-path'
+[OK] deploy-dev instalado em ~/.local/bin para ana.
+
+== tailscale (Tailscale + Trayscale)
+[INFO] Instalando o Tailscale e o Trayscale...
+[INFO] [dry-run] baixar https://pkgs.tailscale.com/stable/ubuntu/resolute.noarmor.gpg -> /tmp/post-install-teste/tailscale-archive-keyring.gpg
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/tailscale-archive-keyring.gpg /usr/share/keyrings/tailscale-archive-keyring.gpg
+[INFO] [dry-run] escrever /etc/apt/sources.list.d/tailscale.list (121 bytes)
+[INFO] [dry-run] apt update
+[INFO] [dry-run] apt install -y tailscale
+[INFO] [dry-run] systemctl enable --now tailscaled
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak install -y flathub dev.deedles.Trayscale
+[INFO] [dry-run] tailscale set --operator=ana
+[OK] Tailscale instalado e 'ana' definido como operator.
+
+== firewall (Firewall (ufw + gufw))
+[INFO] Instalando o ufw e o gufw...
+[INFO] [dry-run] apt install -y ufw gufw
+[OK] ufw e gufw instalados.
+
+== ovpn (Importar perfis OpenVPN)
+[INFO] Importando perfis OpenVPN para o NetworkManager...
+[AVISO] empresa.ovpn pode ser lido por qualquer usuário (permissão 644) e costuma conter chaves privadas: considere 'chmod 600'.
+[INFO] [dry-run] nmcli connection delete id empresa
+[INFO] [dry-run] nmcli connection import type openvpn file /opt/post-install/OVPN/empresa.ovpn
+[INFO] [dry-run] nmcli connection modify empresa ipv4.dns 10.0.0.1
+[INFO] [dry-run] nmcli connection modify empresa ipv4.dns-search corp.exemplo.test
+[OK] Perfil 'empresa' importado.
+[AVISO] Já existe uma conexão 'escritorio' do tipo 802-11-wireless (não VPN): pulando escritorio.ovpn para não sobrescrevê-la.
+
+== virt_manager (virt-manager (QEMU/KVM))
+[INFO] Instalando virt-manager (QEMU/KVM + libvirt)...
+[AVISO] CPU sem suporte a virtualização por hardware (VT-x/AMD-V) ou não habilitado na BIOS/UEFI — o KVM pode não funcionar.
+[INFO] [dry-run] apt install -y qemu-system-x86 libvirt-daemon-system libvirt-clients bridge-utils virt-manager
+[INFO] [dry-run] systemctl enable --now libvirtd
+[INFO] [dry-run] usermod -aG libvirt ana
+[INFO] [dry-run] usermod -aG kvm ana
+[OK] virt-manager instalado. 'ana' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).
+
+== temas_yaru (Temas Yaru (com Flatpak))
+[INFO] Instalando os temas e ícones Yaru...
+[INFO] [dry-run] apt install -y yaru-theme-gtk yaru-theme-icon flatpak
+[INFO] [dry-run] escrever /usr/local/sbin/yaru-flatpak-sync (1331 bytes)
+[INFO] [dry-run] escrever /etc/apt/apt.conf.d/99yaru-flatpak (209 bytes)
+[INFO] [dry-run] /usr/local/sbin/yaru-flatpak-sync --force
+[INFO] [dry-run] flatpak override --system --filesystem=xdg-data/themes:ro --filesystem=/var/lib/yaru-flatpak/themes:ro
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; mkdir -p "$HOME/.local/share/themes"; for tema in /var/lib/yaru-flatpak/themes/Yaru*; do; [ -d "$tema" ] || continue; link="$HOME/.local/share/themes/$(basename "$tema")"; if [ -L "$link" ] || [ ! -e "$link" ]; then; ln -sfn "$tema" "$link"; fi; done; gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark" 2>/dev/null || true'
+[OK] Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.
+
+== papel_parede (Papel de parede)
+[INFO] Nenhum papel de parede escolhido: mantendo o atual.
+
+== extensoes_gnome (Extensões do GNOME)
+[INFO] Instalando extensões do GNOME (GNOME Shell 50)...
+[INFO] [dry-run] baixar https://extensions.gnome.org/download-extension/compativel@exemplo.test.shell-extension.zip?version_tag=101 -> /tmp/post-install-teste/compativel@exemplo.test.zip
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gnome-extensions install --force '/tmp/post-install-teste/compativel@exemplo.test.zip''
+[OK] Extensão compativel@exemplo.test instalada.
+[AVISO] Instalando incompativel@exemplo.test mesmo assim (feita para o GNOME Shell 41): pode não funcionar corretamente.
+[INFO] [dry-run] baixar https://extensions.gnome.org/download-extension/incompativel@exemplo.test.shell-extension.zip?version_tag=23 -> /tmp/post-install-teste/incompativel@exemplo.test.zip
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gnome-extensions install --force '/tmp/post-install-teste/incompativel@exemplo.test.zip''
+[OK] Extensão incompativel@exemplo.test instalada.
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git init --quiet "$dir"; git -C "$dir" fetch --quiet --depth 1 'https://git.exemplo.test/comcommit.git' '0123456789abcdef0123456789abcdef01234567'; git -C "$dir" -c advice.detachedHead=false checkout --quiet FETCH_HEAD; make -C "$dir" install'
+[OK] Extensão comcommit@exemplo.test instalada de https://git.exemplo.test/comcommit.git.
+[AVISO] semcommit@exemplo.test: sem commit fixado em extensoes.txt — instalando o que estiver na branch principal de https://git.exemplo.test/semcommit.git.
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git init --quiet "$dir"; git -C "$dir" fetch --quiet --depth 1 'https://git.exemplo.test/semcommit.git' 'HEAD'; git -C "$dir" -c advice.detachedHead=false checkout --quiet FETCH_HEAD; make -C "$dir" install'
+[OK] Extensão semcommit@exemplo.test instalada de https://git.exemplo.test/semcommit.git.
+[AVISO] Desativando a checagem de versão das extensões (disable-extension-version-validation) para carregar as instaladas mesmo assim. Isso vale para todas as extensões, inclusive as instaladas no futuro; para reverter: gsettings reset org.gnome.shell disable-extension-version-validation
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; gsettings set org.gnome.shell disable-user-extensions false; gsettings set org.gnome.shell enabled-extensions '['\''ubuntu-dock@ubuntu.com'\'', '\''compativel@exemplo.test'\'', '\''incompativel@exemplo.test'\'', '\''comcommit@exemplo.test'\'', '\''semcommit@exemplo.test'\'']'; gsettings set org.gnome.shell disabled-extensions '['\''ding@rastersoft.com'\'']'; gsettings set org.gnome.shell disable-extension-version-validation true; dconf load /org/gnome/shell/extensions/ < '/opt/post-install/GNOME/extensoes.dconf''
+[OK] 5 extensões ativadas e configuradas (as novas carregam no próximo login).
+
+== atalhos_gnome (Atalhos do GNOME)
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; dconf load /org/gnome/ < '/opt/post-install/GNOME/atalhos.dconf''
+[OK] Atalhos do GNOME aplicados.
+
+== nautilus (Nautilus: VSCode, copiar caminho e Projetos)
+[INFO] Instalando extensões do VSCode e de copiar caminho para o Nautilus...
+[INFO] [dry-run] apt install -y python3-nautilus python3-gi wl-clipboard xclip git
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git clone --quiet 'https://github.com/vinicgobbi/vscode_nautilus.git' "$dir/vscode_nautilus"; git -C "$dir/vscode_nautilus" -c advice.detachedHead=false checkout --quiet '<vscodeNautilusCommit>'; bash "$dir/vscode_nautilus/install.sh"; git clone --quiet 'https://github.com/vinicgobbi/nautilus-copypath.git' "$dir/nautilus-copypath"; git -C "$dir/nautilus-copypath" -c advice.detachedHead=false checkout --quiet '<copypathCommit>'; bash "$dir/nautilus-copypath/install.sh"'
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; if [[ "$LANG" == pt_* ]]; then DIR_NAME="Projetos"; else DIR_NAME="Projects"; fi; PROJECTS_DIR="$HOME/$DIR_NAME"; mkdir -p "$PROJECTS_DIR"; xdg-user-dirs-update --set PROJECTS "$PROJECTS_DIR"; BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"; mkdir -p "$(dirname "$BOOKMARKS_FILE")"; touch "$BOOKMARKS_FILE"; grep -q "file://$PROJECTS_DIR" "$BOOKMARKS_FILE" || echo "file://$PROJECTS_DIR" >> "$BOOKMARKS_FILE"'
+[OK] Extensões do Nautilus instaladas e pasta de projetos criada.
+
+== apps_gnome (Favoritos e pastas do menu de apps)
+[INFO] 4 apps visíveis no menu.
+[INFO] Favoritos: org.gnome.Nautilus.desktop, org.gnome.Ptyxis.desktop, firefox.desktop
+[INFO] Pasta Sistema: 3 apps
+[INFO] Fora das pastas (sem categoria conhecida): firefox.desktop
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; gsettings set org.gnome.shell favorite-apps '['\''org.gnome.Nautilus.desktop'\'', '\''org.gnome.Ptyxis.desktop'\'', '\''firefox.desktop'\'']'; dconf reset -f /org/gnome/desktop/app-folders/; dconf load /org/gnome/desktop/app-folders/ <<'POST_INSTALL_PASTAS'; [/]; folder-children=['games', 'sistema']; [folders/games]; name='Game.directory'; translate=true; categories=['Game']; apps=@as []; excluded-apps=@as []; [folders/sistema]; name='Sistema'; translate=false; categories=['System', 'Settings', 'TerminalEmulator']; apps=['org.gnome.Nautilus.desktop']; excluded-apps=@as []; POST_INSTALL_PASTAS; gsettings reset org.gnome.shell app-picker-layout'
+[OK] Favoritos e pastas do menu de apps aplicados.
+
+== limpeza (Limpeza final)
+[INFO] Limpando o sistema...
+[INFO] [dry-run] apt autoremove -y
+[INFO] [dry-run] apt clean
+[INFO] [dry-run] rm -rf /tmp/post-install-teste
+[OK] Instalação finalizada com sucesso!
+[INFO] Recomenda-se reiniciar a máquina para aplicar as mudanças de grupo e kernel.
+
+== Consultas que o cenário não responde (falham na máquina falsa)
+GET http://mirrors.ubuntu.com/mirrors.txt
+GET https://gitea.com/api/v1/repos/gitea/tea/releases/latest
+GET https://ifconfig.co/country
+GET https://launchpad.net/ubuntu/+archivemirrors-rss
+comando: getent -s files passwd ana
+comando: getent group plugdev
+comando: snap list firefox
+comando: snap list thunderbird
