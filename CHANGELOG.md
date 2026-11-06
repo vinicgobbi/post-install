@@ -1,3 +1,14 @@
+## v3.0.0 (2026-11-06)
+
+### BREAKING CHANGE
+
+- o módulo docker deixa de existir (use podman) e o
+Docker não é mais instalado; Node, Rust e Ruby passam a vir do mise.
+
+### Feat
+
+- troca o Docker pelo Podman e usa o mise para Node, pnpm, Rust e Ruby
+
 ## v2.0.1 (2026-11-04)
 
 ### Fix
