@@ -2,6 +2,9 @@ package modules
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,27 +15,27 @@ var rust = Module{
 	ID:    "rust",
 	Grupo: GrupoDesenvolvimento,
 	Title: "Rust, eza, topgrade e cargo-update",
-	Desc:  "rustup e compilação de eza, topgrade e cargo-update (cargo install-update, usado pelo topgrade para atualizar o que veio do cargo) via cargo",
+	Desc:  "Rust stable pelo mise e compilação de eza, topgrade e cargo-update (cargo install-update, usado pelo topgrade para atualizar o que veio do cargo) via cargo",
+	Deps:  []string{"mise"},
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando rustup e compilando eza/topgrade/cargo-update via cargo...")
+		c.Log.Infof("Instalando o Rust pelo mise e compilando eza/topgrade/cargo-update via cargo...")
 		// O cargo-update compila com libgit2/libcurl/libssh2 (embutidos se
 		// faltarem no sistema), o que exige CMake, pkg-config e os cabeçalhos
 		// do OpenSSL.
 		buildPkgs := []string{"build-essential", "cmake", "pkg-config", "libssl-dev"}
 		err := step(
-			func() error { return c.install(append(buildPkgs, "curl")...) },
+			func() error { return c.install(buildPkgs...) },
 			func() error {
 				return c.AsUser(`set -e
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-source "$HOME/.cargo/env"
-cargo install --locked eza topgrade cargo-update
+mise use -g rust@stable
+mise exec -- cargo install --locked eza topgrade cargo-update
 `)
 			},
 		)
 		if err != nil {
 			return err
 		}
-		c.Log.Successf("rustup, eza, topgrade e cargo-update instalados para %s.", c.User)
+		c.Log.Successf("Rust (mise), eza, topgrade e cargo-update instalados para %s.", c.User)
 		return nil
 	},
 }
@@ -64,37 +67,82 @@ var gitGCM = Module{
 	},
 }
 
-var docker = Module{
-	ID:    "docker",
+// O Podman roda sem daemon e sem root: não há grupo com poder de root como o
+// "docker", mas o usuário precisa de uma faixa de UIDs/GIDs subordinados
+// (/etc/subuid e /etc/subgid) para o modo rootless.
+var podman = Module{
+	ID:    "podman",
 	Grupo: GrupoDesenvolvimento,
-	Title: "Docker",
-	Desc:  "Docker Engine, Buildx e Compose pelo repositório oficial; o usuário entra no grupo docker",
+	Title: "Podman",
+	Desc:  "Podman e podman-compose pelos repositórios do Ubuntu (sem daemon e sem root); o usuário recebe faixas de subuid/subgid se ainda não tiver, e imagens sem registry (ex.: \"nginx\") vêm do Docker Hub",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando o Docker pelo repositório oficial...")
+		c.Log.Infof("Instalando o Podman e o podman-compose...")
 		err := step(
+			func() error { return c.install("podman", "podman-compose", "uidmap") },
+			func() error { return garantirSubIDs(c, "/etc/subuid") },
+			func() error { return garantirSubIDs(c, "/etc/subgid") },
+			func() error { return c.MkdirAll("/etc/containers/registries.conf.d", 0o755) },
 			func() error {
-				return instalarChaveAPT(c, "https://download.docker.com/linux/ubuntu/gpg", "/etc/apt/keyrings/docker.asc", fprDocker)
+				return c.WriteFile("/etc/containers/registries.conf.d/50-post-install.conf",
+					"# Nomes curtos de imagem (ex.: \"nginx\", comuns em compose.yaml) vêm do Docker Hub — post-install\n"+
+						"unqualified-search-registries = [\"docker.io\"]\n", 0o644)
 			},
-			func() error {
-				return c.WriteFile("/etc/apt/sources.list.d/docker.sources", "Types: deb\n"+
-					"Architectures: "+c.Sys.Arch+"\n"+
-					"URIs: https://download.docker.com/linux/ubuntu\n"+
-					"Suites: "+c.Sys.Codename+"\n"+
-					"Components: stable\n"+
-					"Signed-By: /etc/apt/keyrings/docker.asc\n", 0o644)
-			},
-			func() error { return c.Run("apt", "update") },
-			func() error {
-				return c.install("docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin")
-			},
-			func() error { return c.Run("usermod", "-aG", "docker", c.User) },
 		)
 		if err != nil {
 			return err
 		}
-		c.Log.Successf("Docker instalado. '%s' foi adicionado ao grupo docker (é preciso reabrir a sessão para valer).", c.User)
+		// Aplica as faixas novas a um armazenamento que já exista.
+		if err := c.AsUser(`podman system migrate`); err != nil {
+			c.Log.Warnf("Falha no 'podman system migrate': %v", err)
+		}
+		c.Log.Successf("Podman e podman-compose instalados para %s (rootless).", c.User)
 		return nil
 	},
+}
+
+// tamanhoSubID é o tamanho padrão de faixa do useradd (SUB_UID_COUNT).
+const tamanhoSubID = 65536
+
+// garantirSubIDs dá ao usuário uma faixa em /etc/subuid ou /etc/subgid. O
+// adduser já faz isso para contas locais; contas de domínio (AD/LDAP) não
+// passam por ele e ficam sem faixa, e o usermod não as altera.
+func garantirSubIDs(c *Ctx, arquivo string) error {
+	uid, err := c.Output("id", "-u", c.User)
+	if err != nil {
+		return err
+	}
+	conteudo, err := os.ReadFile(arquivo)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	linha, falta := faixaSubID(string(conteudo), c.User, strings.TrimSpace(uid))
+	if !falta {
+		return nil
+	}
+	c.Log.Infof("Criando a faixa de IDs subordinados de %s em %s (%s).", c.User, arquivo, strings.TrimSpace(linha))
+	return c.AppendFile(arquivo, linha)
+}
+
+// faixaSubID devolve a linha a acrescentar ao /etc/subuid (ou subgid) e se ela
+// falta: o usuário (por nome ou UID) sem faixa recebe a primeira livre depois
+// das existentes, começando em 100000 como o useradd.
+func faixaSubID(conteudo, user, uid string) (string, bool) {
+	inicio := 100000
+	for _, l := range strings.Split(conteudo, "\n") {
+		campos := strings.Split(strings.TrimSpace(l), ":")
+		if len(campos) != 3 {
+			continue
+		}
+		if campos[0] == user || campos[0] == uid {
+			return "", false
+		}
+		ini, err1 := strconv.Atoi(campos[1])
+		n, err2 := strconv.Atoi(campos[2])
+		if err1 == nil && err2 == nil && ini+n > inicio {
+			inicio = ini + n
+		}
+	}
+	return fmt.Sprintf("%s:%d:%d\n", user, inicio, tamanhoSubID), true
 }
 
 var vscode = Module{
@@ -142,40 +190,31 @@ var golang = Module{
 	},
 }
 
-// scriptNode instala o Node LTS via fnm e põe a inicialização do fnm no
-// .zshrc e no .bashrc (uma vez só). Roda depois do módulo shell, porque o
-// instalador do Oh My Zsh troca o ~/.zshrc.
+// scriptNode instala o Node LTS e o pnpm pelo mise e tira dos rc a
+// inicialização do fnm que versões anteriores escreviam.
 const scriptNode = `set -e
-export PATH="$HOME/.local/share/fnm:$PATH"
-eval "$(fnm env --shell bash)"
-fnm install --lts
-fnm default $(fnm current)
+mise use -g node@lts pnpm@latest
 
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     [ -f "$rc" ] || continue
-    sh=$(basename "$rc" rc | tr -d .)
-    grep -qF 'fnm env' "$rc" || printf '\n# fnm (Node) — post-install\nexport PATH="$HOME/.local/share/fnm:$PATH"\neval "$(fnm env --shell %s)"\n' "$sh" >> "$rc"
+    sed -i -e '/^# fnm (Node) — post-install$/d' \
+        -e '/^export PATH="\$HOME\/\.local\/share\/fnm:\$PATH"$/d' \
+        -e '/^eval "\$(fnm env --shell [a-z]*)"$/d' "$rc"
 done
 `
 
 var node = Module{
 	ID:    "node",
 	Grupo: GrupoDesenvolvimento,
-	Title: "Node.js (fnm)",
-	Desc:  "fnm e o Node LTS para o usuário, com o fnm iniciado no .zshrc e no .bashrc",
+	Title: "Node.js e pnpm (mise)",
+	Desc:  "Node LTS e pnpm pelo mise, para o usuário",
+	Deps:  []string{"mise"},
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando o fnm e o Node LTS para %s...", c.User)
-		err := step(
-			func() error { return c.install("curl", "unzip") },
-			func() error {
-				return c.AsUser(`curl -fsSL https://fnm.vercel.app/install | bash -s -- --skip-shell`)
-			},
-			func() error { return c.AsUser(scriptNode) },
-		)
-		if err != nil {
+		c.Log.Infof("Instalando o Node LTS e o pnpm pelo mise para %s...", c.User)
+		if err := c.AsUser(scriptNode); err != nil {
 			return err
 		}
-		c.Log.Successf("fnm e Node LTS instalados para %s.", c.User)
+		c.Log.Successf("Node LTS e pnpm instalados pelo mise para %s.", c.User)
 		return nil
 	},
 }
@@ -232,51 +271,111 @@ var phpSQLServer = Module{
 	},
 }
 
-// O Bundler e o Jekyll são instalados como gems do usuário (GEM_HOME na
-// home), como recomenda a documentação do Jekyll: assim gem/bundle nunca
-// pedem sudo, e as versões não ficam presas às dos pacotes da distro.
-const rubyAmbiente = `# Gems do Ruby na home do usuário (gem/bundle sem sudo) — post-install
-export GEM_HOME="$HOME/.local/share/gem"
-export PATH="$GEM_HOME/bin:$PATH"
-`
-
-// scriptRuby instala as gems na home do usuário, configura o Bundler e
-// acrescenta GEM_HOME/PATH ao .zshrc e ao .bashrc (uma vez só).
-func scriptRuby() string {
-	return `set -e
-` + rubyAmbiente + `
-gem install --no-document bundler jekyll
-bundle config set --global path vendor/bundle
-
+// scriptRuby instala o Ruby pelo mise e o Bundler e o Jekyll como gems dele.
+// O ~/.default-gems faz o mise reinstalá-las em cada Ruby novo. Tira dos rc o
+// GEM_HOME que versões anteriores escreviam: ele desviaria as gems do Ruby do
+// mise para a pasta antiga.
+const scriptRuby = `set -e
 for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
     [ -f "$rc" ] || continue
-    grep -qF 'GEM_HOME=' "$rc" || printf '\n%s' ` + shQuote(rubyAmbiente) + ` >> "$rc"
+    sed -i -e '/^# Gems do Ruby na home do usuário (gem\/bundle sem sudo) — post-install$/d' \
+        -e '/^export GEM_HOME="\$HOME\/\.local\/share\/gem"$/d' \
+        -e '/^export PATH="\$GEM_HOME\/bin:\$PATH"$/d' "$rc"
 done
+unset GEM_HOME
+
+for gem in bundler jekyll; do
+    grep -qxF "$gem" "$HOME/.default-gems" 2>/dev/null || echo "$gem" >> "$HOME/.default-gems"
+done
+
+mise use -g ruby@latest
+mise exec -- gem install --no-document bundler jekyll
+mise exec -- bundle config set --global path vendor/bundle
 `
-}
 
 var ruby = Module{
 	ID:    "ruby",
 	Grupo: GrupoDesenvolvimento,
 	Title: "Ruby, Bundler e Jekyll",
-	Desc:  "Ruby com headers de desenvolvimento e, como gems do usuário (sem sudo), Bundler e Jekyll; o Bundler instala as gems de cada projeto em vendor/bundle",
+	Desc:  "Ruby pelo mise (compilado na máquina) e, como gems dele, Bundler e Jekyll; o Bundler instala as gems de cada projeto em vendor/bundle",
+	Deps:  []string{"mise"},
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando Ruby e compiladores para gems nativas...")
-		pkgs := []string{"ruby-full", "ruby-dev", "build-essential", "zlib1g-dev"}
+		c.Log.Infof("Instalando as dependências de compilação do Ruby...")
+		// O que o ruby-build (usado pelo mise) pede no Ubuntu; também serve às
+		// gems nativas.
+		pkgs := []string{"build-essential", "autoconf", "patch", "libssl-dev", "libyaml-dev", "libreadline-dev",
+			"zlib1g-dev", "libgmp-dev", "libncurses-dev", "libffi-dev", "libgdbm-dev", "uuid-dev"}
 		if err := c.install(pkgs...); err != nil {
 			return err
 		}
 
-		c.Log.Infof("Instalando Bundler e Jekyll como gems de %s...", c.User)
+		c.Log.Infof("Instalando Ruby, Bundler e Jekyll pelo mise para %s (o Ruby é compilado; leva alguns minutos)...", c.User)
 		// "path vendor/bundle" (global, em ~/.bundle/config): o bundle install
 		// de cada projeto grava as gems dentro do próprio projeto. O Jekyll já
 		// ignora vendor/ no build, e o .gitignore do "jekyll new" também.
-		if err := c.AsUser(scriptRuby()); err != nil {
+		if err := c.AsUser(scriptRuby); err != nil {
 			return err
 		}
-		c.Log.Successf("Ruby, Bundler e Jekyll instalados para %s (gems em ~/.local/share/gem; projetos em vendor/bundle).", c.User)
+		c.Log.Successf("Ruby (mise), Bundler e Jekyll instalados para %s (projetos em vendor/bundle).", c.User)
 		return nil
 	},
+}
+
+// O mise vem do repositório oficial dele: pelo extrepo no Ubuntu 22.04 e
+// 24.04, e pela PPA jdxcode/mise do 26.04 em diante, como manda a
+// documentação (https://mise.jdx.dev/installing-mise.html).
+var mise = Module{
+	ID:    "mise",
+	Grupo: GrupoDesenvolvimento,
+	Title: "mise",
+	Desc:  "Gerenciador de versões de ferramentas (Node, pnpm, Ruby, Rust...) pelo repositório oficial, ativado no .zshrc e no .bashrc",
+	Run: func(c *Ctx) error {
+		var repo []func() error
+		if misePelaPPA(c.Sys.VersionID) {
+			c.Log.Infof("Instalando o mise pela PPA jdxcode/mise...")
+			repo = []func() error{
+				func() error { return c.garantir("add-apt-repository", "software-properties-common") },
+				func() error { return c.Run("add-apt-repository", "-y", "ppa:jdxcode/mise") },
+			}
+		} else {
+			c.Log.Infof("Instalando o mise pelo extrepo...")
+			repo = []func() error{
+				func() error { return c.install("extrepo") },
+				func() error { return c.Run("extrepo", "enable", "mise") },
+			}
+		}
+		err := step(append(repo,
+			func() error { return c.Run("apt", "update") },
+			func() error { return c.install("mise") },
+			func() error { return c.AsUser(scriptMise) },
+		)...)
+		if err != nil {
+			return err
+		}
+		c.Log.Successf("mise instalado e ativado no shell de %s.", c.User)
+		return nil
+	},
+}
+
+// scriptMise ativa o mise no .zshrc e no .bashrc (uma vez só). Roda depois
+// do módulo shell, porque o instalador do Oh My Zsh troca o ~/.zshrc.
+const scriptMise = `for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+    [ -f "$rc" ] || continue
+    sh=$(basename "$rc" rc | tr -d .)
+    grep -qF 'mise activate' "$rc" || printf '\n# mise (Node, pnpm, Ruby, Rust) — post-install\neval "$(mise activate %s)"\n' "$sh" >> "$rc"
+done
+`
+
+// misePelaPPA: a documentação do mise indica a PPA do Ubuntu 26.04 em diante
+// e o extrepo antes dele.
+func misePelaPPA(versao string) bool {
+	maior, menor, _ := strings.Cut(versao, ".")
+	ma, err1 := strconv.Atoi(maior)
+	mi, err2 := strconv.Atoi(menor)
+	if err1 != nil || err2 != nil {
+		return true
+	}
+	return ma > 26 || (ma == 26 && mi >= 4)
 }
 
 var claudeCode = Module{

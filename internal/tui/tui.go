@@ -358,7 +358,7 @@ func (m Model) viewUser() string {
 	b.WriteString("\n")
 	b.WriteString(boldStyle.Render("Para qual usuário do sistema devo configurar o ambiente?"))
 	b.WriteString("\n")
-	b.WriteString(subtleStyle.Render("Grupos, shell, dotfiles, Node, Rust e Claude Code serão aplicados a este usuário."))
+	b.WriteString(subtleStyle.Render("Grupos, shell, dotfiles, mise (Node, pnpm, Rust, Ruby) e Claude Code serão aplicados a este usuário."))
 	b.WriteString("\n\n")
 
 	if d := m.cfg.DetectedUser; d != "" {

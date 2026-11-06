@@ -1,6 +1,7 @@
 // post-install configura uma workstation Ubuntu recém-instalada: mirrors,
-// atualização, repositórios, Docker/VSCode/PHP/SQL Server, Flatpaks,
-// Tailscale, Chrome, Bitwarden, temas, ambiente do usuário, Rust, Claude Code,
+// atualização, repositórios, Podman/VSCode/PHP/SQL Server, Flatpaks,
+// Tailscale, Chrome, Bitwarden, temas, ambiente do usuário, mise (Node, pnpm,
+// Rust, Ruby), Claude Code,
 // OpenVPN e virt-manager — com uma TUI para escolher o que rodar.
 package main
 

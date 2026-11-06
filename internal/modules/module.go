@@ -62,7 +62,7 @@ func All() []Module {
 		mirrors,
 		atualizacao,
 		// Terminal. O shell vem antes dos módulos que escrevem no ~/.zshrc
-		// (node, ruby): o instalador do Oh My Zsh troca o arquivo.
+		// (mise, node, ruby): o instalador do Oh My Zsh troca o arquivo.
 		ferramentas,
 		shell,
 		// Aplicativos
@@ -75,9 +75,10 @@ func All() []Module {
 		solaar,
 		// Desenvolvimento
 		gitGCM,
-		docker,
+		podman,
 		vscode,
 		golang,
+		mise,
 		node,
 		phpSQLServer,
 		rust,
@@ -127,7 +128,6 @@ func (c *Ctx) garantir(bin, pkg string) error {
 // serem instaladas, para um download adulterado não virar repositório
 // confiável do sistema.
 const (
-	fprDocker    = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
 	fprMicrosoft = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
 	// O keyring do GitHub CLI traz a chave atual e a anterior (expirada).
 	fprGitHubCLI    = "7F38BBB59D064DBCB3D84D725612B36462313325"
