@@ -1,14 +1,14 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Ubuntu recém-instalada: mirrors, atualização do sistema, Docker,
+workstation Ubuntu recém-instalada: mirrors, atualização do sistema, Podman,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
 temas e ícones Yaru (com todas as variantes do tema nos apps Flatpak),
 extensões e atalhos do GNOME, o ambiente do usuário (zsh,
-Oh My Zsh, fnm/Node, dotfiles pessoais), Rust (rustup, eza, topgrade, cargo-update),
-Ruby (Bundler e Jekyll), Claude Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
+Oh My Zsh, dotfiles pessoais), mise com Node + pnpm, Rust (eza, topgrade, cargo-update)
+e Ruby (Bundler e Jekyll), Claude Code, deploy-dev, importação de perfis OpenVPN e as extensões "Abrir com o
 VSCode"/"Copiar caminho" no Nautilus.
 
 ## Sistemas suportados
@@ -65,13 +65,14 @@ desmarcado sozinho.
 | | `flatpaks_jogos` | Steam, Heroic, ProtonPlus, PrismLauncher |
 | | `solaar` | Solaar (PPA), regras UDEV e início com a sessão |
 | Desenvolvimento | `git_gcm` | Git Credential Manager, com o chaveiro do GNOME |
-| | `docker` | Docker Engine, Buildx e Compose; usuário no grupo `docker` |
+| | `podman` | Podman e podman-compose, rootless (faixas de subuid/subgid para o usuário) |
 | | `vscode` | VSCode (repositório da Microsoft) |
 | | `go` | Go (`golang`) |
-| | `node` | fnm + Node LTS |
+| | `mise` | mise (extrepo ou PPA oficial), ativado no `.zshrc`/`.bashrc` |
+| | `node` | Node LTS + pnpm pelo mise |
 | | `php_sqlserver` | PHP, Composer, msodbcsql18/mssql-tools18 e sqlsrv/pdo_sqlsrv |
-| | `rust` | rustup, eza, topgrade, cargo-update |
-| | `ruby` | Ruby, Bundler e Jekyll |
+| | `rust` | Rust stable pelo mise; eza, topgrade, cargo-update |
+| | `ruby` | Ruby pelo mise, Bundler e Jekyll |
 | | `claude_code` | Claude Code |
 | | `deploy_dev` | deploy-dev |
 | Rede e virtualização | `tailscale` | Tailscale (repositório oficial) + Trayscale |
@@ -86,9 +87,29 @@ desmarcado sozinho.
 | | `apps_gnome` | favoritos e pastas do menu de apps |
 | Finalização | `limpeza` | `apt autoremove` + `apt clean` |
 
-O `shell` roda antes de `node` e `ruby` porque o instalador do Oh My Zsh troca
-o `~/.zshrc`, e eles acrescentam linhas nele. Desmarcado o `shell`, os dois
-escrevem só nos arquivos que existirem (`.zshrc`/`.bashrc`).
+O `shell` roda antes do `mise` porque o instalador do Oh My Zsh troca o
+`~/.zshrc`, e o `mise` acrescenta a ativação nele. Desmarcado o `shell`, ele
+escreve só nos arquivos que existirem (`.zshrc`/`.bashrc`). `node`, `rust` e
+`ruby` dependem do `mise` e o marcam junto.
+
+## mise (Node, pnpm, Rust, Ruby)
+
+O módulo `mise` instala o [mise](https://mise.jdx.dev) pelo repositório
+oficial, como indica a documentação dele: pelo `extrepo` no Ubuntu 22.04 e
+24.04 e pela PPA `jdxcode/mise` do 26.04 em diante. A linha
+`eval "$(mise activate zsh)"` (ou `bash`) vai para o `~/.zshrc` e o
+`~/.bashrc`.
+
+As ferramentas ficam como globais do usuário em `~/.config/mise/config.toml`
+(`mise use -g`): `node@lts` e `pnpm@latest` (módulo `node`), `rust@stable`
+(módulo `rust`) e `ruby@latest` (módulo `ruby`). Para atualizar, use
+`mise upgrade`. Para fixar outra versão num projeto, use `mise use node@22`
+dentro dele, o que grava um `mise.toml` no projeto.
+
+Ao rodar de novo numa máquina configurada por uma versão anterior, os módulos
+`node` e `ruby` tiram dos rc as linhas do fnm e do `GEM_HOME` que o
+post-install tinha escrito. A pasta `~/.local/share/fnm` e as gems antigas em
+`~/.local/share/gem` ficam como estão e podem ser apagadas à mão.
 
 ## Como usar
 
@@ -237,7 +258,7 @@ internal/
     terminal.go             #   Terminal: ferramentas (gh, tea...), Zsh e dotfiles
     apps.go                 #   Aplicativos: Chrome, Bitwarden, LibreOffice, Flatpaks, Solaar
     mozilla.go              #   Firefox e Thunderbird (repositório da Mozilla, remoção dos snaps)
-    dev.go                  #   Desenvolvimento: GCM, Docker, VSCode, Go, Node, PHP/SQL Server, Rust, Ruby, Claude Code, deploy-dev
+    dev.go                  #   Desenvolvimento: GCM, Podman, VSCode, Go, mise, Node, PHP/SQL Server, Rust, Ruby, Claude Code, deploy-dev
     rede.go                 #   Rede e virtualização: Tailscale, firewall, OpenVPN, virt-manager
     aparencia.go            #   temas Yaru (+ sincronização com o Flatpak) e Nautilus
     wallpaper.go            #   papel de parede (cópia para ~/.local/share/backgrounds + gsettings)
@@ -261,7 +282,7 @@ internal/
        Grupo: GrupoDesenvolvimento,
        Title: "Título no menu",
        Desc:  "Descrição de uma linha",
-       Deps:  []string{"docker"}, // opcional
+       Deps:  []string{"mise"}, // opcional
        Run: func(c *Ctx) error {
            c.Log.Infof("Fazendo algo...")
            if err := c.install("pacote"); err != nil {
@@ -293,7 +314,7 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 [Sistemas suportados](#sistemas-suportados)) e preenche:
 
 - `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`), usado
-  nas URLs dos repositórios (Docker, Tailscale) e no teste de mirrors
+  na URL do repositório do Tailscale e no teste de mirrors
 - `MSRepoVersion` — a versão nas URLs do repositório da Microsoft
   (msodbcsql/mssql-tools): a própria versão nas LTS suportadas, `26.04` nas
   mais novas
@@ -445,19 +466,20 @@ a cópia à mão: `sudo yaru-flatpak-sync --force`.
 
 ## Ruby, Bundler e Jekyll
 
-O módulo `ruby` instala o Ruby com os headers de desenvolvimento e o que as
-gems nativas precisam para compilar (`ruby-full`, `ruby-dev`,
-`build-essential` e `zlib1g-dev`). O Bundler e o Jekyll são instalados **como gems do usuário**, como
-recomenda a documentação do Jekyll, e nada de Ruby exige `sudo` depois:
+O módulo `ruby` instala o Ruby pelo mise (`ruby@latest`), que o compila na
+máquina com o ruby-build. Por isso instala antes as dependências de
+compilação (`build-essential`, `libssl-dev`, `libyaml-dev`, `zlib1g-dev`,
+`libffi-dev` e outras), que também servem às gems nativas. O Ruby fica na home
+do usuário, e nada de Ruby exige `sudo` depois:
 
-- `GEM_HOME=~/.local/share/gem` (com `~/.local/share/gem/bin` no `PATH`) é
-  acrescentado ao `~/.zshrc` e ao `~/.bashrc`: `gem install` grava na home;
+- o Bundler e o Jekyll são instalados como gems desse Ruby e listados no
+  `~/.default-gems`, que o mise reinstala a cada versão nova do Ruby;
 - `bundle config set --global path vendor/bundle` (em `~/.bundle/config`):
   o `bundle install` de cada projeto grava as gems dentro do próprio projeto,
   em `vendor/bundle` — que o Jekyll já ignora no build e o `.gitignore` do
   `jekyll new` já exclui.
 
-Para um projeto específico usar as gems do usuário (`GEM_HOME`) em vez de
+Para um projeto específico usar as gems do Ruby do mise em vez de
 `vendor/bundle`: `bundle config set --local path.system true`.
 
 ## Importação de perfis OpenVPN
@@ -523,12 +545,12 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 
 ## Segurança
 
-- **Grupos com poder de root.** O usuário alvo entra nos grupos `docker`
-  (módulo `docker`) e `libvirt`/`kvm` (módulo `virt_manager`).
-  Quem está no `docker` ou no `libvirt` consegue virar root (ex.: montando
-  `/` num contêiner ou numa VM) — é o comportamento normal dessas
-  ferramentas numa workstation de desenvolvimento, mas vale saber.
-- **Chaves de repositório conferidas.** As chaves de Docker, Microsoft,
+- **Grupos com poder de root.** O usuário alvo entra nos grupos
+  `libvirt`/`kvm` (módulo `virt_manager`). Quem está no `libvirt` consegue
+  virar root (ex.: montando `/` numa VM) — é o comportamento normal numa
+  workstation de desenvolvimento, mas vale saber. O Podman roda rootless e
+  não precisa de grupo: os contêineres têm só os privilégios do usuário.
+- **Chaves de repositório conferidas.** As chaves de Microsoft,
   GitHub CLI, Mozilla, Google e Tailscale são baixadas e comparadas com o
   fingerprint esperado antes de entrarem no sistema.
 - **Versões fixadas.** Os repositórios pessoais executados (Dotfiles,
@@ -537,9 +559,11 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
   binário (`internal/modules/42-logitech-unify-permissions.rules`). Assets de release do GitHub
   (GCM, deploy-dev) são conferidos pelo SHA-256 que o GitHub
   publica.
-- **Scripts de instalação remotos.** fnm, rustup e Claude Code ainda são
-  instalados pelo `curl | sh` oficial de cada um, como o usuário alvo (não
-  como root). O Tailscale vem do repositório oficial assinado.
+- **Scripts de instalação remotos.** O Claude Code ainda é instalado pelo
+  `curl | sh` oficial, como o usuário alvo (não como root). O mise vem do
+  repositório assinado (extrepo ou PPA), e Node, pnpm, Rust e Ruby vêm dele,
+  que confere os downloads de cada ferramenta. O Tailscale vem do repositório
+  oficial assinado.
 - **O que não é verificado.** O `.deb` do Chrome e o do Bitwarden
   são baixados por HTTPS dos sites oficiais, sem conferência de assinatura
   pelo post-install (o Chrome passa a se atualizar pelo repositório assinado

@@ -346,3 +346,27 @@ func TestYaruFlatpakSync(t *testing.T) {
 		t.Errorf("sobrou diretório temporário: %v", sobras)
 	}
 }
+
+func TestFaixaSubID(t *testing.T) {
+	conteudo := "ana:100000:65536\nbia:165536:65536\n"
+	if _, falta := faixaSubID(conteudo, "ana", "1000"); falta {
+		t.Error("ana já tem faixa")
+	}
+	if _, falta := faixaSubID("1500:100000:65536\n", "joao.ad", "1500"); falta {
+		t.Error("faixa pelo UID não reconhecida")
+	}
+	if linha, falta := faixaSubID(conteudo, "joao.ad", "15001"); !falta || linha != "joao.ad:231072:65536\n" {
+		t.Errorf("linha = %q, falta = %v", linha, falta)
+	}
+	if linha, _ := faixaSubID("", "joao.ad", "15001"); linha != "joao.ad:100000:65536\n" {
+		t.Errorf("arquivo vazio: linha = %q", linha)
+	}
+}
+
+func TestMisePelaPPA(t *testing.T) {
+	for v, want := range map[string]bool{"22.04": false, "24.04": false, "24.10": false, "26.04": true, "26.10": true, "": true} {
+		if got := misePelaPPA(v); got != want {
+			t.Errorf("misePelaPPA(%q) = %v, esperado %v", v, got, want)
+		}
+	}
+}
