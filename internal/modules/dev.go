@@ -111,7 +111,7 @@ func garantirSubIDs(c *Ctx, arquivo string) error {
 	if err != nil {
 		return err
 	}
-	conteudo, err := os.ReadFile(arquivo)
+	conteudo, err := c.ReadFile(arquivo)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}

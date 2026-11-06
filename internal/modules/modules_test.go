@@ -79,7 +79,7 @@ func TestUsaFormatoDeb822(t *testing.T) {
 }
 
 func TestLerListaExtensoes(t *testing.T) {
-	ativar, desativar, git, err := lerListaExtensoes("../../GNOME/extensoes.txt")
+	ativar, desativar, git, err := lerListaExtensoes(maquinaReal, "../../GNOME/extensoes.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestLerDesktop(t *testing.T) {
 		{"link.desktop", "[Desktop Entry]\nType=Link\n", false, nil},
 	}
 	for _, tt := range tests {
-		cats, vis := lerDesktop(escrever(tt.nome, tt.conteudo), gnome)
+		cats, vis := lerDesktop(maquinaReal, escrever(tt.nome, tt.conteudo), gnome)
 		if vis != tt.visivel || !slices.Equal(cats, tt.cats) {
 			t.Errorf("%s: visível %v cats %v, esperado %v %v", tt.nome, vis, cats, tt.visivel, tt.cats)
 		}
@@ -195,7 +195,7 @@ func TestLerDesktop(t *testing.T) {
 	os.WriteFile(filepath.Join(alta, "x.desktop"), []byte("[Desktop Entry]\nType=Application\nHidden=true\n"), 0o644)
 	os.WriteFile(filepath.Join(baixa, "x.desktop"), []byte("[Desktop Entry]\nType=Application\n"), 0o644)
 	os.WriteFile(filepath.Join(baixa, "kde", "y.desktop"), []byte("[Desktop Entry]\nType=Application\n"), 0o644)
-	apps := appsInstalados([]string{alta, baixa}, gnome)
+	apps := appsInstalados(maquinaReal, []string{alta, baixa}, gnome)
 	if _, ok := apps["x.desktop"]; ok {
 		t.Error("x.desktop oculto no diretório de maior prioridade não deveria aparecer")
 	}
@@ -205,7 +205,7 @@ func TestLerDesktop(t *testing.T) {
 }
 
 func TestOrganizarPastas(t *testing.T) {
-	pastas, err := lerPastas("../../GNOME/pastas.txt")
+	pastas, err := lerPastas(maquinaReal, "../../GNOME/pastas.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +285,7 @@ func TestOrganizarPastas(t *testing.T) {
 }
 
 func TestEscolherFavoritos(t *testing.T) {
-	favs, err := lerFavoritos("../../GNOME/favoritos.txt")
+	favs, err := lerFavoritos(maquinaReal, "../../GNOME/favoritos.txt")
 	if err != nil {
 		t.Fatal(err)
 	}

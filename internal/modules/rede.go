@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -81,7 +80,7 @@ var ovpn = Module{
 			return err
 		}
 
-		arquivos, _ := filepath.Glob(filepath.Join(c.OVPNDir, "*.ovpn"))
+		arquivos, _ := c.Glob(filepath.Join(c.OVPNDir, "*.ovpn"))
 		if len(arquivos) == 0 {
 			c.Log.Warnf("Nenhum arquivo .ovpn encontrado em %s — pulando importação.", c.OVPNDir)
 			return nil
@@ -111,7 +110,7 @@ var ovpn = Module{
 			// DNS e domínio de busca nem sempre são preenchidos pela importação
 			// automática do plugin; quando o .ovpn declara essas diretivas,
 			// aplica manualmente.
-			conteudo, err := os.ReadFile(arquivo)
+			conteudo, err := c.ReadFile(arquivo)
 			if err != nil {
 				return err
 			}
@@ -162,7 +161,7 @@ func conexoesNM(saida string) map[string]string {
 // avisarPermissaoOVPN avisa quando um .ovpn (que costuma trazer chave privada
 // e certificados embutidos) pode ser lido por qualquer usuário da máquina.
 func avisarPermissaoOVPN(c *Ctx, arquivo string) {
-	if info, err := os.Stat(arquivo); err == nil && info.Mode().Perm()&0o004 != 0 {
+	if info, err := c.Stat(arquivo); err == nil && info.Mode().Perm()&0o004 != 0 {
 		c.Log.Warnf("%s pode ser lido por qualquer usuário (permissão %o) e costuma conter chaves privadas: considere 'chmod 600'.", filepath.Base(arquivo), info.Mode().Perm())
 	}
 }
@@ -200,7 +199,7 @@ var virtManager = Module{
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando virt-manager (QEMU/KVM + libvirt)...")
 
-		if cpu, err := os.ReadFile("/proc/cpuinfo"); err == nil &&
+		if cpu, err := c.ReadFile("/proc/cpuinfo"); err == nil &&
 			!strings.Contains(string(cpu), "vmx") && !strings.Contains(string(cpu), "svm") {
 			c.Log.Warnf("CPU sem suporte a virtualização por hardware (VT-x/AMD-V) ou não habilitado na BIOS/UEFI — o KVM pode não funcionar.")
 		}

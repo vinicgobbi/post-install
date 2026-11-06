@@ -5,7 +5,6 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
-	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -39,11 +38,11 @@ func otimizarMirrorsUbuntu(c *Ctx) error {
 		"mirror://mirrors.ubuntu.com/mirrors.txt", mirror,
 	)
 	for _, arquivo := range []string{"/etc/apt/sources.list", "/etc/apt/sources.list.d/ubuntu.sources"} {
-		info, err := os.Stat(arquivo)
+		info, err := c.Stat(arquivo)
 		if err != nil {
 			continue
 		}
-		data, err := os.ReadFile(arquivo)
+		data, err := c.ReadFile(arquivo)
 		if err != nil {
 			return err
 		}
@@ -142,7 +141,7 @@ func mirrorUbuntuMaisRapido(c *Ctx) (string, bool) {
 		menor  time.Duration
 		wg     sync.WaitGroup
 	)
-	client := &http.Client{Timeout: timeoutCandidato}
+	client := c.HTTPClient(timeoutCandidato)
 
 	for _, cand := range candidatosMirrorUbuntu(c) {
 		wg.Add(1)

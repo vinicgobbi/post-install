@@ -5,7 +5,7 @@ package modules
 
 import (
 	"fmt"
-	"os/exec"
+	"io/fs"
 	"path/filepath"
 
 	"github.com/vinicgobbi/post-install/internal/runner"
@@ -117,7 +117,7 @@ func (c *Ctx) installEnv(env []string, pkgs ...string) error {
 // garantir instala pkg se o comando bin ainda não existir (ex.: o curl, que
 // não vem no Ubuntu Desktop e os instaladores oficiais usam).
 func (c *Ctx) garantir(bin, pkg string) error {
-	if runner.Exists(bin) {
+	if c.Exists(bin) {
 		return nil
 	}
 	return c.install(pkg)
@@ -177,4 +177,16 @@ func step(fns ...func() error) error {
 
 func errorf(format string, a ...any) error { return fmt.Errorf(format, a...) }
 
-var lookPath = exec.LookPath
+// arquivos é o acesso de leitura à máquina usado pelos leitores de
+// configuração e de .desktop. O *runner.Runner implementa (com Host nil, lê
+// a máquina real; nos testes, um Host falso).
+type arquivos interface {
+	ReadFile(path string) ([]byte, error)
+	Stat(path string) (fs.FileInfo, error)
+	WalkDir(root string, fn fs.WalkDirFunc) error
+	LookPath(name string) (string, error)
+}
+
+// maquinaReal lê a máquina real, para quem roda fora de um módulo (ex.: a
+// verificação de extensões antes da interface).
+var maquinaReal arquivos = &runner.Runner{}
