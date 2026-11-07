@@ -1,7 +1,7 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Ubuntu recém-instalada: mirrors, atualização do sistema, Podman,
+workstation Ubuntu ou Fedora Workstation recém-instalada: mirrors, atualização do sistema, Podman,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
@@ -13,11 +13,13 @@ VSCode"/"Copiar caminho" no Nautilus.
 
 ## Sistemas suportados
 
-Só o **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o
-`gnome-shell` instalado), nas **LTS com suporte padrão** — hoje **22.04
-(jammy), 24.04 (noble) e 26.04 (resolute)**. O suporte ao **Fedora
-Workstation** está em desenvolvimento: ele já é reconhecido, mas o programa
-ainda o recusa.
+- **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o `gnome-shell`
+  instalado), nas **LTS com suporte padrão** — hoje **22.04 (jammy), 24.04
+  (noble) e 26.04 (resolute)**;
+- **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`), nas
+  **versões em manutenção** — hoje **43, 44 e 45**. Todos os módulos existem
+  nele, com os mesmos IDs; veja [No Fedora](#no-fedora) o que muda em cada
+  um.
 
 A lista de versões fica em
 [`internal/sysinfo/versoes.go`](internal/sysinfo/versoes.go) e é mantida
@@ -56,6 +58,39 @@ pacotes de transição que instalam a versão snap. Por isso:
   snap para `~/.mozilla/firefox` / `~/.thunderbird` quando o usuário ainda não
   tem um. A remoção é sem `--purge`, então o snapd guarda um snapshot por
   alguns dias.
+
+## No Fedora
+
+Os módulos têm os mesmos IDs e as mesmas flags nas duas distribuições; no
+Fedora, cada um usa o `dnf` e os pacotes e repositórios RPM equivalentes.
+Os repositórios de terceiros são gravados em `/etc/yum.repos.d` (com os
+nomes das instruções oficiais) e as chaves, conferidas pelo fingerprint, em
+`/etc/pki/rpm-gpg`; o dnf as importa na primeira instalação.
+
+| ID | No Fedora |
+|----|-----------|
+| `mirrors` | `fastestmirror=True` e `max_parallel_downloads=10` em `/etc/dnf/libdnf5.conf.d/50-post-install.conf` (o Fedora já usa o metalink; o `/etc/dnf/dnf.conf` continua prevalecendo) |
+| `atualizacao` / `limpeza` | `dnf upgrade --refresh` / `dnf autoremove` + `dnf clean all` |
+| `ferramentas` | `gh` pelo repositório RPM oficial; `btop` (o `bashtop` não existe no Fedora), `ffmpeg-free` e `fuse-libs` |
+| `shell` | igual (o `chsh` vem do `util-linux`) |
+| `firefox_thunderbird` | os RPM do próprio Fedora (sem snap) |
+| `chrome` | repositório RPM do Google, com a assinatura de cada pacote conferida |
+| `bitwarden` | o `.rpm` oficial |
+| `remover_libreoffice` | `dnf remove`, só se houver algo instalado |
+| `flatpaks` / `flatpaks_jogos` | Flathub ativado e sem filtro |
+| `solaar` | `solaar` + `solaar-udev` do Fedora (sem o grupo `plugdev`), com o Flatpak como alternativa |
+| `git_gcm` | o `.tar.gz` da release, no mesmo layout do `.deb` (`/usr/local/share/gcm-core`) |
+| `podman` | `podman` + `podman-compose` |
+| `vscode` / `mise` | repositórios RPM oficiais |
+| `php_sqlserver` | repositório da Microsoft para o **RHEL** (a Microsoft não publica para o Fedora; o módulo avisa), extensões em `/etc/php.d` |
+| `rust` / `ruby` | dependências de compilação do Fedora |
+| `tailscale` | repositório RPM oficial |
+| `firewall` | `firewall-config`, a interface do firewalld, que o Fedora já traz ativo (a zona padrão não muda) |
+| `virt_manager` | libvirt com os daemons modulares (`virtqemud`...), o padrão do Fedora |
+| `temas_yaru` | só os **ícones** Yaru-dark; o tema é o **adw-gtk3-dark** (o visual do libadwaita nos apps GTK 3), também nos Flatpaks |
+| `extensoes_gnome` | no lugar da dock, do AppIndicator e do Tiling Assistant do Ubuntu, as equivalentes do extensions.gnome.org (veja [Extensões do GNOME](#extensões-do-gnome)) |
+| `nautilus` | `nautilus-python` e `python3-gobject` |
+| `go`, `node`, `claude_code`, `deploy_dev`, `ovpn`, `papel_parede`, `atalhos_gnome`, `apps_gnome` | iguais |
 
 ## Módulos
 
@@ -168,7 +203,7 @@ Releases anteriores a essa mudança não têm atestado.
 
 ### Fluxo da TUI
 
-1. Mostra o sistema detectado (versão do Ubuntu). Se houver uma versão mais
+1. Mostra o sistema detectado (distribuição e versão). Se houver uma versão mais
    nova do post-install, a primeira tela oferece atualizar agora ou ignorar (veja [Atualização](#atualização)).
 2. Pergunta para qual usuário do sistema configurar o ambiente. O usuário
    que executou o `sudo` é detectado (`SUDO_USER`, `PKEXEC_UID` ou `logname`,
@@ -260,7 +295,7 @@ transferido para o usuário alvo — o programa roda como root):
 ```
 cmd/post-install/main.go    # flags, verificação de root, TUI x modo texto
 internal/
-  sysinfo/                  # detecção da versão do Ubuntu e checagem de suporte
+  sysinfo/                  # detecção da distribuição e da versão, e checagem de suporte (versoes.go)
   runner/                   # execução de comandos, downloads, escrita de arquivos, dry-run
   runlog/                   # logs .log/.raw.log e repasse das mensagens à interface
   engine/                   # dependências entre módulos e execução em ordem
@@ -425,7 +460,15 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
   git depois do UUID instala a extensão do repositório em vez do
   extensions.gnome.org (ex.: a Now Bar). Depois da URL, opcionalmente, vem o
   commit (ou tag) a instalar — recomendado, para uma mudança na branch
-  principal não chegar sozinha às instalações (sem ele, o módulo avisa);
+  principal não chegar sozinha às instalações (sem ele, o módulo avisa).
+  A mesma lista serve às duas distribuições, com duas marcações:
+  - `a | b` — equivalentes: a primeira que vier com o sistema é ativada; se
+    nenhuma vier, a **última** da linha é baixada do extensions.gnome.org
+    (ex.: `ubuntu-dock@ubuntu.com | dash-to-dock@micxgx.gmail.com` — no
+    Ubuntu, a dock dele; no Fedora, o Dash to Dock, que usa as mesmas
+    preferências de `extensoes.dconf`);
+  - `uuid sistema` — só é ativada se vier com o sistema, nunca é baixada
+    (ex.: as do snapd, que só existem no Ubuntu);
 - `extensoes.dconf` — as preferências delas, no formato do `dconf dump`;
 - `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
   `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
@@ -641,14 +684,16 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
   repositório assinado (extrepo ou PPA), e Node, pnpm, Rust e Ruby vêm dele,
   que confere os downloads de cada ferramenta. O Tailscale vem do repositório
   oficial assinado.
-- **O que não é verificado.** O `.deb` do Chrome e o do Bitwarden
-  são baixados por HTTPS dos sites oficiais, sem conferência de assinatura
-  pelo post-install (o Chrome passa a se atualizar pelo repositório assinado
-  do Google depois de instalado).
+- **O que não é verificado.** O `.deb` do Chrome e o do Bitwarden (e, no
+  Fedora, o `.rpm` do Bitwarden) são baixados por HTTPS dos sites oficiais,
+  sem conferência de assinatura pelo post-install (o Chrome passa a se
+  atualizar pelo repositório assinado do Google depois de instalado; no
+  Fedora ele já é instalado pelo repositório, com a assinatura conferida).
 
 ## Requisitos
 
-- Ubuntu 22.04, 24.04 ou 26.04 (ou mais novo) com GNOME — veja
+- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, ou Fedora Workstation 43, 44 ou
+  45 (ou mais novos, com confirmação) — veja
   [Sistemas suportados](#sistemas-suportados).
 - Acesso root (`sudo`) — exceto em `--dry-run`.
 - Terminal interativo para a TUI (sem ele, o modo texto é usado).

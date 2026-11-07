@@ -27,10 +27,9 @@ const (
 	Fedora Familia = "fedora"
 )
 
-// fedoraHabilitado libera o Fedora Workstation em Detect. Fica desligado
-// até os módulos terem a variante do Fedora: até lá a detecção existe (e é
-// testada), mas o programa recusa o sistema.
-const fedoraHabilitado = false
+// fedoraHabilitado libera o Fedora Workstation em Detect (desligá-lo faz o
+// programa voltar a recusar o Fedora, mantendo a detecção).
+const fedoraHabilitado = true
 
 type Info struct {
 	Familia    Familia

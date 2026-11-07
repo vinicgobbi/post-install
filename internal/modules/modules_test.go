@@ -460,3 +460,17 @@ func TestPara(t *testing.T) {
 		t.Error("variante vazia deveria reaproveitar o Run e a descrição do Ubuntu")
 	}
 }
+
+// Todos os módulos existem nas duas distribuições: um módulo novo sem a
+// variante do Fedora sumiria de lá sem aviso.
+func TestTodosNoFedora(t *testing.T) {
+	disp := map[string]bool{}
+	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Fedora}) {
+		disp[m.ID] = true
+	}
+	for _, m := range All() {
+		if !disp[m.ID] {
+			t.Errorf("%s não tem variante do Fedora (campo Fedora em %s)", m.ID, m.ID)
+		}
+	}
+}
