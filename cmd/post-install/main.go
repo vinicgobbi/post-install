@@ -1,4 +1,5 @@
-// post-install configura uma workstation Ubuntu recém-instalada: mirrors,
+// post-install configura uma workstation Ubuntu ou Fedora Workstation
+// recém-instalada: mirrors,
 // atualização, repositórios, Podman/VSCode/PHP/SQL Server, Flatpaks,
 // Tailscale, Chrome, Bitwarden, temas, ambiente do usuário, mise (Node, pnpm,
 // Rust, Ruby), Claude Code,
@@ -56,6 +57,9 @@ type options struct {
 	gnomeDir string
 	forceExt string
 	noUpdate bool
+	// allowUntested aceita rodar numa versão da distro mais nova que as
+	// testadas, sem perguntar.
+	allowUntested bool
 }
 
 func parseFlags() options {
@@ -75,6 +79,7 @@ func parseFlags() options {
 	flag.StringVar(&o.gnomeDir, "gnome-dir", "", "pasta com extensoes.txt e extensoes.dconf (padrão: GNOME/ ao lado do binário)")
 	flag.StringVar(&o.forceExt, "force-extensions", "", "extensões do GNOME sem versão compatível a instalar mesmo assim (UUIDs separados por vírgula, ou \"none\"); sem ela, pergunta")
 	flag.BoolVar(&o.noUpdate, "no-update-check", false, "não verificar se há uma versão mais nova do post-install")
+	flag.BoolVar(&o.allowUntested, "allow-untested-version", false, "aceitar, sem perguntar, rodar numa versão da distribuição mais nova que as testadas (por sua conta e risco)")
 	flag.StringVar(&o.logDir, "log-dir", "", "pasta onde os logs da execução são gravados (padrão: logs/ ao lado do binário)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Uso: sudo %s [opções]\n\nOpções:\n", os.Args[0])
@@ -184,13 +189,18 @@ func main() {
 
 func run() int {
 	o := parseFlags()
-	all := modules.All()
 
 	if o.version {
 		fmt.Println("post-install", version)
 		return 0
 	}
 	if o.list {
+		// Os módulos da distribuição atual; fora de um sistema suportado,
+		// todos (os do Ubuntu).
+		all := modules.All()
+		if sys, err := sysinfo.Detect(); err == nil {
+			all = modules.Disponiveis(sys)
+		}
 		for i, m := range all {
 			if i == 0 || m.Grupo != all[i-1].Grupo {
 				if i > 0 {
@@ -222,9 +232,13 @@ func run() int {
 		return fail("%v", err)
 	}
 
-	sel, err := initialSelection(all, o.modules, o.skip)
+	all := modules.Disponiveis(sys)
+	sel, avisos, err := initialSelection(all, o.modules, o.skip)
 	if err != nil {
 		return fail("%v", err)
+	}
+	for _, a := range avisos {
+		out.Warn("%s", a)
 	}
 
 	if o.user != "" {
@@ -271,6 +285,9 @@ func run() int {
 	start := func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) []engine.Result {
 		log.SetSink(func(e runlog.Entry) { emit(e) })
 		log.Infof("Sistema detectado: %s", sys.Summary())
+		if sys.NaoTestada {
+			log.Warnf("Versão não testada (testadas: %s): execução aceita por conta e risco do usuário.", strings.Join(sys.Testadas, ", "))
+		}
 		log.Infof("Configuração será aplicada para: %s", esc.User)
 		if log.CleanPath != "" {
 			log.Infof("Log desta execução: %s", log.CleanPath)
@@ -330,6 +347,7 @@ func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p pr
 		ForcarExtensoes:  p.esc.ForcarExtensoes,
 		ExtChosen:        p.extChosen,
 		LogPaths:         []string{log.CleanPath, log.RawPath},
+		VersaoAceita:     o.allowUntested,
 		Start: func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) {
 			start(ctx, esc, mods, emit)
 		},
@@ -372,6 +390,10 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p 
 		if code, sair := oferecerAtualizacao(o, p.upd, out, stdinTTY); sair {
 			return code
 		}
+	}
+
+	if code, sair := confirmarVersaoNaoTestada(o, sys, out, stdinTTY); sair {
+		return code
 	}
 
 	esc := p.esc
@@ -444,6 +466,28 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p 
 	return exitCode(results)
 }
 
+// confirmarVersaoNaoTestada pede (modo texto) a confirmação para seguir numa
+// versão da distribuição mais nova que as testadas. O aviso em si já saiu
+// com os demais de sys.Warnings. Sem terminal, só segue com --yes ou
+// --allow-untested-version; no dry-run, que não altera nada, não pergunta.
+func confirmarVersaoNaoTestada(o options, sys *sysinfo.Info, out *plain.Printer, stdinTTY bool) (code int, sair bool) {
+	switch {
+	case !sys.NaoTestada || o.dryRun || o.allowUntested:
+		return 0, false
+	case stdinTTY:
+		if confirm("Continuar mesmo assim, aceitando os riscos?") {
+			return 0, false
+		}
+		out.Warn("Operação cancelada pelo usuário.")
+		return 0, true
+	case o.yes:
+		out.Warn("--yes sem terminal interativo: seguindo na versão não testada, por sua conta e risco.")
+		return 0, false
+	}
+	out.Handle(runlog.Entry{Level: runlog.Error, Text: "Sem terminal interativo: para seguir numa versão não testada, use --allow-untested-version (ou --yes)."})
+	return 1, true
+}
+
 // oferecerAtualizacao pergunta (modo texto) se atualiza para a versão nova.
 // Devolve sair=true quando a execução deve parar (atualizou ou falhou).
 func oferecerAtualizacao(o options, rel *update.Release, out *plain.Printer, stdinTTY bool) (code int, sair bool) {
@@ -486,22 +530,30 @@ func exitCode(results []engine.Result) int {
 	return code
 }
 
-// initialSelection marca todos os módulos (ou só os de --modules) e
-// desmarca os de --skip.
-func initialSelection(all []modules.Module, only, skip string) ([]bool, error) {
+// initialSelection marca todos os módulos disponíveis (ou só os de
+// --modules) e desmarca os de --skip. Um ID que existe, mas não nesta
+// distribuição, só gera aviso; um que não existe em lugar nenhum é erro.
+func initialSelection(all []modules.Module, only, skip string) (sel []bool, avisos []string, err error) {
 	ids := make([]string, len(all))
 	for i, m := range all {
 		ids[i] = m.ID
+	}
+	var conhecidos []string
+	for _, m := range modules.All() {
+		conhecidos = append(conhecidos, m.ID)
 	}
 	parse := func(s string) ([]string, error) {
 		var out []string
 		for _, id := range strings.Split(s, ",") {
 			id = strings.TrimSpace(id)
-			if id == "" {
+			switch {
+			case id == "":
 				continue
-			}
-			if !slices.Contains(ids, id) {
+			case !slices.Contains(conhecidos, id):
 				return nil, fmt.Errorf("módulo desconhecido: %q (veja --list)", id)
+			case !slices.Contains(ids, id):
+				avisos = append(avisos, fmt.Sprintf("Módulo %q não está disponível nesta distribuição: ignorado.", id))
+				continue
 			}
 			out = append(out, id)
 		}
@@ -509,17 +561,17 @@ func initialSelection(all []modules.Module, only, skip string) ([]bool, error) {
 	}
 	onlyIDs, err := parse(only)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	skipIDs, err := parse(skip)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	sel := make([]bool, len(all))
+	sel = make([]bool, len(all))
 	for i, id := range ids {
 		sel[i] = (len(onlyIDs) == 0 || slices.Contains(onlyIDs, id)) && !slices.Contains(skipIDs, id)
 	}
-	return sel, nil
+	return sel, avisos, nil
 }
 
 // chownLogs passa os logs desta execução para o usuário alvo.

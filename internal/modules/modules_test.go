@@ -8,6 +8,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
+
+	"github.com/vinicgobbi/post-install/internal/runner"
+	"github.com/vinicgobbi/post-install/internal/sysinfo"
 )
 
 func TestIDsUnicos(t *testing.T) {
@@ -78,12 +82,43 @@ func TestUsaFormatoDeb822(t *testing.T) {
 	}
 }
 
+// A lista real (GNOME/extensoes.txt) resolvida numa máquina falsa com as
+// extensões que o Ubuntu traz, e numa sem nenhuma (o Fedora): o resultado
+// não pode depender de onde o teste roda.
 func TestLerListaExtensoes(t *testing.T) {
-	ativar, desativar, git, err := lerListaExtensoes("../../GNOME/extensoes.txt")
+	real, err := os.ReadFile("../../GNOME/extensoes.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ativar) != 15 || !slices.Contains(ativar, "gsconnect@andyholmes.github.io") || !slices.Contains(ativar, "ubuntu-dock@ubuntu.com") {
+	maquina := func(sistema ...string) *runner.Runner {
+		fs := fstest.MapFS{"lista.txt": {Data: real}}
+		for _, uuid := range sistema {
+			fs["usr/share/gnome-shell/extensions/"+uuid+"/metadata.json"] = &fstest.MapFile{Data: []byte("{}")}
+		}
+		return &runner.Runner{Host: &hostFalso{arquivos: fs, semResposta: map[string]bool{}}}
+	}
+	doUbuntu := []string{"snapd-prompting@canonical.com", "snapd-search-provider@canonical.com", "tiling-assistant@ubuntu.com",
+		"ubuntu-appindicators@ubuntu.com", "ubuntu-dock@ubuntu.com", "web-search-provider@ubuntu.com", "ding@rastersoft.com"}
+
+	fedora, _, _, err := lerListaExtensoes(maquina(), "/lista.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, uuid := range []string{"dash-to-dock@micxgx.gmail.com", "appindicatorsupport@rgcjonas.gmail.com", "tiling-assistant@leleat-on-github"} {
+		if !slices.Contains(fedora, uuid) {
+			t.Errorf("Fedora sem %s: %v", uuid, fedora)
+		}
+	}
+	if slices.ContainsFunc(fedora, func(u string) bool { return slices.Contains(doUbuntu, u) }) || len(fedora) != 12 {
+		t.Errorf("Fedora com extensões do Ubuntu ou contagem errada: %v", fedora)
+	}
+
+	ativar, desativar, git, err := lerListaExtensoes(maquina(doUbuntu...), "/lista.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ativar) != 15 || !slices.Contains(ativar, "gsconnect@andyholmes.github.io") || !slices.Contains(ativar, "ubuntu-dock@ubuntu.com") ||
+		slices.Contains(ativar, "dash-to-dock@micxgx.gmail.com") {
 		t.Errorf("ativar = %v", ativar)
 	}
 	if !slices.Equal(desativar, []string{"ding@rastersoft.com"}) {
@@ -182,7 +217,7 @@ func TestLerDesktop(t *testing.T) {
 		{"link.desktop", "[Desktop Entry]\nType=Link\n", false, nil},
 	}
 	for _, tt := range tests {
-		cats, vis := lerDesktop(escrever(tt.nome, tt.conteudo), gnome)
+		cats, vis := lerDesktop(maquinaReal, escrever(tt.nome, tt.conteudo), gnome)
 		if vis != tt.visivel || !slices.Equal(cats, tt.cats) {
 			t.Errorf("%s: visível %v cats %v, esperado %v %v", tt.nome, vis, cats, tt.visivel, tt.cats)
 		}
@@ -195,7 +230,7 @@ func TestLerDesktop(t *testing.T) {
 	os.WriteFile(filepath.Join(alta, "x.desktop"), []byte("[Desktop Entry]\nType=Application\nHidden=true\n"), 0o644)
 	os.WriteFile(filepath.Join(baixa, "x.desktop"), []byte("[Desktop Entry]\nType=Application\n"), 0o644)
 	os.WriteFile(filepath.Join(baixa, "kde", "y.desktop"), []byte("[Desktop Entry]\nType=Application\n"), 0o644)
-	apps := appsInstalados([]string{alta, baixa}, gnome)
+	apps := appsInstalados(maquinaReal, []string{alta, baixa}, gnome)
 	if _, ok := apps["x.desktop"]; ok {
 		t.Error("x.desktop oculto no diretório de maior prioridade não deveria aparecer")
 	}
@@ -205,7 +240,7 @@ func TestLerDesktop(t *testing.T) {
 }
 
 func TestOrganizarPastas(t *testing.T) {
-	pastas, err := lerPastas("../../GNOME/pastas.txt")
+	pastas, err := lerPastas(maquinaReal, "../../GNOME/pastas.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +320,7 @@ func TestOrganizarPastas(t *testing.T) {
 }
 
 func TestEscolherFavoritos(t *testing.T) {
-	favs, err := lerFavoritos("../../GNOME/favoritos.txt")
+	favs, err := lerFavoritos(maquinaReal, "../../GNOME/favoritos.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,6 +402,75 @@ func TestMisePelaPPA(t *testing.T) {
 	for v, want := range map[string]bool{"22.04": false, "24.04": false, "24.10": false, "26.04": true, "26.10": true, "": true} {
 		if got := misePelaPPA(v); got != want {
 			t.Errorf("misePelaPPA(%q) = %v, esperado %v", v, got, want)
+		}
+	}
+}
+
+// No Ubuntu, Disponiveis é a própria All: nada muda para quem já usa.
+func TestDisponiveisUbuntu(t *testing.T) {
+	all, ub := All(), Disponiveis(&sysinfo.Info{Familia: sysinfo.Ubuntu})
+	if len(all) != len(ub) {
+		t.Fatalf("Ubuntu tem %d módulos, All tem %d", len(ub), len(all))
+	}
+	for i := range all {
+		if all[i].ID != ub[i].ID || all[i].Title != ub[i].Title || all[i].Desc != ub[i].Desc || !slices.Equal(all[i].Deps, ub[i].Deps) {
+			t.Errorf("%s mudou no Ubuntu", all[i].ID)
+		}
+	}
+}
+
+// As dependências de cada módulo disponível também estão disponíveis na
+// mesma distribuição, e cada variante tem Run.
+func TestDisponiveisCoerentes(t *testing.T) {
+	for _, f := range []sysinfo.Familia{sysinfo.Ubuntu, sysinfo.Fedora} {
+		mods := Disponiveis(&sysinfo.Info{Familia: f})
+		ids := map[string]bool{}
+		for _, m := range mods {
+			ids[m.ID] = true
+			if m.Run == nil {
+				t.Errorf("%s/%s sem Run", f, m.ID)
+			}
+		}
+		for _, m := range mods {
+			for _, d := range m.Deps {
+				if !ids[d] {
+					t.Errorf("%s/%s depende de %s, indisponível nessa distribuição", f, m.ID, d)
+				}
+			}
+		}
+	}
+}
+
+func TestPara(t *testing.T) {
+	m := Module{ID: "x", Title: "X", Desc: "no Ubuntu", Deps: []string{"mise"}, Run: func(*Ctx) error { return nil }}
+	if _, ok := m.Para(sysinfo.Fedora); ok {
+		t.Error("sem variante, não deveria estar disponível no Fedora")
+	}
+	falhou := errorf("fedora")
+	m.Fedora = &Variante{Desc: "no Fedora", Deps: []string{}, Run: func(*Ctx) error { return falhou }}
+	f, ok := m.Para(sysinfo.Fedora)
+	if !ok || f.Title != "X" || f.Desc != "no Fedora" || len(f.Deps) != 0 || f.Run(nil) != falhou || f.Fedora != nil {
+		t.Errorf("variante mal aplicada: %+v", f)
+	}
+	if u, _ := m.Para(sysinfo.Ubuntu); u.Desc != "no Ubuntu" || u.Run(nil) != nil {
+		t.Error("no Ubuntu deveria valer o próprio módulo")
+	}
+	m.Fedora = &Variante{}
+	if f, ok := m.Para(sysinfo.Fedora); !ok || f.Run == nil || f.Run(nil) != nil || f.Desc != "no Ubuntu" {
+		t.Error("variante vazia deveria reaproveitar o Run e a descrição do Ubuntu")
+	}
+}
+
+// Todos os módulos existem nas duas distribuições: um módulo novo sem a
+// variante do Fedora sumiria de lá sem aviso.
+func TestTodosNoFedora(t *testing.T) {
+	disp := map[string]bool{}
+	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Fedora}) {
+		disp[m.ID] = true
+	}
+	for _, m := range All() {
+		if !disp[m.ID] {
+			t.Errorf("%s não tem variante do Fedora (campo Fedora em %s)", m.ID, m.ID)
 		}
 	}
 }

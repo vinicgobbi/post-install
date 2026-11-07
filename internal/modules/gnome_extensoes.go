@@ -2,6 +2,7 @@ package modules
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,12 +27,12 @@ var extensoesGnome = Module{
 	Title: "Extensões do GNOME",
 	Desc:  "Instala (extensions.gnome.org ou repositório git), ativa e configura as extensões de GNOME/extensoes.txt e GNOME/extensoes.dconf",
 	Run: func(c *Ctx) error {
-		if !runner.Exists("gnome-extensions") {
+		if !c.Exists("gnome-extensions") {
 			c.Log.Warnf("gnome-extensions não encontrado (GNOME Shell não instalado?): pulando extensões.")
 			return nil
 		}
 		lista := filepath.Join(c.GNOMEDir, "extensoes.txt")
-		ativar, desativar, git, err := lerListaExtensoes(lista)
+		ativar, desativar, git, err := lerListaExtensoes(c, lista)
 		if errors.Is(err, os.ErrNotExist) {
 			c.Log.Warnf("%s não encontrado: pulando extensões.", lista)
 			return nil
@@ -50,7 +51,7 @@ var extensoesGnome = Module{
 		var instaladas []string
 		forcadas := false
 		for _, uuid := range ativar {
-			if extensaoDoSistema(uuid) {
+			if extensaoDoSistema(c, uuid) {
 				instaladas = append(instaladas, uuid)
 				continue
 			}
@@ -105,7 +106,7 @@ var extensoesGnome = Module{
 			c.Log.Warnf("Desativando a checagem de versão das extensões (disable-extension-version-validation) para carregar as instaladas mesmo assim. Isso vale para todas as extensões, inclusive as instaladas no futuro; para reverter: gsettings reset org.gnome.shell disable-extension-version-validation")
 			script += "gsettings set org.gnome.shell disable-extension-version-validation true\n"
 		}
-		if conf := filepath.Join(c.GNOMEDir, "extensoes.dconf"); fileExists(conf) {
+		if conf := filepath.Join(c.GNOMEDir, "extensoes.dconf"); c.FileExists(conf) {
 			script += "dconf load /org/gnome/shell/extensions/ < " + shQuote(conf) + "\n"
 		}
 		if err := c.AsUser(script); err != nil {
@@ -114,6 +115,7 @@ var extensoesGnome = Module{
 		c.Log.Successf("%d extensões ativadas e configuradas (as novas carregam no próximo login).", len(instaladas))
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // extGit é a origem de uma extensão instalada de um repositório git. Ref é o
@@ -126,14 +128,19 @@ type extGit struct {
 // lerListaExtensoes lê o arquivo de UUIDs: uma por linha, "#" comenta, o
 // prefixo "-" marca extensões a manter desativadas e uma URL depois do UUID
 // (opcionalmente seguida de um commit/tag) indica o repositório git de onde
-// instalar (devolvido em git, por UUID).
-func lerListaExtensoes(path string) (ativar, desativar []string, git map[string]extGit, err error) {
-	f, err := os.Open(path)
+// instalar (devolvido em git, por UUID). Duas marcações servem a mais de
+// uma distribuição com a mesma lista, resolvidas aqui contra a máquina lida
+// por a:
+//   - "a | b": equivalentes (ex.: a dock do Ubuntu e o Dash to Dock). A
+//     primeira que vier com o sistema entra; se nenhuma vier, entra a
+//     última, baixada do extensions.gnome.org;
+//   - "uuid sistema": só entra se vier com o sistema; nunca é baixada.
+func lerListaExtensoes(a arquivos, path string) (ativar, desativar []string, git map[string]extGit, err error) {
+	data, err := a.ReadFile(path)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
 		linha := strings.TrimSpace(sc.Text())
 		if linha == "" || strings.HasPrefix(linha, "#") {
@@ -143,7 +150,19 @@ func lerListaExtensoes(path string) (ativar, desativar []string, git map[string]
 			desativar = append(desativar, strings.TrimSpace(uuid))
 			continue
 		}
+		if strings.Contains(linha, "|") {
+			if uuid, ok := escolherAlternativa(a, strings.Split(linha, "|")); ok {
+				ativar = append(ativar, uuid)
+			}
+			continue
+		}
 		campos := strings.Fields(linha)
+		if len(campos) == 2 && campos[1] == "sistema" {
+			if extensaoDoSistema(a, campos[0]) {
+				ativar = append(ativar, campos[0])
+			}
+			continue
+		}
 		ativar = append(ativar, campos[0])
 		if len(campos) > 1 {
 			if git == nil {
@@ -157,6 +176,27 @@ func lerListaExtensoes(path string) (ativar, desativar []string, git map[string]
 		}
 	}
 	return ativar, desativar, git, sc.Err()
+}
+
+// escolherAlternativa fica com a primeira das equivalentes que vier com o
+// sistema ou, se nenhuma vier, com a última (a do extensions.gnome.org).
+// Numa linha sem nenhum UUID (só "|"), não há o que escolher.
+func escolherAlternativa(a arquivos, alts []string) (string, bool) {
+	var limpas []string
+	for _, alt := range alts {
+		if alt = strings.TrimSpace(alt); alt != "" {
+			limpas = append(limpas, alt)
+		}
+	}
+	if len(limpas) == 0 {
+		return "", false
+	}
+	for _, alt := range limpas {
+		if extensaoDoSistema(a, alt) {
+			return alt, true
+		}
+	}
+	return limpas[len(limpas)-1], true
 }
 
 // versaoGnomeShell devolve a versão maior do GNOME Shell ("50"), que é o que
@@ -184,8 +224,8 @@ func majorDaVersao(out string) string {
 
 // extensaoDoSistema: extensões que vêm com a distro (ex.: ubuntu-dock) não
 // são baixadas, só ativadas.
-func extensaoDoSistema(uuid string) bool {
-	return fileExists(filepath.Join("/usr/share/gnome-shell/extensions", uuid))
+func extensaoDoSistema(a arquivos, uuid string) bool {
+	return existe(a, filepath.Join("/usr/share/gnome-shell/extensions", uuid))
 }
 
 // ExtInfo é o que o extensions.gnome.org diz sobre uma extensão para a
@@ -261,7 +301,7 @@ func instalarExtensao(c *Ctx, info ExtInfo) error {
 // repositório e roda o "make install" dele, que copia a extensão para
 // ~/.local/share/gnome-shell/extensions.
 func instalarExtensaoGit(c *Ctx, src extGit) error {
-	if !runner.Exists("make") {
+	if !c.Exists("make") {
 		if err := c.install("make"); err != nil {
 			return err
 		}
@@ -284,7 +324,7 @@ make -C "$dir" install
 // interface perguntar sobre as extensões sem versão compatível. Devolve a
 // versão do GNOME Shell e as incompatíveis; sem GNOME ou sem a lista, nada.
 func VerificarExtensoes(gnomeDir string) (string, []ExtInfo) {
-	ativar, _, git, err := lerListaExtensoes(filepath.Join(gnomeDir, "extensoes.txt"))
+	ativar, _, git, err := lerListaExtensoes(maquinaReal, filepath.Join(gnomeDir, "extensoes.txt"))
 	if err != nil || !runner.Exists("gnome-shell") {
 		return "", nil
 	}
@@ -313,7 +353,7 @@ func VerificarExtensoes(gnomeDir string) (string, []ExtInfo) {
 		incompt []ExtInfo
 	)
 	for _, uuid := range ativar {
-		if _, ok := git[uuid]; ok || extensaoDoSistema(uuid) {
+		if _, ok := git[uuid]; ok || extensaoDoSistema(maquinaReal, uuid) {
 			continue
 		}
 		wg.Add(1)
@@ -394,7 +434,8 @@ func mesclar(base, incluir, remover []string) []string {
 	return out
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
+// existe informa se o caminho existe na máquina lida por a.
+func existe(a arquivos, path string) bool {
+	_, err := a.Stat(path)
 	return err == nil
 }

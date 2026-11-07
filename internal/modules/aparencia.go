@@ -61,6 +61,36 @@ var temasYaru = Module{
 		c.Log.Successf("Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.")
 		return nil
 	},
+	// No Fedora, só os ícones são do Yaru; o tema segue o libadwaita, com o
+	// adw-gtk3 (o visual do libadwaita para os apps GTK 3) no sistema e nos
+	// Flatpaks, pelo Flathub. Os ícones do sistema os Flatpaks já enxergam.
+	Fedora: &Variante{
+		Title: "Ícones Yaru e tema adw-gtk3",
+		Desc:  "Ícones Yaru (Yaru-dark) e o tema adw-gtk3-dark (o visual do libadwaita nos apps GTK 3), também nos apps Flatpak",
+		Run:   aplicarYaruAdwGtk3,
+	},
+}
+
+// scriptIconesAdwGtk3 aplica os ícones Yaru-dark e o adw-gtk3-dark (escuro,
+// combinando com os ícones) como o usuário.
+const scriptIconesAdwGtk3 = `gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark"
+gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"
+`
+
+func aplicarYaruAdwGtk3(c *Ctx) error {
+	c.Log.Infof("Instalando os ícones Yaru e o tema adw-gtk3...")
+	err := step(
+		func() error { return c.install("yaru-icon-theme", "adw-gtk3-theme") },
+		func() error { return c.garantir("flatpak", "flatpak") },
+		c.garantirFlathub,
+		func() error { return c.flatpakInstall("org.gtk.Gtk3theme.adw-gtk3", "org.gtk.Gtk3theme.adw-gtk3-dark") },
+		func() error { return c.AsUser(scriptIconesAdwGtk3) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Ícones Yaru-dark e tema adw-gtk3-dark aplicados (nos apps Flatpak, a partir da próxima abertura de cada app).")
+	return nil
 }
 
 // scriptPastaProjetos cria a pasta de projetos (no idioma do sistema),
@@ -83,23 +113,31 @@ var nautilus = Module{
 	Title: "Nautilus: VSCode, copiar caminho e Projetos",
 	Desc:  "Adiciona 'Abrir com o VSCode' e 'Copiar caminho' ao menu de contexto do Nautilus e cria a pasta Projetos (diretório XDG e favorito na barra lateral)",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando extensões do VSCode e de copiar caminho para o Nautilus...")
-		deps := []string{"python3-nautilus", "python3-gi", "wl-clipboard", "xclip", "git"}
-		err := step(
-			func() error { return c.install(deps...) },
-			func() error {
-				return c.AsUser("set -e\ndir=$(mktemp -d)\ntrap 'rm -rf \"$dir\"' EXIT\n" +
-					clonarFixado(vscodeNautilusRepo, vscodeNautilusCommit, `"$dir/vscode_nautilus"`) +
-					`bash "$dir/vscode_nautilus/install.sh"` + "\n" +
-					clonarFixado(copypathRepo, copypathCommit, `"$dir/nautilus-copypath"`) +
-					`bash "$dir/nautilus-copypath/install.sh"` + "\n")
-			},
-			func() error { return c.AsUser(scriptPastaProjetos) },
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Extensões do Nautilus instaladas e pasta de projetos criada.")
-		return nil
+		return instalarNautilus(c, "python3-nautilus", "python3-gi", "wl-clipboard", "xclip", "git")
 	},
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarNautilus(c, "nautilus-python", "python3-gobject", "wl-clipboard", "xclip", "git")
+		},
+	},
+}
+
+func instalarNautilus(c *Ctx, deps ...string) error {
+	c.Log.Infof("Instalando extensões do VSCode e de copiar caminho para o Nautilus...")
+	err := step(
+		func() error { return c.install(deps...) },
+		func() error {
+			return c.AsUser("set -e\ndir=$(mktemp -d)\ntrap 'rm -rf \"$dir\"' EXIT\n" +
+				clonarFixado(vscodeNautilusRepo, vscodeNautilusCommit, `"$dir/vscode_nautilus"`) +
+				`bash "$dir/vscode_nautilus/install.sh"` + "\n" +
+				clonarFixado(copypathRepo, copypathCommit, `"$dir/nautilus-copypath"`) +
+				`bash "$dir/nautilus-copypath/install.sh"` + "\n")
+		},
+		func() error { return c.AsUser(scriptPastaProjetos) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Extensões do Nautilus instaladas e pasta de projetos criada.")
+	return nil
 }

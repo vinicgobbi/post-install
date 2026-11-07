@@ -1,0 +1,35 @@
+# Em cada PR (e push na development): as mesmas verificações do job "test"
+# do release.yml, para um problema — inclusive uma mudança nos testes golden
+# do dry-run (internal/modules/testdata/golden) — aparecer antes do merge, e
+# não só no push para a main.
+#
+# Actions fixadas pelo SHA do commit (a tag fica no comentário), como no
+# release.yml; o Dependabot propõe as atualizações.
+name: Testes
+
+on:
+  pull_request:
+  push:
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - run: shellcheck scripts/*.sh internal/modules/*.sh

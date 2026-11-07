@@ -1,7 +1,7 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Ubuntu recém-instalada: mirrors, atualização do sistema, Podman,
+workstation Ubuntu ou Fedora Workstation recém-instalada: mirrors, atualização do sistema, Podman,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
@@ -13,16 +13,31 @@ VSCode"/"Copiar caminho" no Nautilus.
 
 ## Sistemas suportados
 
-Só o **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o
-`gnome-shell` instalado), nas versões **22.04 (jammy), 24.04 (noble) e
-26.04 (resolute)**, além das mais novas que a 26.04.
+- **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o `gnome-shell`
+  instalado), nas **LTS com suporte padrão** — hoje **22.04 (jammy), 24.04
+  (noble) e 26.04 (resolute)**;
+- **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`), nas
+  **versões em manutenção** — hoje **43, 44 e 45**. Todos os módulos existem
+  nele, com os mesmos IDs; veja [No Fedora](#no-fedora) o que muda em cada
+  um.
+
+A lista de versões fica em
+[`internal/sysinfo/versoes.go`](internal/sysinfo/versoes.go) e é mantida
+pelo workflow `versoes.yml` (veja [Versões suportadas](#versões-suportadas)).
 
 Qualquer outro sistema faz o programa parar com uma mensagem clara em vez de
 continuar em um estado incerto — inclusive derivados do Ubuntu (Linux Mint,
-Pop!_OS, Zorin...), sabores com outro desktop (Kubuntu, Xubuntu...) e versões
-anteriores à 22.04 ou interinas entre as LTS suportadas. Versões mais novas
-que a 26.04 usam o repositório da Microsoft do 26.04 (compatível), com um
-aviso.
+Pop!_OS, Zorin...), sabores com outro desktop (Kubuntu, Xubuntu...), versões
+fora do suporte padrão ou interinas entre as LTS suportadas, e as variantes
+atômicas do Fedora (Silverblue, Kinoite).
+
+**Versões mais novas que as da lista** (ex.: o Ubuntu 26.10, ou uma LTS que
+saiu depois da release do post-install) podem funcionar, mas não foram
+testadas: o programa avisa e pede confirmação antes de seguir (na TUI, uma
+tela com "Sair" como padrão; no modo texto, `[s/N]`). Sem terminal
+interativo, segue só com `--allow-untested-version` ou `--yes`; no
+`--dry-run`, que não altera nada, só avisa. Nelas, o Ubuntu usa o
+repositório da Microsoft da última LTS da lista (compatível).
 
 ### Firefox e Thunderbird sem snap
 
@@ -43,6 +58,39 @@ pacotes de transição que instalam a versão snap. Por isso:
   snap para `~/.mozilla/firefox` / `~/.thunderbird` quando o usuário ainda não
   tem um. A remoção é sem `--purge`, então o snapd guarda um snapshot por
   alguns dias.
+
+## No Fedora
+
+Os módulos têm os mesmos IDs e as mesmas flags nas duas distribuições; no
+Fedora, cada um usa o `dnf` e os pacotes e repositórios RPM equivalentes.
+Os repositórios de terceiros são gravados em `/etc/yum.repos.d` (com os
+nomes das instruções oficiais) e as chaves, conferidas pelo fingerprint, em
+`/etc/pki/rpm-gpg`; o dnf as importa na primeira instalação.
+
+| ID | No Fedora |
+|----|-----------|
+| `mirrors` | `fastestmirror=True` e `max_parallel_downloads=10` em `/etc/dnf/libdnf5.conf.d/50-post-install.conf` (o Fedora já usa o metalink; o `/etc/dnf/dnf.conf` continua prevalecendo) |
+| `atualizacao` / `limpeza` | `dnf upgrade --refresh` / `dnf autoremove` + `dnf clean all` |
+| `ferramentas` | `gh` pelo repositório RPM oficial; `btop` (o `bashtop` não existe no Fedora), `ffmpeg-free` e `fuse-libs` |
+| `shell` | igual (o `chsh` vem do `util-linux`) |
+| `firefox_thunderbird` | os RPM do próprio Fedora (sem snap) |
+| `chrome` | repositório RPM do Google, com a assinatura de cada pacote conferida |
+| `bitwarden` | o `.rpm` oficial |
+| `remover_libreoffice` | `dnf remove`, só se houver algo instalado |
+| `flatpaks` / `flatpaks_jogos` | Flathub ativado e sem filtro |
+| `solaar` | `solaar` + `solaar-udev` do Fedora (sem o grupo `plugdev`), com o Flatpak como alternativa |
+| `git_gcm` | o `.tar.gz` da release, no mesmo layout do `.deb` (`/usr/local/share/gcm-core`) |
+| `podman` | `podman` + `podman-compose` |
+| `vscode` / `mise` | repositórios RPM oficiais |
+| `php_sqlserver` | repositório da Microsoft para o **RHEL** (a Microsoft não publica para o Fedora; o módulo avisa), extensões em `/etc/php.d` |
+| `rust` / `ruby` | dependências de compilação do Fedora |
+| `tailscale` | repositório RPM oficial |
+| `firewall` | `firewall-config`, a interface do firewalld, que o Fedora já traz ativo (a zona padrão não muda) |
+| `virt_manager` | libvirt com os daemons modulares (`virtqemud`...), o padrão do Fedora |
+| `temas_yaru` | só os **ícones** Yaru-dark; o tema é o **adw-gtk3-dark** (o visual do libadwaita nos apps GTK 3), também nos Flatpaks |
+| `extensoes_gnome` | no lugar da dock, do AppIndicator e do Tiling Assistant do Ubuntu, as equivalentes do extensions.gnome.org (veja [Extensões do GNOME](#extensões-do-gnome)) |
+| `nautilus` | `nautilus-python` e `python3-gobject` |
+| `go`, `node`, `claude_code`, `deploy_dev`, `ovpn`, `papel_parede`, `atalhos_gnome`, `apps_gnome` | iguais |
 
 ## Módulos
 
@@ -155,7 +203,7 @@ Releases anteriores a essa mudança não têm atestado.
 
 ### Fluxo da TUI
 
-1. Mostra o sistema detectado (versão do Ubuntu). Se houver uma versão mais
+1. Mostra o sistema detectado (distribuição e versão). Se houver uma versão mais
    nova do post-install, a primeira tela oferece atualizar agora ou ignorar (veja [Atualização](#atualização)).
 2. Pergunta para qual usuário do sistema configurar o ambiente. O usuário
    que executou o `sudo` é detectado (`SUDO_USER`, `PKEXEC_UID` ou `logname`,
@@ -204,6 +252,7 @@ dele, que são pulados. Use `--fail-fast` para parar tudo no primeiro erro.
 | `--wallpaper NOME` | papel de parede a aplicar (nome do arquivo, ou `none` para não alterar); sem ela, a TUI pergunta |
 | `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, configurações do GNOME e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` ao lado do binário) |
 | `--no-update-check` | não verifica se há versão nova do post-install |
+| `--allow-untested-version` | segue, sem perguntar, numa versão da distribuição mais nova que as testadas (por sua conta e risco) |
 | `--version` | mostra a versão |
 
 Sem terminal interativo (pipe, CI), o programa usa o modo texto
@@ -246,7 +295,7 @@ transferido para o usuário alvo — o programa roda como root):
 ```
 cmd/post-install/main.go    # flags, verificação de root, TUI x modo texto
 internal/
-  sysinfo/                  # detecção da versão do Ubuntu e checagem de suporte
+  sysinfo/                  # detecção da distribuição e da versão, e checagem de suporte (versoes.go)
   runner/                   # execução de comandos, downloads, escrita de arquivos, dry-run
   runlog/                   # logs .log/.raw.log e repasse das mensagens à interface
   engine/                   # dependências entre módulos e execução em ordem
@@ -265,6 +314,7 @@ internal/
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
     gnome_apps.go           #   favoritos e pastas do menu de apps (por categoria)
+    golden_test.go          #   testes golden do dry-run (cenários em testdata/golden/)
   config/flatpaks.go        # listas de Flatpaks (apps e jogos)
   update/                   # verificação e aplicação de versão nova (release do GitHub)
   tui/                      # interface Bubble Tea
@@ -295,6 +345,20 @@ internal/
    ```
 2. Inclua-o em `All()` (`internal/modules/module.go`) entre os módulos do
    mesmo grupo — um teste garante que cada grupo fica junto e na ordem.
+3. O `Run` é o caminho do Ubuntu. Para o módulo existir também no Fedora,
+   preencha `Fedora` com uma `Variante` (sem ela, o módulo fica indisponível
+   lá: some da TUI e do `--list`, e `--modules` só avisa). `Title`/`Desc`
+   vazios e `Deps` nil herdam os do módulo:
+   ```go
+   Fedora: &Variante{
+       Desc: "Descrição no Fedora", // opcional
+       Run: func(c *Ctx) error {
+           return c.install("pacote-no-fedora") // dnf no Fedora
+       },
+   },
+   ```
+   `Disponiveis(sys)` devolve a lista já adaptada à distribuição detectada;
+   no Ubuntu, é a própria `All()`.
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -304,21 +368,69 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 - `c.Probe(...)`/`c.Output(...)` — consultas somente-leitura (rodam mesmo no dry-run)
 - `c.AsUser(script)` — shell como o usuário alvo (`su - usuario -c`)
 - `c.install(...)`, `c.garantir(comando, pacote)`, `c.flatpakInstall(...)`
+- `c.install(...)` usa o `apt` no Ubuntu e o `dnf` no Fedora (os nomes de
+  pacote são os da distribuição); `c.pacoteInstalado(pkg)` consulta o `dpkg`
+  ou o `rpm`
 - `instalarChaveAPT(c, url, destino, fingerprints...)` — chave de repositório conferida
+- `instalarChaveRPM(c, url, nome, fingerprints...)` e `repoRPM(c, nome, título, baseurl, chave)` —
+  chave conferida em `/etc/pki/rpm-gpg` (com `rpm --import`) e `.repo` em
+  `/etc/yum.repos.d` com `gpgcheck=1`
 - `c.Download(url, destino)`, `c.Temp(nome)`, `c.WriteFile(...)`, `c.AppendFile(...)`
 - `c.Log.Infof/Successf/Warnf(...)` — avisos marcam o módulo como "concluído com avisos"
+- `c.Exists(...)`, `c.LookPath(...)`, `c.ReadFile(...)`, `c.Stat(...)`, `c.FileExists(...)`,
+  `c.Glob(...)` — consultas à máquina (no lugar de `os.*`/`exec.LookPath`)
+
+Toda consulta à máquina ou à rede passa pelo `Ctx` porque os **testes
+golden** trocam a máquina por uma falsa. `golden_test.go` descreve cenários
+(Ubuntu 22.04, 24.04 e 26.04 recém-instalados e um 26.04 já configurado),
+roda todos os módulos em dry-run contra cada um e compara o resultado com
+`internal/modules/testdata/golden/<cenário>.txt`. Uma mudança em qualquer
+módulo, inclusive na lista de Flatpaks, aparece como diferença nesses
+arquivos. Se a mudança for intencional, regrave e revise o diff antes de
+commitar:
+
+```bash
+go test ./internal/modules -run TestGolden -update
+git diff internal/modules/testdata/golden/
+```
+
+Os commits e versões fixados pelo `pins.yml` aparecem normalizados (ex.:
+`<dotfilesCommit>`), então os PRs de atualização dos pins não mexem nos
+golden. Os arquivos de `GNOME/` usados nos testes são fixtures próprias, em
+`internal/modules/testdata/gnome/`.
 
 ## Detecção de sistema (`internal/sysinfo`)
 
 `sysinfo.Detect` lê `/etc/os-release`, recusa o que não for suportado (veja
 [Sistemas suportados](#sistemas-suportados)) e preenche:
 
+- `Familia` — `ubuntu` ou `fedora` (este só com `VARIANT_ID=workstation`)
 - `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`), usado
-  na URL do repositório do Tailscale e no teste de mirrors
+  na URL do repositório do Tailscale e no teste de mirrors; vazio no Fedora
 - `MSRepoVersion` — a versão nas URLs do repositório da Microsoft
-  (msodbcsql/mssql-tools): a própria versão nas LTS suportadas, `26.04` nas
-  mais novas
+  (msodbcsql/mssql-tools), tirada de `versoes.go`: no Ubuntu, a da própria LTS
+  (ou a da última da lista, nas mais novas); no Fedora, a do RHEL
+- `NaoTestada` — versão mais nova que todas as de `versoes.go` (pede
+  confirmação)
 - `Arch` — `dpkg --print-architecture`
+
+### Versões suportadas
+
+`internal/sysinfo/versoes.go` lista, da mais antiga para a mais nova:
+
+- **Ubuntu:** as LTS com suporte padrão (sem contar o ESM pago), pelas datas
+  do [`distro-info-data`](https://salsa.debian.org/debian/distro-info-data)
+  (a mesma fonte do `ubuntu-distro-info --supported`);
+- **Fedora:** as versões em manutenção, pela API do
+  [Bodhi](https://bodhi.fedoraproject.org/releases/) (fim de vida ainda não
+  alcançado);
+- para cada uma, a versão do repositório da Microsoft a usar, conferindo se
+  ele já existe em `packages.microsoft.com`.
+
+O workflow `versoes.yml` roda o `scripts/atualizar-versoes.sh` toda semana
+(ou à mão) e abre um PR na `development` quando a lista muda — uma versão
+nova entra, uma fora de suporte sai. A mudança só chega às máquinas na
+próxima release do post-install.
 
 O GNOME é conferido pelo binário `gnome-shell`, e não por
 `XDG_CURRENT_DESKTOP`: o sudo costuma limpar essa variável.
@@ -348,7 +460,15 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
   git depois do UUID instala a extensão do repositório em vez do
   extensions.gnome.org (ex.: a Now Bar). Depois da URL, opcionalmente, vem o
   commit (ou tag) a instalar — recomendado, para uma mudança na branch
-  principal não chegar sozinha às instalações (sem ele, o módulo avisa);
+  principal não chegar sozinha às instalações (sem ele, o módulo avisa).
+  A mesma lista serve às duas distribuições, com duas marcações:
+  - `a | b` — equivalentes: a primeira que vier com o sistema é ativada; se
+    nenhuma vier, a **última** da linha é baixada do extensions.gnome.org
+    (ex.: `ubuntu-dock@ubuntu.com | dash-to-dock@micxgx.gmail.com` — no
+    Ubuntu, a dock dele; no Fedora, o Dash to Dock, que usa as mesmas
+    preferências de `extensoes.dconf`);
+  - `uuid sistema` — só é ativada se vier com o sistema, nunca é baixada
+    (ex.: as do snapd, que só existem no Ubuntu);
 - `extensoes.dconf` — as preferências delas, no formato do `dconf dump`;
 - `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
   `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
@@ -564,14 +684,16 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
   repositório assinado (extrepo ou PPA), e Node, pnpm, Rust e Ruby vêm dele,
   que confere os downloads de cada ferramenta. O Tailscale vem do repositório
   oficial assinado.
-- **O que não é verificado.** O `.deb` do Chrome e o do Bitwarden
-  são baixados por HTTPS dos sites oficiais, sem conferência de assinatura
-  pelo post-install (o Chrome passa a se atualizar pelo repositório assinado
-  do Google depois de instalado).
+- **O que não é verificado.** O `.deb` do Chrome e o do Bitwarden (e, no
+  Fedora, o `.rpm` do Bitwarden) são baixados por HTTPS dos sites oficiais,
+  sem conferência de assinatura pelo post-install (o Chrome passa a se
+  atualizar pelo repositório assinado do Google depois de instalado; no
+  Fedora ele já é instalado pelo repositório, com a assinatura conferida).
 
 ## Requisitos
 
-- Ubuntu 22.04, 24.04 ou 26.04 (ou mais novo) com GNOME — veja
+- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, ou Fedora Workstation 43, 44 ou
+  45 (ou mais novos, com confirmação) — veja
   [Sistemas suportados](#sistemas-suportados).
 - Acesso root (`sudo`) — exceto em `--dry-run`.
 - Terminal interativo para a TUI (sem ele, o modo texto é usado).

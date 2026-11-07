@@ -3,8 +3,6 @@ package modules
 import (
 	"strconv"
 	"strings"
-
-	"github.com/vinicgobbi/post-install/internal/runner"
 )
 
 // No Ubuntu, os pacotes "firefox" e "thunderbird" do repositório oficial são
@@ -83,7 +81,7 @@ func instalarFirefoxThunderbird(c *Ctx) error {
 // usuário ainda não tem um), para não perder favoritos, senhas e e-mails.
 // Sem --purge: o snapd guarda um snapshot automático por alguns dias.
 func removerSnapsMozilla(c *Ctx) {
-	if !runner.Exists("snap") {
+	if !c.Exists("snap") {
 		return
 	}
 	perfis := map[string]struct{ origem, destino string }{
@@ -127,5 +125,19 @@ var firefoxThunderbird = Module{
 		}
 		c.Log.Successf("Firefox e Thunderbird instalados pelos .deb da Mozilla.")
 		return nil
+	},
+	// No Fedora os dois já são RPM dos repositórios oficiais (sem snap): o
+	// Firefox vem no Workstation, e o Thunderbird só falta instalar.
+	Fedora: &Variante{
+		Title: "Firefox e Thunderbird",
+		Desc:  "Firefox e Thunderbird pelos pacotes RPM do Fedora",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o Firefox e o Thunderbird (RPM do Fedora)...")
+			if err := c.install("firefox", "thunderbird"); err != nil {
+				return err
+			}
+			c.Log.Successf("Firefox e Thunderbird instalados pelos pacotes do Fedora.")
+			return nil
+		},
 	},
 }

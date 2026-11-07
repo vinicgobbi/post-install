@@ -1,0 +1,263 @@
+# Cenário fedora-44-limpo: Fedora Linux 44 (Workstation Edition), usuário ana, dry-run
+
+== mirrors (Otimizar mirrors)
+[INFO] Otimizando a seleção de espelhos (mirrors) do dnf...
+[INFO] [dry-run] mkdir -p /etc/dnf/libdnf5.conf.d
+[INFO] [dry-run] escrever /etc/dnf/libdnf5.conf.d/50-post-install.conf (121 bytes)
+[OK] dnf configurado (/etc/dnf/libdnf5.conf.d/50-post-install.conf): mirror de menor latência e 10 downloads em paralelo.
+
+== atualizacao (Atualizar sistema)
+[INFO] Atualizando pacotes do sistema...
+[INFO] [dry-run] dnf upgrade --refresh -y
+[OK] Sistema atualizado.
+
+== ferramentas (Ferramentas de terminal)
+[INFO] Instalando ferramentas de terminal...
+[INFO] [dry-run] dnf install -y git curl jq bat
+[INFO] [dry-run] baixar https://cli.github.com/packages/githubcli-archive-keyring.asc -> /tmp/post-install-teste/githubcli-archive-keyring.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/githubcli-archive-keyring.asc /etc/pki/rpm-gpg/githubcli-archive-keyring.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/gh-cli.repo (168 bytes)
+[INFO] Instalando ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg, btop, FUSE 2)...
+[INFO] [dry-run] dnf install -y gh nmap pipx ffmpeg-free btop fuse-libs
+[INFO] Instalando o Gitea CLI (tea)...
+[INFO] [dry-run] baixar https://gitea.com/gitea/tea/releases/download/v0.11.1/tea-0.11.1-linux-amd64.xz -> /tmp/post-install-teste/tea-0.11.1-linux-amd64.xz
+[INFO] [dry-run] xz -df /tmp/post-install-teste/tea-0.11.1-linux-amd64.xz
+[INFO] [dry-run] install -m 0755 /tmp/post-install-teste/tea-0.11.1-linux-amd64 /usr/local/bin/tea
+[OK] Ferramentas de terminal instaladas.
+
+== shell (Zsh e dotfiles)
+[INFO] Configurando o Zsh e os dotfiles para ana...
+[INFO] [dry-run] dnf install -y zsh git curl util-linux
+=> ERRO: zsh não encontrado: exec: "zsh": executable file not found in $PATH
+
+== firefox_thunderbird (Firefox e Thunderbird)
+[INFO] Instalando o Firefox e o Thunderbird (RPM do Fedora)...
+[INFO] [dry-run] dnf install -y firefox thunderbird
+[OK] Firefox e Thunderbird instalados pelos pacotes do Fedora.
+
+== chrome (Google Chrome)
+[INFO] Instalando o Google Chrome...
+[INFO] [dry-run] baixar https://dl.google.com/linux/linux_signing_key.pub -> /tmp/post-install-teste/google-linux-signing-key.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/google-linux-signing-key.asc /etc/pki/rpm-gpg/google-linux-signing-key.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/google-chrome-post-install.repo (190 bytes)
+[INFO] [dry-run] dnf install -y google-chrome-stable
+[OK] Google Chrome instalado.
+
+== bitwarden (Bitwarden)
+[INFO] Instalando Bitwarden nativo (integração com navegador)...
+[INFO] [dry-run] baixar https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=rpm -> /tmp/post-install-teste/bitwarden.rpm
+[INFO] [dry-run] dnf install -y /tmp/post-install-teste/bitwarden.rpm
+[OK] Bitwarden instalado nativamente.
+
+== remover_libreoffice (Remover LibreOffice nativo)
+[INFO] Removendo LibreOffice pré-instalado...
+[INFO] [dry-run] dnf remove -y libreoffice*
+[OK] LibreOffice nativo removido.
+
+== flatpaks (Flatpaks)
+[INFO] Configurando Flatpak e instalando apps...
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub com.getpostman.Postman com.github.tchx84.Flatseal com.mattjakeman.ExtensionManager com.obsproject.Studio com.spotify.Client dev.vencord.Vesktop io.dbeaver.DBeaverCommunity io.ente.auth io.github.flattool.Ignition io.github.flattool.Warehouse io.missioncenter.MissionCenter md.obsidian.Obsidian org.filezillaproject.Filezilla org.gaphor.Gaphor org.gnome.Boxes org.libreoffice.LibreOffice org.onlyoffice.desktopeditors org.qbittorrent.qBittorrent org.remmina.Remmina org.telegram.desktop org.videolan.VLC me.iepure.devtoolbox com.rtosta.zapzap be.alexandervanhee.gradia org.gnome.Snapshot org.gnome.Weather net.blip.Blip
+[OK] Aplicativos Flatpak instalados.
+
+== flatpaks_jogos (Flatpaks de jogos)
+[INFO] Instalando Flatpaks de jogos...
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub com.heroicgameslauncher.hgl com.valvesoftware.Steam com.vysp3r.ProtonPlus org.prismlauncher.PrismLauncher
+[OK] Flatpaks de jogos instalados.
+
+== solaar (Solaar (Logitech))
+[INFO] Instalando o Solaar pelos pacotes do Fedora...
+[INFO] [dry-run] dnf install -y solaar solaar-udev
+[OK] Solaar instalado pelos pacotes do Fedora.
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; mkdir -p "$HOME/.config/autostart"; for desktop in /usr/share/applications/solaar.desktop \; /var/lib/flatpak/exports/share/applications/io.github.pwr_solaar.solaar.desktop; do; if [ -f "$desktop" ]; then; destino="$HOME/.config/autostart/$(basename "$desktop")"; cp "$desktop" "$destino"; sed -i -E '/^Exec=/{/ -w hide$/! s/$/ -w hide/}' "$destino"; break; fi; done'
+[INFO] Configurando regras UDEV para o Solaar (regra do Solaar <solaarTag>)...
+[INFO] [dry-run] escrever /etc/udev/rules.d/42-logitech-unify-permissions.rules (<regraSolaar> bytes)
+[INFO] [dry-run] udevadm control --reload-rules
+[INFO] [dry-run] udevadm trigger --subsystem-match=usb
+[INFO] [dry-run] udevadm trigger --subsystem-match=hidraw
+[OK] Regras UDEV do Solaar configuradas.
+
+== git_gcm (Git Credential Manager)
+[INFO] Instalando o Git Credential Manager...
+[INFO] [dry-run] baixar https://github.com/git-ecosystem/git-credential-manager/releases/download/v3.0.2/gcm-linux-x64-3.0.2.tar.gz -> /tmp/post-install-teste/gcm.tar.gz
+[INFO] [dry-run] dnf install -y git
+[INFO] [dry-run] rm -rf /usr/local/share/gcm-core
+[INFO] [dry-run] mkdir -p /usr/local/share/gcm-core
+[INFO] [dry-run] tar --no-same-owner -xzf /tmp/post-install-teste/gcm.tar.gz -C /usr/local/share/gcm-core
+[INFO] [dry-run] ln -sf ../share/gcm-core/git-credential-manager /usr/local/bin/git-credential-manager
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; git-credential-manager configure && git config --global credential.credentialStore secretservice'
+[OK] Git Credential Manager instalado e configurado para ana.
+
+== podman (Podman)
+[INFO] Instalando o Podman e o podman-compose...
+[INFO] [dry-run] dnf install -y podman podman-compose
+[INFO] [dry-run] mkdir -p /etc/containers/registries.conf.d
+[INFO] [dry-run] escrever /etc/containers/registries.conf.d/50-post-install.conf (146 bytes)
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; podman system migrate'
+[OK] Podman e podman-compose instalados para ana (rootless).
+
+== vscode (Visual Studio Code)
+[INFO] Instalando o VSCode pelo repositório da Microsoft...
+[INFO] [dry-run] baixar https://packages.microsoft.com/keys/microsoft.asc -> /tmp/post-install-teste/microsoft.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/microsoft.asc /etc/pki/rpm-gpg/microsoft.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/vscode.repo (154 bytes)
+[INFO] [dry-run] dnf install -y code
+[OK] VSCode instalado.
+
+== go (Go)
+[INFO] Instalando o Go...
+[INFO] [dry-run] dnf install -y golang
+[OK] Go instalado.
+
+== mise (mise)
+[INFO] Instalando o mise pelo repositório RPM oficial...
+[INFO] [dry-run] baixar https://mise.jdx.dev/gpg-key.pub -> /tmp/post-install-teste/mise.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/mise.asc /etc/pki/rpm-gpg/mise.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/mise.repo (111 bytes)
+[INFO] [dry-run] dnf install -y mise
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sh=$(basename "$rc" rc | tr -d .); grep -qF 'mise activate' "$rc" || printf '\n# mise (Node, pnpm, Ruby, Rust) — post-install\neval "$(mise activate %s)"\n' "$sh" >> "$rc"; done'
+[OK] mise instalado e ativado no shell de ana.
+
+== node (Node.js e pnpm (mise))
+[INFO] Instalando o Node LTS e o pnpm pelo mise para ana...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; mise use -g node@lts pnpm@latest; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sed -i -e '/^# fnm (Node) — post-install$/d' \; -e '/^export PATH="\$HOME\/\.local\/share\/fnm:\$PATH"$/d' \; -e '/^eval "\$(fnm env --shell [a-z]*)"$/d' "$rc"; done'
+[OK] Node LTS e pnpm instalados pelo mise para ana.
+
+== php_sqlserver (PHP e SQL Server)
+[INFO] Instalando PHP, Composer e as ferramentas do SQL Server...
+[AVISO] A Microsoft não publica o msodbcsql18/mssql-tools18 para o Fedora: usando o repositório do RHEL 10, que costuma funcionar.
+[INFO] [dry-run] baixar https://packages.microsoft.com/keys/microsoft-2025.asc -> /tmp/post-install-teste/microsoft-2025.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/microsoft-2025.asc /etc/pki/rpm-gpg/microsoft-2025.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/mssql-release.repo (192 bytes)
+[INFO] [dry-run] dnf install -y php php-cli php-devel php-pear php-xml composer
+[INFO] [dry-run] ACCEPT_EULA=Y dnf install -y msodbcsql18 mssql-tools18 unixODBC-devel
+[INFO] [dry-run] escrever /etc/profile.d/mssql-tools.sh (43 bytes)
+[INFO] Compilando e habilitando as extensões sqlsrv/pdo_sqlsrv...
+[INFO] [dry-run] pecl install sqlsrv pdo_sqlsrv
+[INFO] [dry-run] escrever /etc/php.d/20-sqlsrv.ini (20 bytes)
+[INFO] [dry-run] escrever /etc/php.d/30-pdo_sqlsrv.ini (24 bytes)
+[OK] PHP, Composer, ferramentas e extensões do SQL Server instalados.
+
+== rust (Rust, eza, topgrade e cargo-update)
+[INFO] Instalando o Rust pelo mise e compilando eza/topgrade/cargo-update via cargo...
+[INFO] [dry-run] dnf install -y gcc gcc-c++ make cmake pkgconf-pkg-config openssl-devel
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; mise use -g rust@stable; mise exec -- cargo install --locked eza topgrade cargo-update'
+[OK] Rust (mise), eza, topgrade e cargo-update instalados para ana.
+
+== ruby (Ruby, Bundler e Jekyll)
+[INFO] Instalando as dependências de compilação do Ruby...
+[INFO] [dry-run] dnf install -y autoconf gcc patch make bzip2 openssl-devel libyaml-devel libffi-devel readline-devel zlib-ng-compat-devel gdbm-devel ncurses-devel perl-FindBin gmp-devel libuuid-devel
+[INFO] Instalando Ruby, Bundler e Jekyll pelo mise para ana (o Ruby é compilado; leva alguns minutos)...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sed -i -e '/^# Gems do Ruby na home do usuário (gem\/bundle sem sudo) — post-install$/d' \; -e '/^export GEM_HOME="\$HOME\/\.local\/share\/gem"$/d' \; -e '/^export PATH="\$GEM_HOME\/bin:\$PATH"$/d' "$rc"; done; unset GEM_HOME; for gem in bundler jekyll; do; grep -qxF "$gem" "$HOME/.default-gems" 2>/dev/null || echo "$gem" >> "$HOME/.default-gems"; done; mise use -g ruby@latest; mise exec -- gem install --no-document bundler jekyll; mise exec -- bundle config set --global path vendor/bundle'
+[OK] Ruby (mise), Bundler e Jekyll instalados para ana (projetos em vendor/bundle).
+
+== claude_code (Claude Code)
+[INFO] Instalando o Claude Code...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; curl -fsSL https://claude.ai/install.sh | bash'
+[OK] Claude Code instalado para ana.
+
+== deploy_dev (deploy-dev)
+[INFO] Instalando o deploy-dev (última release do deploy-tools)...
+[INFO] [dry-run] baixar https://github.com/vinicgobbi/deploy-tools/releases/download/v1.0.0/deploy-dev-linux-amd64 -> /tmp/post-install-teste/deploy-dev-linux-amd64
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; install -m 0755 '/tmp/post-install-teste/deploy-dev-linux-amd64' "$dir/deploy-dev"; "$dir/deploy-dev" install --add-to-path'
+[OK] deploy-dev instalado em ~/.local/bin para ana.
+
+== tailscale (Tailscale + Trayscale)
+[INFO] Instalando o Tailscale e o Trayscale...
+[INFO] [dry-run] baixar https://pkgs.tailscale.com/stable/fedora/repo.gpg -> /tmp/post-install-teste/tailscale.gpg
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/tailscale.gpg /etc/pki/rpm-gpg/tailscale.gpg
+[INFO] [dry-run] escrever /etc/yum.repos.d/tailscale.repo (175 bytes)
+[INFO] [dry-run] dnf install -y tailscale
+[INFO] [dry-run] systemctl enable --now tailscaled
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub dev.deedles.Trayscale
+[INFO] [dry-run] tailscale set --operator=ana
+[OK] Tailscale instalado e 'ana' definido como operator.
+
+== firewall (Firewall (firewall-config))
+[INFO] Instalando o firewall-config...
+[INFO] [dry-run] dnf install -y firewall-config
+[OK] firewall-config instalado; o firewalld segue com a configuração padrão do Fedora.
+
+== ovpn (Importar perfis OpenVPN)
+[INFO] Importando perfis OpenVPN para o NetworkManager...
+[AVISO] Nenhum arquivo .ovpn encontrado em /opt/post-install/OVPN — pulando importação.
+
+== virt_manager (virt-manager (QEMU/KVM))
+[INFO] Instalando virt-manager (QEMU/KVM + libvirt)...
+[INFO] [dry-run] dnf install -y virt-manager qemu-kvm libvirt-daemon-kvm libvirt-daemon-config-network
+[INFO] [dry-run] systemctl enable --now virtqemud.socket virtqemud-ro.socket virtqemud-admin.socket virtnetworkd.socket virtnetworkd-ro.socket virtnetworkd-admin.socket virtnodedevd.socket virtnodedevd-ro.socket virtnodedevd-admin.socket virtnwfilterd.socket virtnwfilterd-ro.socket virtnwfilterd-admin.socket virtsecretd.socket virtsecretd-ro.socket virtsecretd-admin.socket virtstoraged.socket virtstoraged-ro.socket virtstoraged-admin.socket
+[INFO] [dry-run] usermod -aG kvm ana
+[OK] virt-manager instalado. 'ana' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).
+
+== temas_yaru (Ícones Yaru e tema adw-gtk3)
+[INFO] Instalando os ícones Yaru e o tema adw-gtk3...
+[INFO] [dry-run] dnf install -y yaru-icon-theme adw-gtk3-theme
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub org.gtk.Gtk3theme.adw-gtk3 org.gtk.Gtk3theme.adw-gtk3-dark
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark"; gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"'
+[OK] Ícones Yaru-dark e tema adw-gtk3-dark aplicados (nos apps Flatpak, a partir da próxima abertura de cada app).
+
+== papel_parede (Papel de parede)
+[INFO] Aplicando o papel de parede 'paisagem.jpg'...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; install -D -m 0644 '/opt/post-install/Wallpapers/paisagem.jpg' '/home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.gnome.desktop.background picture-uri 'file:///home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.gnome.desktop.background picture-uri-dark 'file:///home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.gnome.desktop.background picture-options 'zoom''
+[OK] Papel de parede aplicado: /home/ana/.local/share/backgrounds/paisagem.jpg
+
+== extensoes_gnome (Extensões do GNOME)
+[INFO] Instalando extensões do GNOME (GNOME Shell 50)...
+[INFO] [dry-run] baixar https://extensions.gnome.org/download-extension/compativel@exemplo.test.shell-extension.zip?version_tag=101 -> /tmp/post-install-teste/compativel@exemplo.test.zip
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gnome-extensions install --force '/tmp/post-install-teste/compativel@exemplo.test.zip''
+[OK] Extensão compativel@exemplo.test instalada.
+[AVISO] incompativel@exemplo.test não tem versão para o GNOME Shell 50 (última suportada: 41): não será instalada automaticamente.
+[INFO] [dry-run] dnf install -y make
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git init --quiet "$dir"; git -C "$dir" fetch --quiet --depth 1 'https://git.exemplo.test/comcommit.git' '0123456789abcdef0123456789abcdef01234567'; git -C "$dir" -c advice.detachedHead=false checkout --quiet FETCH_HEAD; make -C "$dir" install'
+[OK] Extensão comcommit@exemplo.test instalada de https://git.exemplo.test/comcommit.git.
+[AVISO] semcommit@exemplo.test: sem commit fixado em extensoes.txt — instalando o que estiver na branch principal de https://git.exemplo.test/semcommit.git.
+[INFO] [dry-run] dnf install -y make
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git init --quiet "$dir"; git -C "$dir" fetch --quiet --depth 1 'https://git.exemplo.test/semcommit.git' 'HEAD'; git -C "$dir" -c advice.detachedHead=false checkout --quiet FETCH_HEAD; make -C "$dir" install'
+[OK] Extensão semcommit@exemplo.test instalada de https://git.exemplo.test/semcommit.git.
+[INFO] [dry-run] baixar https://extensions.gnome.org/download-extension/dash-to-dock@micxgx.gmail.com.shell-extension.zip?version_tag=301 -> /tmp/post-install-teste/dash-to-dock@micxgx.gmail.com.zip
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gnome-extensions install --force '/tmp/post-install-teste/dash-to-dock@micxgx.gmail.com.zip''
+[OK] Extensão dash-to-dock@micxgx.gmail.com instalada.
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; gsettings set org.gnome.shell disable-user-extensions false; gsettings set org.gnome.shell enabled-extensions '['\''compativel@exemplo.test'\'', '\''comcommit@exemplo.test'\'', '\''semcommit@exemplo.test'\'', '\''dash-to-dock@micxgx.gmail.com'\'']'; gsettings set org.gnome.shell disabled-extensions '['\''ding@rastersoft.com'\'']'; dconf load /org/gnome/shell/extensions/ < '/opt/post-install/GNOME/extensoes.dconf''
+[OK] 4 extensões ativadas e configuradas (as novas carregam no próximo login).
+
+== atalhos_gnome (Atalhos do GNOME)
+[INFO] Gradia não instalado: instalando via Flatpak para os atalhos...
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub be.alexandervanhee.gradia
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; dconf load /org/gnome/ < '/opt/post-install/GNOME/atalhos.dconf''
+[OK] Atalhos do GNOME aplicados.
+
+== nautilus (Nautilus: VSCode, copiar caminho e Projetos)
+[INFO] Instalando extensões do VSCode e de copiar caminho para o Nautilus...
+[INFO] [dry-run] dnf install -y nautilus-python python3-gobject wl-clipboard xclip git
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git clone --quiet 'https://github.com/vinicgobbi/vscode_nautilus.git' "$dir/vscode_nautilus"; git -C "$dir/vscode_nautilus" -c advice.detachedHead=false checkout --quiet '<vscodeNautilusCommit>'; bash "$dir/vscode_nautilus/install.sh"; git clone --quiet 'https://github.com/vinicgobbi/nautilus-copypath.git' "$dir/nautilus-copypath"; git -C "$dir/nautilus-copypath" -c advice.detachedHead=false checkout --quiet '<copypathCommit>'; bash "$dir/nautilus-copypath/install.sh"'
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; if [[ "$LANG" == pt_* ]]; then DIR_NAME="Projetos"; else DIR_NAME="Projects"; fi; PROJECTS_DIR="$HOME/$DIR_NAME"; mkdir -p "$PROJECTS_DIR"; xdg-user-dirs-update --set PROJECTS "$PROJECTS_DIR"; BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"; mkdir -p "$(dirname "$BOOKMARKS_FILE")"; touch "$BOOKMARKS_FILE"; grep -q "file://$PROJECTS_DIR" "$BOOKMARKS_FILE" || echo "file://$PROJECTS_DIR" >> "$BOOKMARKS_FILE"'
+[OK] Extensões do Nautilus instaladas e pasta de projetos criada.
+
+== apps_gnome (Favoritos e pastas do menu de apps)
+[INFO] 3 apps visíveis no menu.
+[INFO] Favoritos: org.gnome.Nautilus.desktop, org.gnome.Ptyxis.desktop, firefox.desktop
+[INFO] Pasta Sistema: 2 apps
+[INFO] Fora das pastas (sem categoria conhecida): firefox.desktop
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; gsettings set org.gnome.shell favorite-apps '['\''org.gnome.Nautilus.desktop'\'', '\''org.gnome.Ptyxis.desktop'\'', '\''firefox.desktop'\'']'; dconf reset -f /org/gnome/desktop/app-folders/; dconf load /org/gnome/desktop/app-folders/ <<'POST_INSTALL_PASTAS'; [/]; folder-children=['games', 'sistema']; [folders/games]; name='Games'; translate=false; categories=['Game']; apps=@as []; excluded-apps=@as []; [folders/sistema]; name='Sistema'; translate=false; categories=['System', 'Settings', 'TerminalEmulator']; apps=['org.gnome.Nautilus.desktop']; excluded-apps=@as []; POST_INSTALL_PASTAS; gsettings reset org.gnome.shell app-picker-layout'
+[OK] Favoritos e pastas do menu de apps aplicados.
+
+== limpeza (Limpeza final)
+[INFO] Limpando o sistema...
+[INFO] [dry-run] dnf autoremove -y
+[INFO] [dry-run] dnf clean all
+[INFO] [dry-run] rm -rf /tmp/post-install-teste
+[OK] Instalação finalizada com sucesso!
+[INFO] Recomenda-se reiniciar a máquina para aplicar as mudanças de grupo e kernel.
+
+== Consultas que o cenário não responde (falham na máquina falsa)
+comando: flatpak info be.alexandervanhee.gradia
+comando: getent group libvirt

@@ -1,0 +1,8 @@
+# Fixture dos testes golden.
+[Games]
+diretorio = Game.directory
+categorias = Game
+apps =
+[Sistema]
+categorias = System Settings TerminalEmulator
+apps = org.gnome.Nautilus.desktop

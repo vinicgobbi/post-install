@@ -5,7 +5,6 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
-	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -22,6 +21,36 @@ var mirrors = Module{
 		c.Log.Infof("Otimizando a seleção de espelhos (mirrors) do APT...")
 		return otimizarMirrorsUbuntu(c)
 	},
+	Fedora: &Variante{
+		Desc: "Faz o dnf escolher o mirror de menor latência (fastestmirror) e baixar 10 pacotes em paralelo",
+		Run:  otimizarMirrorsFedora,
+	},
+}
+
+// confDnf é um arquivo de configuração extra do dnf5: o diretório é lido
+// antes do /etc/dnf/dnf.conf, então o que estiver configurado lá à mão
+// continua valendo. Apagar o arquivo volta ao padrão.
+const confDnf = "/etc/dnf/libdnf5.conf.d/50-post-install.conf"
+
+const confDnfConteudo = `# Mirror de menor latência e downloads em paralelo — post-install
+[main]
+fastestmirror=True
+max_parallel_downloads=10
+`
+
+// otimizarMirrorsFedora: o Fedora já escolhe os mirrors pelo metalink; o
+// fastestmirror passa a preferir, entre eles, o de menor latência medida,
+// e o padrão de 3 downloads simultâneos sobe para 10.
+func otimizarMirrorsFedora(c *Ctx) error {
+	c.Log.Infof("Otimizando a seleção de espelhos (mirrors) do dnf...")
+	if err := c.MkdirAll("/etc/dnf/libdnf5.conf.d", 0o755); err != nil {
+		return err
+	}
+	if err := c.WriteFile(confDnf, confDnfConteudo, 0o644); err != nil {
+		return err
+	}
+	c.Log.Successf("dnf configurado (%s): mirror de menor latência e 10 downloads em paralelo.", confDnf)
+	return nil
 }
 
 func otimizarMirrorsUbuntu(c *Ctx) error {
@@ -39,11 +68,11 @@ func otimizarMirrorsUbuntu(c *Ctx) error {
 		"mirror://mirrors.ubuntu.com/mirrors.txt", mirror,
 	)
 	for _, arquivo := range []string{"/etc/apt/sources.list", "/etc/apt/sources.list.d/ubuntu.sources"} {
-		info, err := os.Stat(arquivo)
+		info, err := c.Stat(arquivo)
 		if err != nil {
 			continue
 		}
-		data, err := os.ReadFile(arquivo)
+		data, err := c.ReadFile(arquivo)
 		if err != nil {
 			return err
 		}
@@ -142,7 +171,7 @@ func mirrorUbuntuMaisRapido(c *Ctx) (string, bool) {
 		menor  time.Duration
 		wg     sync.WaitGroup
 	)
-	client := &http.Client{Timeout: timeoutCandidato}
+	client := c.HTTPClient(timeoutCandidato)
 
 	for _, cand := range candidatosMirrorUbuntu(c) {
 		wg.Add(1)
