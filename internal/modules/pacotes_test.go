@@ -87,3 +87,21 @@ gpgkey=file:///etc/pki/rpm-gpg/exemplo.asc
 		t.Errorf("repo:\n%s", repo)
 	}
 }
+
+// Sem LibreOffice instalado, o Fedora não roda o "dnf remove" (que, com um
+// padrão sem nada instalado, não tem sucesso garantido).
+func TestRemoverLibreofficeFedoraSemNada(t *testing.T) {
+	c, linhas := ctxDryRun(t, sysinfo.Fedora, nil)
+	m, ok := removerLibreoffice.Para(sysinfo.Fedora)
+	if !ok {
+		t.Fatal("remover_libreoffice deveria existir no Fedora")
+	}
+	if err := m.Run(c); err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range *linhas {
+		if strings.Contains(l, "dnf remove") {
+			t.Errorf("não deveria remover nada: %q", *linhas)
+		}
+	}
+}

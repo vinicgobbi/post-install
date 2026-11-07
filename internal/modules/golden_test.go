@@ -267,6 +267,7 @@ func fedoraLimpo(t *testing.T, versao string) cenario {
 			"getent passwd ana":          "ana:x:1000:1000:Ana:/home/ana:/bin/bash\n",
 			"id -u ana":                  "1000\n",
 			"gnome-shell --version":      "GNOME Shell 50.1\n",
+			"rpm -qa libreoffice*":       "libreoffice-core-26.8.1.1-1.fc44.x86_64\nlibreoffice-writer-26.8.1.1-1.fc44.x86_64\n",
 		},
 		http: map[string]string{
 			"https://gitea.com/api/v1/repos/gitea/tea/releases/latest":                               `{"tag_name":"v0.11.1"}`,

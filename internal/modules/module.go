@@ -204,6 +204,8 @@ const (
 	fprGitHubCLI    = "7F38BBB59D064DBCB3D84D725612B36462313325"
 	fprGitHubCLIOld = "2C6106201985B60E6C7AC87323F3D4EA75716059"
 	fprTailscale    = "2596A99EAAB33821893C0A79458CA832957F5868"
+	// Google Linux Packages Signing Authority (Chrome).
+	fprGoogle = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
 )
 
 // instalarChaveAPT baixa uma chave para /etc/apt/keyrings (ou outro destino)
@@ -252,6 +254,14 @@ func conteudoRepoRPM(nome, titulo, baseurl, chave string) string {
 
 func (c *Ctx) ensureFlathub() error {
 	return c.Run("flatpak", "remote-add", "--if-not-exists", "flathub", "https://flathub.org/repo/flathub.flatpakrepo")
+}
+
+// ensureFlathubFedora: o Fedora pode trazer o Flathub já cadastrado, mas
+// desativado ou filtrado (só alguns apps); o remote-modify o deixa completo.
+func (c *Ctx) ensureFlathubFedora() error {
+	return step(c.ensureFlathub, func() error {
+		return c.Run("flatpak", "remote-modify", "--enable", "--no-filter", "flathub")
+	})
 }
 
 func (c *Ctx) flatpakInstall(apps ...string) error {

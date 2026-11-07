@@ -3,6 +3,7 @@ package modules
 import (
 	_ "embed"
 	"path/filepath"
+	"strings"
 
 	"github.com/vinicgobbi/post-install/internal/config"
 )
@@ -25,29 +26,58 @@ var solaar = Module{
 		if err := c.Run("usermod", "-aG", "plugdev", c.User); err != nil {
 			return err
 		}
-		if err := c.AsUser(scriptAutostartSolaar); err != nil {
-			c.Log.Warnf("Não foi possível pôr o Solaar para iniciar com a sessão: %v", err)
-		}
-
-		// O pacote da PPA já traz a regra em /usr/lib/udev/rules.d; só
-		// o Flatpak (que não instala nada fora do sandbox) precisa dela aqui.
-		if regraSolaarInstalada(c) {
-			c.Log.Infof("Regra UDEV do Solaar já instalada pelo pacote.")
-			return nil
-		}
-		c.Log.Infof("Configurando regras UDEV para o Solaar (regra do Solaar %s)...", solaarTag)
-		err := step(
-			func() error { return c.WriteFile(regraSolaarDestino, regraSolaar, 0o644) },
-			func() error { return c.Run("udevadm", "control", "--reload-rules") },
-			func() error { return c.Run("udevadm", "trigger", "--subsystem-match=usb") },
-			func() error { return c.Run("udevadm", "trigger", "--subsystem-match=hidraw") },
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Regras UDEV do Solaar configuradas.")
-		return nil
+		return configurarSolaar(c)
 	},
+	// No Fedora o solaar-udev traz a regra (com TAG+="uaccess", sem o grupo
+	// plugdev, que o Fedora não usa); o Flatpak segue como alternativa.
+	Fedora: &Variante{
+		Desc: "Instala o Solaar e a regra UDEV do receptor Logitech Unifying pelos pacotes do Fedora (com fallback para Flatpak) e o início junto da sessão, só na bandeja",
+		Run: func(c *Ctx) error {
+			if err := instalarSolaarFedora(c); err != nil {
+				return err
+			}
+			return configurarSolaar(c)
+		},
+	},
+}
+
+// configurarSolaar põe o Solaar para iniciar com a sessão e instala a regra
+// UDEV embutida se nenhum pacote a trouxe.
+func configurarSolaar(c *Ctx) error {
+	if err := c.AsUser(scriptAutostartSolaar); err != nil {
+		c.Log.Warnf("Não foi possível pôr o Solaar para iniciar com a sessão: %v", err)
+	}
+
+	// Os pacotes (PPA no Ubuntu, solaar-udev no Fedora) já trazem a regra em
+	// /usr/lib/udev/rules.d; só o Flatpak (que não instala nada fora do
+	// sandbox) precisa dela aqui.
+	if regraSolaarInstalada(c) {
+		c.Log.Infof("Regra UDEV do Solaar já instalada pelo pacote.")
+		return nil
+	}
+	c.Log.Infof("Configurando regras UDEV para o Solaar (regra do Solaar %s)...", solaarTag)
+	err := step(
+		func() error { return c.WriteFile(regraSolaarDestino, regraSolaar, 0o644) },
+		func() error { return c.Run("udevadm", "control", "--reload-rules") },
+		func() error { return c.Run("udevadm", "trigger", "--subsystem-match=usb") },
+		func() error { return c.Run("udevadm", "trigger", "--subsystem-match=hidraw") },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Regras UDEV do Solaar configuradas.")
+	return nil
+}
+
+func instalarSolaarFedora(c *Ctx) error {
+	c.Log.Infof("Instalando o Solaar pelos pacotes do Fedora...")
+	err := c.install("solaar", "solaar-udev")
+	if err == nil {
+		c.Log.Successf("Solaar instalado pelos pacotes do Fedora.")
+		return nil
+	}
+	c.Log.Warnf("Falha ao instalar o Solaar pelos pacotes do Fedora (%v); instalando via Flatpak.", err)
+	return instalarSolaarFlatpak(c)
 }
 
 // scriptAutostartSolaar põe o Solaar (pacote, ou Flatpak como alternativa)
@@ -108,6 +138,10 @@ func instalarSolaar(c *Ctx) error {
 	}
 
 	c.Log.Warnf("Falha ao instalar o Solaar pela PPA (%v); instalando via Flatpak.", err)
+	return instalarSolaarFlatpak(c)
+}
+
+func instalarSolaarFlatpak(c *Ctx) error {
 	if err := step(c.ensureFlathub, func() error { return c.flatpakInstall("io.github.pwr_solaar.solaar") }); err != nil {
 		return err
 	}
@@ -128,6 +162,23 @@ var removerLibreoffice = Module{
 		c.Log.Successf("LibreOffice nativo removido.")
 		return nil
 	},
+	// O Workstation traz o LibreOffice em RPM. "dnf remove" de um padrão sem
+	// nada instalado não é garantido como sucesso, então confere antes.
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Removendo LibreOffice pré-instalado...")
+			out, _ := c.Output("rpm", "-qa", "libreoffice*")
+			if strings.TrimSpace(out) == "" {
+				c.Log.Infof("LibreOffice nativo não está instalado.")
+				return nil
+			}
+			if err := c.Run("dnf", "remove", "-y", "libreoffice*"); err != nil {
+				return err
+			}
+			c.Log.Successf("LibreOffice nativo removido.")
+			return nil
+		},
+	},
 }
 
 var flatpaks = Module{
@@ -147,6 +198,22 @@ var flatpaks = Module{
 		c.Log.Successf("Aplicativos Flatpak instalados.")
 		return nil
 	},
+	// O Workstation já traz o Flatpak e o GNOME Software com suporte a ele.
+	Fedora: &Variante{
+		Desc: "Flathub (ativado e sem filtro) e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Configurando Flatpak e instalando apps...")
+			if err := step(
+				func() error { return c.garantir("flatpak", "flatpak") },
+				c.ensureFlathubFedora,
+				func() error { return c.flatpakInstall(config.Flatpaks...) },
+			); err != nil {
+				return err
+			}
+			c.Log.Successf("Aplicativos Flatpak instalados.")
+			return nil
+		},
+	},
 }
 
 var flatpaksJogos = Module{
@@ -165,6 +232,20 @@ var flatpaksJogos = Module{
 		}
 		c.Log.Successf("Flatpaks de jogos instalados.")
 		return nil
+	},
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando Flatpaks de jogos...")
+			if err := step(
+				func() error { return c.garantir("flatpak", "flatpak") },
+				c.ensureFlathubFedora,
+				func() error { return c.flatpakInstall(config.FlatpaksJogos...) },
+			); err != nil {
+				return err
+			}
+			c.Log.Successf("Flatpaks de jogos instalados.")
+			return nil
+		},
 	},
 }
 
@@ -187,6 +268,24 @@ var bitwarden = Module{
 		}
 		c.Log.Successf("Bitwarden instalado nativamente.")
 		return nil
+	},
+	// O .rpm oficial (instala em /opt/Bitwarden), como o .deb no Ubuntu.
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando Bitwarden nativo (integração com navegador)...")
+			pkg := c.Temp("bitwarden.rpm")
+			err := step(
+				func() error {
+					return c.Download("https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=rpm", pkg)
+				},
+				func() error { return c.install(pkg) },
+			)
+			if err != nil {
+				return err
+			}
+			c.Log.Successf("Bitwarden instalado nativamente.")
+			return nil
+		},
 	},
 }
 
@@ -213,4 +312,36 @@ var chrome = Module{
 		c.Log.Successf("Google Chrome instalado.")
 		return nil
 	},
+	Fedora: &Variante{
+		Desc: "Instala o Google Chrome pelo repositório RPM do Google, com a chave conferida pelo fingerprint",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o Google Chrome...")
+			if err := step(
+				func() error { return configurarRepoChrome(c) },
+				func() error { return c.install("google-chrome-stable") },
+			); err != nil {
+				return err
+			}
+			c.Log.Successf("Google Chrome instalado.")
+			return nil
+		},
+	},
+}
+
+// repoChrome é o id do repositório do Chrome gravado aqui. O Fedora traz um
+// "google-chrome" próprio (desativado, em /usr/share/dnf5/repos.d, pelo
+// fedora-workstation-repositories); um id diferente evita depender dele e
+// conflitar com ele. O /etc/default/google-chrome desse mesmo pacote impede
+// que o RPM do Chrome crie um terceiro repositório.
+const repoChrome = "google-chrome-post-install"
+
+// configurarRepoChrome: diferente do .rpm baixado solto (que o dnf instala
+// sem conferir a assinatura, localpkg_gpgcheck=False), pelo repositório
+// cada pacote é conferido contra a chave do Google.
+func configurarRepoChrome(c *Ctx) error {
+	chave, err := instalarChaveRPM(c, "https://dl.google.com/linux/linux_signing_key.pub", "google-linux-signing-key.asc", fprGoogle)
+	if err != nil {
+		return err
+	}
+	return repoRPM(c, repoChrome, "Google Chrome", "https://dl.google.com/linux/chrome/rpm/stable/x86_64", chave)
 }
