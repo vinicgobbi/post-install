@@ -18,12 +18,16 @@ func pacotesFerramentas(c *Ctx) []string {
 	return []string{"gh", "nmap", "pipx", "ffmpeg", "bashtop", fuse}
 }
 
+// pacotesFerramentasFedora: no Fedora o bashtop não existe (entra o btop, o
+// sucessor dele), o ffmpeg dos repositórios oficiais é o ffmpeg-free e o
+// FUSE 2 é o fuse-libs.
+var pacotesFerramentasFedora = []string{"gh", "nmap", "pipx", "ffmpeg-free", "btop", "fuse-libs"}
+
 // instalarFerramentas tenta tudo numa chamada só; se falhar (algum pacote
 // ausente na versão), instala um por um e só avisa dos que faltarem, sem
 // derrubar o módulo.
-func instalarFerramentas(c *Ctx) {
-	c.Log.Infof("Instalando ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2)...")
-	pkgs := pacotesFerramentas(c)
+func instalarFerramentas(c *Ctx, nomes string, pkgs []string) {
+	c.Log.Infof("Instalando ferramentas de terminal (%s)...", nomes)
 	if c.install(pkgs...) == nil {
 		return
 	}
@@ -68,6 +72,18 @@ func instalarTea(c *Ctx) error {
 	)
 }
 
+// configurarRepoGitHubCLIRPM segue a mesma página para o Fedora: o .repo
+// oficial (cli.github.com/packages/rpm/gh-cli.repo), com a chave baixada e
+// conferida antes, como no Ubuntu.
+func configurarRepoGitHubCLIRPM(c *Ctx) error {
+	chave, err := instalarChaveRPM(c, "https://cli.github.com/packages/githubcli-archive-keyring.asc",
+		"githubcli-archive-keyring.asc", fprGitHubCLI, fprGitHubCLIOld)
+	if err != nil {
+		return err
+	}
+	return repoRPM(c, "gh-cli", "packages for the GitHub CLI", "https://cli.github.com/packages/rpm", chave)
+}
+
 // configurarRepoGitHubCLI segue https://github.com/cli/cli/blob/trunk/docs/install_linux.md:
 // o "gh" dos repositórios do Ubuntu fica bem atrás das releases.
 func configurarRepoGitHubCLI(c *Ctx) error {
@@ -98,11 +114,8 @@ var ferramentas = Module{
 		if err != nil {
 			return err
 		}
-		instalarFerramentas(c)
-		c.Log.Infof("Instalando o Gitea CLI (tea)...")
-		if err := instalarTea(c); err != nil {
-			c.Log.Warnf("Não foi possível instalar o tea: %v", err)
-		}
+		instalarFerramentas(c, "gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2", pacotesFerramentas(c))
+		instalarTeaOuAvisar(c)
 
 		// No Ubuntu o "bat" instala o binário como "batcat" por conflito de
 		// nome; cria um link para "bat" funcionar em todo lugar.
@@ -116,6 +129,31 @@ var ferramentas = Module{
 		c.Log.Successf("Ferramentas de terminal instaladas.")
 		return nil
 	},
+	Fedora: &Variante{
+		Desc: "git, curl, jq, bat, gh (repositório oficial), tea, nmap, pipx, ffmpeg (ffmpeg-free), btop e FUSE 2 para AppImages",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando ferramentas de terminal...")
+			err := step(
+				func() error { return c.install("git", "curl", "jq", "bat") },
+				func() error { return configurarRepoGitHubCLIRPM(c) },
+			)
+			if err != nil {
+				return err
+			}
+			instalarFerramentas(c, "gh, tea, nmap, pipx, ffmpeg, btop, FUSE 2", pacotesFerramentasFedora)
+			instalarTeaOuAvisar(c)
+			c.Log.Successf("Ferramentas de terminal instaladas.")
+			return nil
+		},
+	},
+}
+
+// instalarTeaOuAvisar: sem o tea, o resto das ferramentas continua valendo.
+func instalarTeaOuAvisar(c *Ctx) {
+	c.Log.Infof("Instalando o Gitea CLI (tea)...")
+	if err := instalarTea(c); err != nil {
+		c.Log.Warnf("Não foi possível instalar o tea: %v", err)
+	}
 }
 
 var shell = Module{
@@ -124,32 +162,44 @@ var shell = Module{
 	Title: "Zsh e dotfiles",
 	Desc:  "Zsh como shell padrão e os dotfiles pessoais (Oh My Zsh, plugins, tema, fontes e configurações)",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Configurando o Zsh e os dotfiles para %s...", c.User)
-		if err := c.install("zsh", "git", "curl"); err != nil {
-			return err
-		}
-
-		// chsh só aceita contas presentes de fato em /etc/passwd; contas de
-		// domínio (AD/LDAP via sssd/winbind) resolvem por NSS, mas não estão
-		// no arquivo. A resolução restrita à fonte "files" distingue os casos.
-		if c.Probe("getent", "-s", "files", "passwd", c.User) {
-			zsh, err := c.LookPath("zsh")
-			if err != nil {
-				return errorf("zsh não encontrado: %w", err)
-			}
-			if err := c.Run("chsh", "-s", zsh, c.User); err != nil {
-				return err
-			}
-		} else {
-			c.Log.Warnf("'%s' é uma conta de domínio (AD/LDAP), não local: pulando 'chsh' (não dá para trocar o shell padrão por aqui nesse caso).", c.User)
-		}
-
-		if err := c.AsUser("set -e\ndir=$(mktemp -d)\ntrap 'rm -rf \"$dir\"' EXIT\n" +
-			clonarFixado(dotfilesRepo, dotfilesCommit, `"$dir"`) +
-			`bash "$dir/bootstrap.sh"` + "\n"); err != nil {
-			return err
-		}
-		c.Log.Successf("Zsh e dotfiles configurados para %s.", c.User)
-		return nil
+		return configurarShell(c, "zsh", "git", "curl")
 	},
+	// O chsh fica no util-linux, que já vem no Workstation.
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			return configurarShell(c, "zsh", "git", "curl", "util-linux")
+		},
+	},
+}
+
+// configurarShell instala os pacotes, põe o Zsh como shell padrão e aplica
+// os dotfiles.
+func configurarShell(c *Ctx, pkgs ...string) error {
+	c.Log.Infof("Configurando o Zsh e os dotfiles para %s...", c.User)
+	if err := c.install(pkgs...); err != nil {
+		return err
+	}
+
+	// chsh só aceita contas presentes de fato em /etc/passwd; contas de
+	// domínio (AD/LDAP via sssd/winbind) resolvem por NSS, mas não estão
+	// no arquivo. A resolução restrita à fonte "files" distingue os casos.
+	if c.Probe("getent", "-s", "files", "passwd", c.User) {
+		zsh, err := c.LookPath("zsh")
+		if err != nil {
+			return errorf("zsh não encontrado: %w", err)
+		}
+		if err := c.Run("chsh", "-s", zsh, c.User); err != nil {
+			return err
+		}
+	} else {
+		c.Log.Warnf("'%s' é uma conta de domínio (AD/LDAP), não local: pulando 'chsh' (não dá para trocar o shell padrão por aqui nesse caso).", c.User)
+	}
+
+	if err := c.AsUser("set -e\ndir=$(mktemp -d)\ntrap 'rm -rf \"$dir\"' EXIT\n" +
+		clonarFixado(dotfilesRepo, dotfilesCommit, `"$dir"`) +
+		`bash "$dir/bootstrap.sh"` + "\n"); err != nil {
+		return err
+	}
+	c.Log.Successf("Zsh e dotfiles configurados para %s.", c.User)
+	return nil
 }

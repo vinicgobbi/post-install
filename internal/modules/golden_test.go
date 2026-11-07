@@ -246,12 +246,44 @@ func ubuntuConfigurado(t *testing.T) cenario {
 	return c
 }
 
+// fedoraLimpo é um Fedora Workstation recém-instalado: GNOME, Flatpak,
+// git, Firefox e Thunderbird em RPM, sem zsh, e com rede. Só rodam os
+// módulos que já têm a variante do Fedora (Disponiveis).
+func fedoraLimpo(t *testing.T, versao string) cenario {
+	sys := sysinfo.Info{Familia: sysinfo.Fedora, ID: "fedora", PrettyName: "Fedora Linux " + versao + " (Workstation Edition)",
+		VersionID: versao, MSRepoVersion: "10", Arch: "amd64"}
+	h := &hostFalso{
+		arquivos: fstest.MapFS{
+			"etc/subuid":   arq("ana:524288:65536\n"),
+			"etc/subgid":   arq("ana:524288:65536\n"),
+			"proc/cpuinfo": arq("flags\t\t: fpu vme vmx sse sse2\n"),
+			"usr/share/applications/org.gnome.Nautilus.desktop": arq("[Desktop Entry]\nType=Application\nCategories=GNOME;GTK;Utility;Core;FileManager;\n"),
+			"usr/share/applications/org.gnome.Ptyxis.desktop":   arq("[Desktop Entry]\nType=Application\nCategories=GNOME;GTK;System;TerminalEmulator;\n"),
+			"usr/share/applications/firefox.desktop":            arq("[Desktop Entry]\nType=Application\nCategories=Network;WebBrowser;\n"),
+		},
+		binarios: map[string]bool{"gnome-shell": true, "gnome-extensions": true, "flatpak": true, "git": true, "curl": true},
+		comandos: map[string]string{
+			"getent -s files passwd ana": "ana:x:1000:1000:Ana:/home/ana:/bin/bash\n",
+			"getent passwd ana":          "ana:x:1000:1000:Ana:/home/ana:/bin/bash\n",
+			"id -u ana":                  "1000\n",
+			"gnome-shell --version":      "GNOME Shell 50.1\n",
+		},
+		http: map[string]string{
+			"https://gitea.com/api/v1/repos/gitea/tea/releases/latest":                               `{"tag_name":"v0.11.1"}`,
+			"https://gitea.com/gitea/tea/releases/download/v0.11.1/tea-0.11.1-linux-amd64.xz.sha256": sha + "  tea-0.11.1-linux-amd64.xz\n",
+		},
+		semResposta: map[string]bool{},
+	}
+	return cenario{nome: "fedora-" + versao + "-limpo", sys: sys, host: h, wallpaper: dirPacote + "/Wallpapers/paisagem.jpg"}
+}
+
 func cenarios(t *testing.T) []cenario {
 	return []cenario{
 		ubuntuLimpo(t, "22.04"),
 		ubuntuLimpo(t, "24.04"),
 		ubuntuLimpo(t, "26.04"),
 		ubuntuConfigurado(t),
+		fedoraLimpo(t, "44"),
 	}
 }
 
