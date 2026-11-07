@@ -1,0 +1,41 @@
+# Cenário fedora-44-limpo: Fedora Linux 44 (Workstation Edition), usuário ana, dry-run
+
+== mirrors (Otimizar mirrors)
+[INFO] Otimizando a seleção de espelhos (mirrors) do dnf...
+[INFO] [dry-run] mkdir -p /etc/dnf/libdnf5.conf.d
+[INFO] [dry-run] escrever /etc/dnf/libdnf5.conf.d/50-post-install.conf (121 bytes)
+[OK] dnf configurado (/etc/dnf/libdnf5.conf.d/50-post-install.conf): mirror de menor latência e 10 downloads em paralelo.
+
+== atualizacao (Atualizar sistema)
+[INFO] Atualizando pacotes do sistema...
+[INFO] [dry-run] dnf upgrade --refresh -y
+[OK] Sistema atualizado.
+
+== ferramentas (Ferramentas de terminal)
+[INFO] Instalando ferramentas de terminal...
+[INFO] [dry-run] dnf install -y git curl jq bat
+[INFO] [dry-run] baixar https://cli.github.com/packages/githubcli-archive-keyring.asc -> /tmp/post-install-teste/githubcli-archive-keyring.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/githubcli-archive-keyring.asc /etc/pki/rpm-gpg/githubcli-archive-keyring.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/gh-cli.repo (168 bytes)
+[INFO] Instalando ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg, btop, FUSE 2)...
+[INFO] [dry-run] dnf install -y gh nmap pipx ffmpeg-free btop fuse-libs
+[INFO] Instalando o Gitea CLI (tea)...
+[INFO] [dry-run] baixar https://gitea.com/gitea/tea/releases/download/v0.11.1/tea-0.11.1-linux-amd64.xz -> /tmp/post-install-teste/tea-0.11.1-linux-amd64.xz
+[INFO] [dry-run] xz -df /tmp/post-install-teste/tea-0.11.1-linux-amd64.xz
+[INFO] [dry-run] install -m 0755 /tmp/post-install-teste/tea-0.11.1-linux-amd64 /usr/local/bin/tea
+[OK] Ferramentas de terminal instaladas.
+
+== shell (Zsh e dotfiles)
+[INFO] Configurando o Zsh e os dotfiles para ana...
+[INFO] [dry-run] dnf install -y zsh git curl util-linux
+=> ERRO: zsh não encontrado: exec: "zsh": executable file not found in $PATH
+
+== limpeza (Limpeza final)
+[INFO] Limpando o sistema...
+[INFO] [dry-run] dnf autoremove -y
+[INFO] [dry-run] dnf clean all
+[INFO] [dry-run] rm -rf /tmp/post-install-teste
+[OK] Instalação finalizada com sucesso!
+[INFO] Recomenda-se reiniciar a máquina para aplicar as mudanças de grupo e kernel.
+
+== Consultas que o cenário não responde (falham na máquina falsa)
