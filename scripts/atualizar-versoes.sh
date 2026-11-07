@@ -111,7 +111,9 @@ fi
 
 # Resumo: as entradas que saem e as que entram.
 entradas() { grep -oE '\{Versao: [^}]*\}' "$1" | sed -E 's/[{}]//g' || true; }
-# (o diff sai com 1 quando há diferença, o que é o caso aqui)
+# (o diff sai com 1 quando há diferença, o que é o caso aqui). As crases do
+# sed são Markdown literal para o corpo do PR, não substituição de comando.
+# shellcheck disable=SC2016
 { diff <(entradas "$ARQ") <(entradas "$TMP/versoes.go") || true; } | sed -nE \
     -e 's/^< (.*)/- **sai:** `\1`/p' \
     -e 's/^> (.*)/- **entra:** `\1`/p' | tee -a "$RESUMO"
