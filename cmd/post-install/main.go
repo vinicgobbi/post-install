@@ -188,13 +188,18 @@ func main() {
 
 func run() int {
 	o := parseFlags()
-	all := modules.All()
 
 	if o.version {
 		fmt.Println("post-install", version)
 		return 0
 	}
 	if o.list {
+		// Os módulos da distribuição atual; fora de um sistema suportado,
+		// todos (os do Ubuntu).
+		all := modules.All()
+		if sys, err := sysinfo.Detect(); err == nil {
+			all = modules.Disponiveis(sys)
+		}
 		for i, m := range all {
 			if i == 0 || m.Grupo != all[i-1].Grupo {
 				if i > 0 {
@@ -226,9 +231,13 @@ func run() int {
 		return fail("%v", err)
 	}
 
-	sel, err := initialSelection(all, o.modules, o.skip)
+	all := modules.Disponiveis(sys)
+	sel, avisos, err := initialSelection(all, o.modules, o.skip)
 	if err != nil {
 		return fail("%v", err)
+	}
+	for _, a := range avisos {
+		out.Warn("%s", a)
 	}
 
 	if o.user != "" {
@@ -520,22 +529,30 @@ func exitCode(results []engine.Result) int {
 	return code
 }
 
-// initialSelection marca todos os módulos (ou só os de --modules) e
-// desmarca os de --skip.
-func initialSelection(all []modules.Module, only, skip string) ([]bool, error) {
+// initialSelection marca todos os módulos disponíveis (ou só os de
+// --modules) e desmarca os de --skip. Um ID que existe, mas não nesta
+// distribuição, só gera aviso; um que não existe em lugar nenhum é erro.
+func initialSelection(all []modules.Module, only, skip string) (sel []bool, avisos []string, err error) {
 	ids := make([]string, len(all))
 	for i, m := range all {
 		ids[i] = m.ID
+	}
+	var conhecidos []string
+	for _, m := range modules.All() {
+		conhecidos = append(conhecidos, m.ID)
 	}
 	parse := func(s string) ([]string, error) {
 		var out []string
 		for _, id := range strings.Split(s, ",") {
 			id = strings.TrimSpace(id)
-			if id == "" {
+			switch {
+			case id == "":
 				continue
-			}
-			if !slices.Contains(ids, id) {
+			case !slices.Contains(conhecidos, id):
 				return nil, fmt.Errorf("módulo desconhecido: %q (veja --list)", id)
+			case !slices.Contains(ids, id):
+				avisos = append(avisos, fmt.Sprintf("Módulo %q não está disponível nesta distribuição: ignorado.", id))
+				continue
 			}
 			out = append(out, id)
 		}
@@ -543,17 +560,17 @@ func initialSelection(all []modules.Module, only, skip string) ([]bool, error) {
 	}
 	onlyIDs, err := parse(only)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	skipIDs, err := parse(skip)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	sel := make([]bool, len(all))
+	sel = make([]bool, len(all))
 	for i, id := range ids {
 		sel[i] = (len(onlyIDs) == 0 || slices.Contains(onlyIDs, id)) && !slices.Contains(skipIDs, id)
 	}
-	return sel, nil
+	return sel, avisos, nil
 }
 
 // chownLogs passa os logs desta execução para o usuário alvo.

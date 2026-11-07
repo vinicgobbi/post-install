@@ -1,6 +1,8 @@
 // Package modules contém as etapas da pós-instalação. Cada módulo pertence a
 // um grupo e é autocontido (configura o próprio repositório, se precisar);
-// a ordem de execução é a ordem da lista em All.
+// a ordem de execução é a ordem da lista em All. O Run de cada módulo é o
+// caminho do Ubuntu; a variante do Fedora fica no campo Fedora, e
+// Disponiveis devolve a lista já adaptada à distribuição detectada.
 package modules
 
 import (
@@ -30,7 +32,60 @@ type Module struct {
 	Desc  string
 	// Deps são IDs de módulos que precisam rodar antes deste.
 	Deps []string
-	Run  func(c *Ctx) error
+	// Run é o caminho do Ubuntu.
+	Run func(c *Ctx) error
+	// Fedora é a variante do Fedora Workstation (nil = indisponível nele).
+	Fedora *Variante
+}
+
+// Variante é como o módulo trabalha numa distribuição que não o Ubuntu.
+// Title e Desc vazios e Deps nil herdam os do módulo (Deps vazio, mas não
+// nil, tira as dependências).
+type Variante struct {
+	Title string
+	Desc  string
+	Deps  []string
+	Run   func(c *Ctx) error
+}
+
+// Para devolve o módulo como ele roda na família dada, e se está disponível
+// nela.
+func (m Module) Para(f sysinfo.Familia) (Module, bool) {
+	var v *Variante
+	switch f {
+	case sysinfo.Ubuntu, "":
+		return m, true
+	case sysinfo.Fedora:
+		v = m.Fedora
+	}
+	if v == nil {
+		return Module{}, false
+	}
+	out := m
+	out.Fedora = nil
+	out.Run = v.Run
+	if v.Title != "" {
+		out.Title = v.Title
+	}
+	if v.Desc != "" {
+		out.Desc = v.Desc
+	}
+	if v.Deps != nil {
+		out.Deps = v.Deps
+	}
+	return out, true
+}
+
+// Disponiveis devolve os módulos disponíveis na distribuição, já adaptados
+// a ela, na ordem de All. No Ubuntu é a própria All.
+func Disponiveis(sys *sysinfo.Info) []Module {
+	var out []Module
+	for _, m := range All() {
+		if mm, ok := m.Para(sys.Familia); ok {
+			out = append(out, mm)
+		}
+	}
+	return out
 }
 
 // Ctx é o que cada módulo recebe para trabalhar.
@@ -105,13 +160,29 @@ func All() []Module {
 
 // ---- Helpers de pacotes ----
 
-// install instala pacotes com o apt, de forma não interativa.
+// fedora diz se o sistema é da família Fedora (sem Sys, vale o Ubuntu).
+func (c *Ctx) fedora() bool { return c.Sys != nil && c.Sys.Familia == sysinfo.Fedora }
+
+// install instala pacotes de forma não interativa, com o apt no Ubuntu e o
+// dnf no Fedora. Os nomes são os da distribuição: cada variante passa os
+// seus. Também aceita o caminho de um .deb/.rpm baixado.
 func (c *Ctx) install(pkgs ...string) error {
 	return c.installEnv(nil, pkgs...)
 }
 
 func (c *Ctx) installEnv(env []string, pkgs ...string) error {
+	if c.fedora() {
+		return c.RunEnv(env, "dnf", append([]string{"install", "-y"}, pkgs...)...)
+	}
 	return c.RunEnv(env, "apt", append([]string{"install", "-y"}, pkgs...)...)
+}
+
+// pacoteInstalado consulta o gerenciador de pacotes (dpkg ou rpm).
+func (c *Ctx) pacoteInstalado(pkg string) bool {
+	if c.fedora() {
+		return c.Probe("rpm", "-q", pkg)
+	}
+	return c.Probe("dpkg", "-s", pkg)
 }
 
 // garantir instala pkg se o comando bin ainda não existir (ex.: o curl, que
@@ -144,6 +215,38 @@ func instalarChaveAPT(c *Ctx, url, destino string, fprs ...string) error {
 		func() error { return c.VerifyKey(tmp, fprs...) },
 		func() error { return c.Run("install", "-D", "-m", "0644", tmp, destino) },
 	)
+}
+
+// chavesRPM é onde as chaves dos repositórios RPM ficam, como no Fedora.
+const chavesRPM = "/etc/pki/rpm-gpg"
+
+// instalarChaveRPM baixa a chave de um repositório RPM para chavesRPM, só
+// depois de conferir o fingerprint, e a importa no rpm (o dnf também confere
+// pelo gpgkey do .repo, que deve apontar para o mesmo arquivo).
+func instalarChaveRPM(c *Ctx, url, nome string, fprs ...string) (string, error) {
+	destino := filepath.Join(chavesRPM, nome)
+	tmp := c.Temp(nome)
+	return destino, step(
+		func() error { return c.Download(url, tmp) },
+		func() error { return c.VerifyKey(tmp, fprs...) },
+		func() error { return c.Run("install", "-D", "-m", "0644", tmp, destino) },
+		func() error { return c.Run("rpm", "--import", destino) },
+	)
+}
+
+// repoRPM grava /etc/yum.repos.d/<nome>.repo, com a assinatura dos pacotes
+// conferida pela chave local (gpgkey=file://...).
+func repoRPM(c *Ctx, nome, titulo, baseurl, chave string) error {
+	return c.WriteFile("/etc/yum.repos.d/"+nome+".repo", conteudoRepoRPM(nome, titulo, baseurl, chave), 0o644)
+}
+
+func conteudoRepoRPM(nome, titulo, baseurl, chave string) string {
+	return "[" + nome + "]\n" +
+		"name=" + titulo + "\n" +
+		"baseurl=" + baseurl + "\n" +
+		"enabled=1\n" +
+		"gpgcheck=1\n" +
+		"gpgkey=file://" + chave + "\n"
 }
 
 func (c *Ctx) ensureFlathub() error {

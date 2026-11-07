@@ -168,7 +168,7 @@ func avisarPermissaoOVPN(c *Ctx, arquivo string) {
 
 // O pacote "-gnome" traz o diálogo de autenticação GTK.
 func instalarPluginOpenVPN(c *Ctx) error {
-	if c.Probe("dpkg", "-s", "network-manager-openvpn") {
+	if c.pacoteInstalado("network-manager-openvpn") {
 		return nil
 	}
 	return c.install("network-manager-openvpn", "network-manager-openvpn-gnome")
