@@ -30,6 +30,56 @@
 [INFO] [dry-run] dnf install -y zsh git curl util-linux
 => ERRO: zsh não encontrado: exec: "zsh": executable file not found in $PATH
 
+== firefox_thunderbird (Firefox e Thunderbird)
+[INFO] Instalando o Firefox e o Thunderbird (RPM do Fedora)...
+[INFO] [dry-run] dnf install -y firefox thunderbird
+[OK] Firefox e Thunderbird instalados pelos pacotes do Fedora.
+
+== chrome (Google Chrome)
+[INFO] Instalando o Google Chrome...
+[INFO] [dry-run] baixar https://dl.google.com/linux/linux_signing_key.pub -> /tmp/post-install-teste/google-linux-signing-key.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/google-linux-signing-key.asc /etc/pki/rpm-gpg/google-linux-signing-key.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/google-chrome-post-install.repo (190 bytes)
+[INFO] [dry-run] dnf install -y google-chrome-stable
+[OK] Google Chrome instalado.
+
+== bitwarden (Bitwarden)
+[INFO] Instalando Bitwarden nativo (integração com navegador)...
+[INFO] [dry-run] baixar https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=rpm -> /tmp/post-install-teste/bitwarden.rpm
+[INFO] [dry-run] dnf install -y /tmp/post-install-teste/bitwarden.rpm
+[OK] Bitwarden instalado nativamente.
+
+== remover_libreoffice (Remover LibreOffice nativo)
+[INFO] Removendo LibreOffice pré-instalado...
+[INFO] [dry-run] dnf remove -y libreoffice*
+[OK] LibreOffice nativo removido.
+
+== flatpaks (Flatpaks)
+[INFO] Configurando Flatpak e instalando apps...
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub com.getpostman.Postman com.github.tchx84.Flatseal com.mattjakeman.ExtensionManager com.obsproject.Studio com.spotify.Client dev.vencord.Vesktop io.dbeaver.DBeaverCommunity io.ente.auth io.github.flattool.Ignition io.github.flattool.Warehouse io.missioncenter.MissionCenter md.obsidian.Obsidian org.filezillaproject.Filezilla org.gaphor.Gaphor org.gnome.Boxes org.libreoffice.LibreOffice org.onlyoffice.desktopeditors org.qbittorrent.qBittorrent org.remmina.Remmina org.telegram.desktop org.videolan.VLC me.iepure.devtoolbox com.rtosta.zapzap be.alexandervanhee.gradia org.gnome.Snapshot org.gnome.Weather net.blip.Blip
+[OK] Aplicativos Flatpak instalados.
+
+== flatpaks_jogos (Flatpaks de jogos)
+[INFO] Instalando Flatpaks de jogos...
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub com.heroicgameslauncher.hgl com.valvesoftware.Steam com.vysp3r.ProtonPlus org.prismlauncher.PrismLauncher
+[OK] Flatpaks de jogos instalados.
+
+== solaar (Solaar (Logitech))
+[INFO] Instalando o Solaar pelos pacotes do Fedora...
+[INFO] [dry-run] dnf install -y solaar solaar-udev
+[OK] Solaar instalado pelos pacotes do Fedora.
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; mkdir -p "$HOME/.config/autostart"; for desktop in /usr/share/applications/solaar.desktop \; /var/lib/flatpak/exports/share/applications/io.github.pwr_solaar.solaar.desktop; do; if [ -f "$desktop" ]; then; destino="$HOME/.config/autostart/$(basename "$desktop")"; cp "$desktop" "$destino"; sed -i -E '/^Exec=/{/ -w hide$/! s/$/ -w hide/}' "$destino"; break; fi; done'
+[INFO] Configurando regras UDEV para o Solaar (regra do Solaar <solaarTag>)...
+[INFO] [dry-run] escrever /etc/udev/rules.d/42-logitech-unify-permissions.rules (<regraSolaar> bytes)
+[INFO] [dry-run] udevadm control --reload-rules
+[INFO] [dry-run] udevadm trigger --subsystem-match=usb
+[INFO] [dry-run] udevadm trigger --subsystem-match=hidraw
+[OK] Regras UDEV do Solaar configuradas.
+
 == limpeza (Limpeza final)
 [INFO] Limpando o sistema...
 [INFO] [dry-run] dnf autoremove -y
