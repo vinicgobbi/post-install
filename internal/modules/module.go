@@ -221,8 +221,10 @@ func instalarChaveAPT(c *Ctx, url, destino string, fprs ...string) error {
 const chavesRPM = "/etc/pki/rpm-gpg"
 
 // instalarChaveRPM baixa a chave de um repositório RPM para chavesRPM, só
-// depois de conferir o fingerprint, e a importa no rpm (o dnf também confere
-// pelo gpgkey do .repo, que deve apontar para o mesmo arquivo).
+// depois de conferir o fingerprint. O dnf a importa sozinho na primeira
+// instalação pelo repositório (gpgkey do .repo, veja repoRPM). Não usa
+// "rpm --import": ele pode ler só a primeira chave de um arquivo com várias
+// (ex.: o do GitHub CLI, em que a primeira é a antiga, expirada).
 func instalarChaveRPM(c *Ctx, url, nome string, fprs ...string) (string, error) {
 	destino := filepath.Join(chavesRPM, nome)
 	tmp := c.Temp(nome)
@@ -230,7 +232,6 @@ func instalarChaveRPM(c *Ctx, url, nome string, fprs ...string) (string, error) 
 		func() error { return c.Download(url, tmp) },
 		func() error { return c.VerifyKey(tmp, fprs...) },
 		func() error { return c.Run("install", "-D", "-m", "0644", tmp, destino) },
-		func() error { return c.Run("rpm", "--import", destino) },
 	)
 }
 

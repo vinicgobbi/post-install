@@ -71,7 +71,6 @@ func TestRepositorioRPM(t *testing.T) {
 	want := []string{
 		"[dry-run] baixar https://exemplo.test/chave.asc -> /tmp/teste/exemplo.asc",
 		"[dry-run] install -D -m 0644 /tmp/teste/exemplo.asc /etc/pki/rpm-gpg/exemplo.asc",
-		"[dry-run] rpm --import /etc/pki/rpm-gpg/exemplo.asc",
 		"[dry-run] escrever /etc/yum.repos.d/exemplo.repo (120 bytes)",
 	}
 	if !slices.Equal(*linhas, want) {
