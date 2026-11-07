@@ -56,6 +56,9 @@ type options struct {
 	gnomeDir string
 	forceExt string
 	noUpdate bool
+	// allowUntested aceita rodar numa versão da distro mais nova que as
+	// testadas, sem perguntar.
+	allowUntested bool
 }
 
 func parseFlags() options {
@@ -75,6 +78,7 @@ func parseFlags() options {
 	flag.StringVar(&o.gnomeDir, "gnome-dir", "", "pasta com extensoes.txt e extensoes.dconf (padrão: GNOME/ ao lado do binário)")
 	flag.StringVar(&o.forceExt, "force-extensions", "", "extensões do GNOME sem versão compatível a instalar mesmo assim (UUIDs separados por vírgula, ou \"none\"); sem ela, pergunta")
 	flag.BoolVar(&o.noUpdate, "no-update-check", false, "não verificar se há uma versão mais nova do post-install")
+	flag.BoolVar(&o.allowUntested, "allow-untested-version", false, "aceitar, sem perguntar, rodar numa versão da distribuição mais nova que as testadas (por sua conta e risco)")
 	flag.StringVar(&o.logDir, "log-dir", "", "pasta onde os logs da execução são gravados (padrão: logs/ ao lado do binário)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Uso: sudo %s [opções]\n\nOpções:\n", os.Args[0])
@@ -271,6 +275,9 @@ func run() int {
 	start := func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) []engine.Result {
 		log.SetSink(func(e runlog.Entry) { emit(e) })
 		log.Infof("Sistema detectado: %s", sys.Summary())
+		if sys.NaoTestada {
+			log.Warnf("Versão não testada (testadas: %s): execução aceita por conta e risco do usuário.", strings.Join(sys.Testadas, ", "))
+		}
 		log.Infof("Configuração será aplicada para: %s", esc.User)
 		if log.CleanPath != "" {
 			log.Infof("Log desta execução: %s", log.CleanPath)
@@ -330,6 +337,7 @@ func runTUI(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p pr
 		ForcarExtensoes:  p.esc.ForcarExtensoes,
 		ExtChosen:        p.extChosen,
 		LogPaths:         []string{log.CleanPath, log.RawPath},
+		VersaoAceita:     o.allowUntested,
 		Start: func(ctx context.Context, esc modules.Escolhas, mods []modules.Module, emit func(any)) {
 			start(ctx, esc, mods, emit)
 		},
@@ -372,6 +380,10 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p 
 		if code, sair := oferecerAtualizacao(o, p.upd, out, stdinTTY); sair {
 			return code
 		}
+	}
+
+	if code, sair := confirmarVersaoNaoTestada(o, sys, out, stdinTTY); sair {
+		return code
 	}
 
 	esc := p.esc
@@ -442,6 +454,28 @@ func runPlain(o options, sys *sysinfo.Info, all []modules.Module, sel []bool, p 
 	fmt.Println()
 	fmt.Println(tui.Summary(results, elapsed.Elapsed, nil))
 	return exitCode(results)
+}
+
+// confirmarVersaoNaoTestada pede (modo texto) a confirmação para seguir numa
+// versão da distribuição mais nova que as testadas. O aviso em si já saiu
+// com os demais de sys.Warnings. Sem terminal, só segue com --yes ou
+// --allow-untested-version; no dry-run, que não altera nada, não pergunta.
+func confirmarVersaoNaoTestada(o options, sys *sysinfo.Info, out *plain.Printer, stdinTTY bool) (code int, sair bool) {
+	switch {
+	case !sys.NaoTestada || o.dryRun || o.allowUntested:
+		return 0, false
+	case stdinTTY:
+		if confirm("Continuar mesmo assim, aceitando os riscos?") {
+			return 0, false
+		}
+		out.Warn("Operação cancelada pelo usuário.")
+		return 0, true
+	case o.yes:
+		out.Warn("--yes sem terminal interativo: seguindo na versão não testada, por sua conta e risco.")
+		return 0, false
+	}
+	out.Handle(runlog.Entry{Level: runlog.Error, Text: "Sem terminal interativo: para seguir numa versão não testada, use --allow-untested-version (ou --yes)."})
+	return 1, true
 }
 
 // oferecerAtualizacao pergunta (modo texto) se atualiza para a versão nova.

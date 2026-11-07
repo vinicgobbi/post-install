@@ -14,15 +14,28 @@ VSCode"/"Copiar caminho" no Nautilus.
 ## Sistemas suportados
 
 Só o **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o
-`gnome-shell` instalado), nas versões **22.04 (jammy), 24.04 (noble) e
-26.04 (resolute)**, além das mais novas que a 26.04.
+`gnome-shell` instalado), nas **LTS com suporte padrão** — hoje **22.04
+(jammy), 24.04 (noble) e 26.04 (resolute)**. O suporte ao **Fedora
+Workstation** está em desenvolvimento: ele já é reconhecido, mas o programa
+ainda o recusa.
+
+A lista de versões fica em
+[`internal/sysinfo/versoes.go`](internal/sysinfo/versoes.go) e é mantida
+pelo workflow `versoes.yml` (veja [Versões suportadas](#versões-suportadas)).
 
 Qualquer outro sistema faz o programa parar com uma mensagem clara em vez de
 continuar em um estado incerto — inclusive derivados do Ubuntu (Linux Mint,
-Pop!_OS, Zorin...), sabores com outro desktop (Kubuntu, Xubuntu...) e versões
-anteriores à 22.04 ou interinas entre as LTS suportadas. Versões mais novas
-que a 26.04 usam o repositório da Microsoft do 26.04 (compatível), com um
-aviso.
+Pop!_OS, Zorin...), sabores com outro desktop (Kubuntu, Xubuntu...), versões
+fora do suporte padrão ou interinas entre as LTS suportadas, e as variantes
+atômicas do Fedora (Silverblue, Kinoite).
+
+**Versões mais novas que as da lista** (ex.: o Ubuntu 26.10, ou uma LTS que
+saiu depois da release do post-install) podem funcionar, mas não foram
+testadas: o programa avisa e pede confirmação antes de seguir (na TUI, uma
+tela com "Sair" como padrão; no modo texto, `[s/N]`). Sem terminal
+interativo, segue só com `--allow-untested-version` ou `--yes`; no
+`--dry-run`, que não altera nada, só avisa. Nelas, o Ubuntu usa o
+repositório da Microsoft da última LTS da lista (compatível).
 
 ### Firefox e Thunderbird sem snap
 
@@ -204,6 +217,7 @@ dele, que são pulados. Use `--fail-fast` para parar tudo no primeiro erro.
 | `--wallpaper NOME` | papel de parede a aplicar (nome do arquivo, ou `none` para não alterar); sem ela, a TUI pergunta |
 | `--ovpn-dir` / `--wallpapers-dir` / `--gnome-dir` / `--log-dir` | pastas de `.ovpn`, papéis de parede, configurações do GNOME e logs (padrão: `OVPN/`, `Wallpapers/`, `GNOME/` e `logs/` ao lado do binário) |
 | `--no-update-check` | não verifica se há versão nova do post-install |
+| `--allow-untested-version` | segue, sem perguntar, numa versão da distribuição mais nova que as testadas (por sua conta e risco) |
 | `--version` | mostra a versão |
 
 Sem terminal interativo (pipe, CI), o programa usa o modo texto
@@ -335,12 +349,33 @@ golden. Os arquivos de `GNOME/` usados nos testes são fixtures próprias, em
 `sysinfo.Detect` lê `/etc/os-release`, recusa o que não for suportado (veja
 [Sistemas suportados](#sistemas-suportados)) e preenche:
 
+- `Familia` — `ubuntu` ou `fedora` (este só com `VARIANT_ID=workstation`)
 - `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`), usado
-  na URL do repositório do Tailscale e no teste de mirrors
+  na URL do repositório do Tailscale e no teste de mirrors; vazio no Fedora
 - `MSRepoVersion` — a versão nas URLs do repositório da Microsoft
-  (msodbcsql/mssql-tools): a própria versão nas LTS suportadas, `26.04` nas
-  mais novas
+  (msodbcsql/mssql-tools), tirada de `versoes.go`: no Ubuntu, a da própria LTS
+  (ou a da última da lista, nas mais novas); no Fedora, a do RHEL
+- `NaoTestada` — versão mais nova que todas as de `versoes.go` (pede
+  confirmação)
 - `Arch` — `dpkg --print-architecture`
+
+### Versões suportadas
+
+`internal/sysinfo/versoes.go` lista, da mais antiga para a mais nova:
+
+- **Ubuntu:** as LTS com suporte padrão (sem contar o ESM pago), pelas datas
+  do [`distro-info-data`](https://salsa.debian.org/debian/distro-info-data)
+  (a mesma fonte do `ubuntu-distro-info --supported`);
+- **Fedora:** as versões em manutenção, pela API do
+  [Bodhi](https://bodhi.fedoraproject.org/releases/) (fim de vida ainda não
+  alcançado);
+- para cada uma, a versão do repositório da Microsoft a usar, conferindo se
+  ele já existe em `packages.microsoft.com`.
+
+O workflow `versoes.yml` roda o `scripts/atualizar-versoes.sh` toda semana
+(ou à mão) e abre um PR na `development` quando a lista muda — uma versão
+nova entra, uma fora de suporte sai. A mudança só chega às máquinas na
+próxima release do post-install.
 
 O GNOME é conferido pelo binário `gnome-shell`, e não por
 `XDG_CURRENT_DESKTOP`: o sudo costuma limpar essa variável.
