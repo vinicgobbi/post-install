@@ -26,8 +26,11 @@ var pacotesFerramentasFedora = []string{"gh", "nmap", "pipx", "ffmpeg-free", "bt
 // instalarFerramentas tenta tudo numa chamada só; se falhar (algum pacote
 // ausente na versão), instala um por um e só avisa dos que faltarem, sem
 // derrubar o módulo.
-func instalarFerramentas(c *Ctx, nomes string, pkgs []string) {
+//
+// pacotes é chamada depois da mensagem: no Ubuntu, ela consulta o apt-cache.
+func instalarFerramentas(c *Ctx, nomes string, pacotes func(*Ctx) []string) {
 	c.Log.Infof("Instalando ferramentas de terminal (%s)...", nomes)
+	pkgs := pacotes(c)
 	if c.install(pkgs...) == nil {
 		return
 	}
@@ -114,7 +117,7 @@ var ferramentas = Module{
 		if err != nil {
 			return err
 		}
-		instalarFerramentas(c, "gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2", pacotesFerramentas(c))
+		instalarFerramentas(c, "gh, tea, nmap, pipx, ffmpeg, bashtop, FUSE 2", pacotesFerramentas)
 		instalarTeaOuAvisar(c)
 
 		// No Ubuntu o "bat" instala o binário como "batcat" por conflito de
@@ -140,7 +143,7 @@ var ferramentas = Module{
 			if err != nil {
 				return err
 			}
-			instalarFerramentas(c, "gh, tea, nmap, pipx, ffmpeg, btop, FUSE 2", pacotesFerramentasFedora)
+			instalarFerramentas(c, "gh, tea, nmap, pipx, ffmpeg, btop, FUSE 2", func(*Ctx) []string { return pacotesFerramentasFedora })
 			instalarTeaOuAvisar(c)
 			c.Log.Successf("Ferramentas de terminal instaladas.")
 			return nil
