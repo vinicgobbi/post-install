@@ -118,3 +118,51 @@ func TestGcmTarGz(t *testing.T) {
 		}
 	}
 }
+
+// O formato com "|" e "sistema" resolve a mesma lista para cada distribuição.
+func TestListaExtensoesPorDistro(t *testing.T) {
+	lista := `# comentário
+comum@exemplo.test
+ubuntu-dock@ubuntu.com | dash-to-dock@micxgx.gmail.com
+a@ubuntu.com|b@exemplo.test|c@exemplo.test
+snapd-prompting@canonical.com sistema
+ | 
+git@exemplo.test https://git.exemplo.test/x.git abc123
+-ding@rastersoft.com
+`
+	maquina := func(sistema ...string) *runner.Runner {
+		fs := fstest.MapFS{"lista.txt": {Data: []byte(lista)}}
+		for _, uuid := range sistema {
+			fs["usr/share/gnome-shell/extensions/"+uuid+"/metadata.json"] = &fstest.MapFile{Data: []byte("{}")}
+		}
+		return &runner.Runner{Host: &hostFalso{arquivos: fs, semResposta: map[string]bool{}}}
+	}
+
+	// Ubuntu: as do sistema entram, e nenhuma equivalente é baixada.
+	ativar, desativar, git, err := lerListaExtensoes(maquina("ubuntu-dock@ubuntu.com", "a@ubuntu.com", "snapd-prompting@canonical.com"), "/lista.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"comum@exemplo.test", "ubuntu-dock@ubuntu.com", "a@ubuntu.com", "snapd-prompting@canonical.com", "git@exemplo.test"}; !slices.Equal(ativar, want) {
+		t.Errorf("Ubuntu: ativar = %v, esperado %v", ativar, want)
+	}
+	if !slices.Equal(desativar, []string{"ding@rastersoft.com"}) || git["git@exemplo.test"].Ref != "abc123" || len(git) != 1 {
+		t.Errorf("Ubuntu: desativar = %v, git = %v", desativar, git)
+	}
+
+	// Fedora: sem nada do sistema, entra a última de cada linha com "|", e
+	// a marcada "sistema" fica de fora.
+	ativar, _, _, err = lerListaExtensoes(maquina(), "/lista.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"comum@exemplo.test", "dash-to-dock@micxgx.gmail.com", "c@exemplo.test", "git@exemplo.test"}; !slices.Equal(ativar, want) {
+		t.Errorf("Fedora: ativar = %v, esperado %v", ativar, want)
+	}
+
+	// A primeira que vier com o sistema ganha, mesmo que não seja a primeira da linha.
+	ativar, _, _, _ = lerListaExtensoes(maquina("b@exemplo.test"), "/lista.txt")
+	if !slices.Contains(ativar, "b@exemplo.test") || slices.Contains(ativar, "c@exemplo.test") {
+		t.Errorf("alternativa do sistema não escolhida: %v", ativar)
+	}
+}

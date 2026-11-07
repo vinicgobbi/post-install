@@ -72,6 +72,7 @@ var appsGnome = Module{
 		c.Log.Successf("Favoritos e pastas do menu de apps aplicados.")
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // ---- Configuração ----

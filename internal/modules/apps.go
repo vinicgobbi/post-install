@@ -142,7 +142,7 @@ func instalarSolaar(c *Ctx) error {
 }
 
 func instalarSolaarFlatpak(c *Ctx) error {
-	if err := step(c.ensureFlathub, func() error { return c.flatpakInstall("io.github.pwr_solaar.solaar") }); err != nil {
+	if err := step(c.garantirFlathub, func() error { return c.flatpakInstall("io.github.pwr_solaar.solaar") }); err != nil {
 		return err
 	}
 	c.Log.Successf("Solaar instalado via Flatpak.")

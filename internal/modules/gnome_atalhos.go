@@ -26,6 +26,7 @@ var atalhosGnome = Module{
 		c.Log.Successf("Atalhos do GNOME aplicados.")
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // garantirFlatpak instala um app chamado por atalho (ex.: o Gradia, que
@@ -41,5 +42,5 @@ func garantirFlatpak(c *Ctx, app, nome string) error {
 			return err
 		}
 	}
-	return step(c.ensureFlathub, func() error { return c.flatpakInstall(app) })
+	return step(c.garantirFlathub, func() error { return c.flatpakInstall(app) })
 }

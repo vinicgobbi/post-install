@@ -263,17 +263,22 @@ func fedoraLimpo(t *testing.T, versao string) cenario {
 		},
 		binarios: map[string]bool{"gnome-shell": true, "gnome-extensions": true, "flatpak": true, "git": true, "curl": true},
 		comandos: map[string]string{
-			"getent -s files passwd ana":          "ana:x:1000:1000:Ana:/home/ana:/bin/bash\n",
-			"getent passwd ana":                   "ana:x:1000:1000:Ana:/home/ana:/bin/bash\n",
-			"id -u ana":                           "1000\n",
-			"gnome-shell --version":               "GNOME Shell 50.1\n",
-			"rpm -q NetworkManager-openvpn-gnome": "NetworkManager-openvpn-gnome-1.12.5-1.fc44.x86_64\n",
-			"getent group kvm":                    "kvm:x:36:qemu\n",
-			"nmcli -g NAME,TYPE connection show":  "Wired connection 1:802-3-ethernet\n",
-			"rpm -qa libreoffice*":                "libreoffice-core-26.8.1.1-1.fc44.x86_64\nlibreoffice-writer-26.8.1.1-1.fc44.x86_64\n",
+			"getent -s files passwd ana": "ana:x:1000:1000:Ana:/home/ana:/bin/bash\n",
+			"getent passwd ana":          "ana:x:1000:1000:Ana:/home/ana:/bin/bash\n",
+			"id -u ana":                  "1000\n",
+			"gnome-shell --version":      "GNOME Shell 50.1\n",
+			"[ana] gsettings get org.gnome.shell enabled-extensions":  "@as []\n",
+			"[ana] gsettings get org.gnome.shell disabled-extensions": "@as []\n",
+			"rpm -q NetworkManager-openvpn-gnome":                     "NetworkManager-openvpn-gnome-1.12.5-1.fc44.x86_64\n",
+			"getent group kvm":                                        "kvm:x:36:qemu\n",
+			"nmcli -g NAME,TYPE connection show":                      "Wired connection 1:802-3-ethernet\n",
+			"rpm -qa libreoffice*":                                    "libreoffice-core-26.8.1.1-1.fc44.x86_64\nlibreoffice-writer-26.8.1.1-1.fc44.x86_64\n",
 		},
 		http: map[string]string{
 			"https://gitea.com/api/v1/repos/gitea/tea/releases/latest":                               `{"tag_name":"v0.11.1"}`,
+			"https://extensions.gnome.org/extension-info/?uuid=compativel%40exemplo.test":            `{"shell_version_map":{"50":{"pk":101},"40":{"pk":11}}}`,
+			"https://extensions.gnome.org/extension-info/?uuid=incompativel%40exemplo.test":          `{"shell_version_map":{"40":{"pk":22},"41":{"pk":23}}}`,
+			"https://extensions.gnome.org/extension-info/?uuid=dash-to-dock%40micxgx.gmail.com":      `{"shell_version_map":{"50":{"pk":301},"49":{"pk":300}}}`,
 			"https://gitea.com/gitea/tea/releases/download/v0.11.1/tea-0.11.1-linux-amd64.xz.sha256": sha + "  tea-0.11.1-linux-amd64.xz\n",
 			"https://api.github.com/repos/git-ecosystem/git-credential-manager/releases/latest": `{"assets":[
 				{"name":"gcm-linux-x64-3.0.2-symbols.tar.gz","browser_download_url":"https://github.com/git-ecosystem/git-credential-manager/releases/download/v3.0.2/gcm-linux-x64-3.0.2-symbols.tar.gz","digest":"sha256:` + sha + `"},
@@ -284,6 +289,13 @@ func fedoraLimpo(t *testing.T, versao string) cenario {
 				{"name":"deploy-dev-linux-amd64.sha256","browser_download_url":"https://github.com/vinicgobbi/deploy-tools/releases/download/v1.0.0/deploy-dev-linux-amd64.sha256","digest":""}]}`,
 		},
 		semResposta: map[string]bool{},
+	}
+	for _, nome := range []string{"extensoes.txt", "extensoes.dconf", "atalhos.dconf", "favoritos.txt", "pastas.txt"} {
+		b, err := os.ReadFile(filepath.Join("testdata/gnome", nome))
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.arquivos[strings.TrimPrefix(dirPacote, "/")+"/GNOME/"+nome] = arq(string(b))
 	}
 	return cenario{nome: "fedora-" + versao + "-limpo", sys: sys, host: h, wallpaper: dirPacote + "/Wallpapers/paisagem.jpg"}
 }

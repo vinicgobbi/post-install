@@ -8,7 +8,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
+	"github.com/vinicgobbi/post-install/internal/runner"
 	"github.com/vinicgobbi/post-install/internal/sysinfo"
 )
 
@@ -80,12 +82,43 @@ func TestUsaFormatoDeb822(t *testing.T) {
 	}
 }
 
+// A lista real (GNOME/extensoes.txt) resolvida numa máquina falsa com as
+// extensões que o Ubuntu traz, e numa sem nenhuma (o Fedora): o resultado
+// não pode depender de onde o teste roda.
 func TestLerListaExtensoes(t *testing.T) {
-	ativar, desativar, git, err := lerListaExtensoes(maquinaReal, "../../GNOME/extensoes.txt")
+	real, err := os.ReadFile("../../GNOME/extensoes.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ativar) != 15 || !slices.Contains(ativar, "gsconnect@andyholmes.github.io") || !slices.Contains(ativar, "ubuntu-dock@ubuntu.com") {
+	maquina := func(sistema ...string) *runner.Runner {
+		fs := fstest.MapFS{"lista.txt": {Data: real}}
+		for _, uuid := range sistema {
+			fs["usr/share/gnome-shell/extensions/"+uuid+"/metadata.json"] = &fstest.MapFile{Data: []byte("{}")}
+		}
+		return &runner.Runner{Host: &hostFalso{arquivos: fs, semResposta: map[string]bool{}}}
+	}
+	doUbuntu := []string{"snapd-prompting@canonical.com", "snapd-search-provider@canonical.com", "tiling-assistant@ubuntu.com",
+		"ubuntu-appindicators@ubuntu.com", "ubuntu-dock@ubuntu.com", "web-search-provider@ubuntu.com", "ding@rastersoft.com"}
+
+	fedora, _, _, err := lerListaExtensoes(maquina(), "/lista.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, uuid := range []string{"dash-to-dock@micxgx.gmail.com", "appindicatorsupport@rgcjonas.gmail.com", "tiling-assistant@leleat-on-github"} {
+		if !slices.Contains(fedora, uuid) {
+			t.Errorf("Fedora sem %s: %v", uuid, fedora)
+		}
+	}
+	if slices.ContainsFunc(fedora, func(u string) bool { return slices.Contains(doUbuntu, u) }) || len(fedora) != 12 {
+		t.Errorf("Fedora com extensões do Ubuntu ou contagem errada: %v", fedora)
+	}
+
+	ativar, desativar, git, err := lerListaExtensoes(maquina(doUbuntu...), "/lista.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ativar) != 15 || !slices.Contains(ativar, "gsconnect@andyholmes.github.io") || !slices.Contains(ativar, "ubuntu-dock@ubuntu.com") ||
+		slices.Contains(ativar, "dash-to-dock@micxgx.gmail.com") {
 		t.Errorf("ativar = %v", ativar)
 	}
 	if !slices.Equal(desativar, []string{"ding@rastersoft.com"}) {

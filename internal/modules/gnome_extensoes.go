@@ -115,6 +115,7 @@ var extensoesGnome = Module{
 		c.Log.Successf("%d extensões ativadas e configuradas (as novas carregam no próximo login).", len(instaladas))
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // extGit é a origem de uma extensão instalada de um repositório git. Ref é o
@@ -127,7 +128,13 @@ type extGit struct {
 // lerListaExtensoes lê o arquivo de UUIDs: uma por linha, "#" comenta, o
 // prefixo "-" marca extensões a manter desativadas e uma URL depois do UUID
 // (opcionalmente seguida de um commit/tag) indica o repositório git de onde
-// instalar (devolvido em git, por UUID).
+// instalar (devolvido em git, por UUID). Duas marcações servem a mais de
+// uma distribuição com a mesma lista, resolvidas aqui contra a máquina lida
+// por a:
+//   - "a | b": equivalentes (ex.: a dock do Ubuntu e o Dash to Dock). A
+//     primeira que vier com o sistema entra; se nenhuma vier, entra a
+//     última, baixada do extensions.gnome.org;
+//   - "uuid sistema": só entra se vier com o sistema; nunca é baixada.
 func lerListaExtensoes(a arquivos, path string) (ativar, desativar []string, git map[string]extGit, err error) {
 	data, err := a.ReadFile(path)
 	if err != nil {
@@ -143,7 +150,19 @@ func lerListaExtensoes(a arquivos, path string) (ativar, desativar []string, git
 			desativar = append(desativar, strings.TrimSpace(uuid))
 			continue
 		}
+		if strings.Contains(linha, "|") {
+			if uuid, ok := escolherAlternativa(a, strings.Split(linha, "|")); ok {
+				ativar = append(ativar, uuid)
+			}
+			continue
+		}
 		campos := strings.Fields(linha)
+		if len(campos) == 2 && campos[1] == "sistema" {
+			if extensaoDoSistema(a, campos[0]) {
+				ativar = append(ativar, campos[0])
+			}
+			continue
+		}
 		ativar = append(ativar, campos[0])
 		if len(campos) > 1 {
 			if git == nil {
@@ -157,6 +176,27 @@ func lerListaExtensoes(a arquivos, path string) (ativar, desativar []string, git
 		}
 	}
 	return ativar, desativar, git, sc.Err()
+}
+
+// escolherAlternativa fica com a primeira das equivalentes que vier com o
+// sistema ou, se nenhuma vier, com a última (a do extensions.gnome.org).
+// Numa linha sem nenhum UUID (só "|"), não há o que escolher.
+func escolherAlternativa(a arquivos, alts []string) (string, bool) {
+	var limpas []string
+	for _, alt := range alts {
+		if alt = strings.TrimSpace(alt); alt != "" {
+			limpas = append(limpas, alt)
+		}
+	}
+	if len(limpas) == 0 {
+		return "", false
+	}
+	for _, alt := range limpas {
+		if extensaoDoSistema(a, alt) {
+			return alt, true
+		}
+	}
+	return limpas[len(limpas)-1], true
 }
 
 // versaoGnomeShell devolve a versão maior do GNOME Shell ("50"), que é o que

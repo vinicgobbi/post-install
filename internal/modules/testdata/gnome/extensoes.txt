@@ -9,6 +9,8 @@ incompativel@exemplo.test
 comcommit@exemplo.test https://git.exemplo.test/comcommit.git 0123456789abcdef0123456789abcdef01234567
 semcommit@exemplo.test https://git.exemplo.test/semcommit.git
 
-# Vem com o sistema (só ativada) e desativada
-ubuntu-dock@ubuntu.com
+# Vem com o sistema (só ativada) ou equivalente baixada; só do sistema;
+# desativada
+ubuntu-dock@ubuntu.com | dash-to-dock@micxgx.gmail.com
+snapd-prompting@canonical.com sistema
 -ding@rastersoft.com

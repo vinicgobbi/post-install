@@ -282,6 +282,15 @@ func (c *Ctx) ensureFlathubFedora() error {
 	})
 }
 
+// garantirFlathub cadastra o Flathub (no Fedora, também o ativa e tira o
+// filtro).
+func (c *Ctx) garantirFlathub() error {
+	if c.fedora() {
+		return c.ensureFlathubFedora()
+	}
+	return c.ensureFlathub()
+}
+
 func (c *Ctx) flatpakInstall(apps ...string) error {
 	if len(apps) == 0 {
 		return nil

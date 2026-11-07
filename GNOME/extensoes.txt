@@ -6,6 +6,13 @@
 # Depois da URL, opcionalmente, o commit (ou tag) a instalar — recomendado,
 # para uma mudança na branch principal não chegar sozinha às instalações.
 # Prefixo "-" = manter desativada (ex.: extensões que vêm com o Ubuntu).
+#
+# A mesma lista serve ao Ubuntu e ao Fedora:
+# - "a | b": equivalentes. A primeira que vier com o sistema é ativada; se
+#   nenhuma vier, a ÚLTIMA da linha é baixada do extensions.gnome.org (ex.: a
+#   dock do Ubuntu e, no Fedora, o Dash to Dock, que usa as mesmas
+#   preferências de extensoes.dconf);
+# - "uuid sistema": só é ativada se vier com o sistema; nunca é baixada.
 
 # extensions.gnome.org
 AlphabeticalAppGrid@stuarthayhurst
@@ -20,11 +27,12 @@ lockkeys@vaina.lt
 # Repositório git
 nowbar@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowbar.git 49a8e3aa84dfa80fcbcd9462a4a7ecc4fa25aca0
 
-# Vêm com o Ubuntu (só são ativadas/desativadas se existirem no sistema)
-snapd-prompting@canonical.com
-snapd-search-provider@canonical.com
-tiling-assistant@ubuntu.com
-ubuntu-appindicators@ubuntu.com
-ubuntu-dock@ubuntu.com
-web-search-provider@ubuntu.com
+# Vêm com o Ubuntu ("sistema": só existem nele; com "|": no Fedora, entra a
+# equivalente do extensions.gnome.org)
+snapd-prompting@canonical.com       sistema
+snapd-search-provider@canonical.com sistema
+tiling-assistant@ubuntu.com         | tiling-assistant@leleat-on-github
+ubuntu-appindicators@ubuntu.com     | appindicatorsupport@rgcjonas.gmail.com
+ubuntu-dock@ubuntu.com              | dash-to-dock@micxgx.gmail.com
+web-search-provider@ubuntu.com      sistema
 -ding@rastersoft.com

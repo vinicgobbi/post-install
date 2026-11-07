@@ -194,6 +194,62 @@
 [INFO] [dry-run] usermod -aG kvm ana
 [OK] virt-manager instalado. 'ana' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).
 
+== temas_yaru (Ícones Yaru e tema adw-gtk3)
+[INFO] Instalando os ícones Yaru e o tema adw-gtk3...
+[INFO] [dry-run] dnf install -y yaru-icon-theme adw-gtk3-theme
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub org.gtk.Gtk3theme.adw-gtk3 org.gtk.Gtk3theme.adw-gtk3-dark
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark"; gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"'
+[OK] Ícones Yaru-dark e tema adw-gtk3-dark aplicados (nos apps Flatpak, a partir da próxima abertura de cada app).
+
+== papel_parede (Papel de parede)
+[INFO] Aplicando o papel de parede 'paisagem.jpg'...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; install -D -m 0644 '/opt/post-install/Wallpapers/paisagem.jpg' '/home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.gnome.desktop.background picture-uri 'file:///home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.gnome.desktop.background picture-uri-dark 'file:///home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.gnome.desktop.background picture-options 'zoom''
+[OK] Papel de parede aplicado: /home/ana/.local/share/backgrounds/paisagem.jpg
+
+== extensoes_gnome (Extensões do GNOME)
+[INFO] Instalando extensões do GNOME (GNOME Shell 50)...
+[INFO] [dry-run] baixar https://extensions.gnome.org/download-extension/compativel@exemplo.test.shell-extension.zip?version_tag=101 -> /tmp/post-install-teste/compativel@exemplo.test.zip
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gnome-extensions install --force '/tmp/post-install-teste/compativel@exemplo.test.zip''
+[OK] Extensão compativel@exemplo.test instalada.
+[AVISO] incompativel@exemplo.test não tem versão para o GNOME Shell 50 (última suportada: 41): não será instalada automaticamente.
+[INFO] [dry-run] dnf install -y make
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git init --quiet "$dir"; git -C "$dir" fetch --quiet --depth 1 'https://git.exemplo.test/comcommit.git' '0123456789abcdef0123456789abcdef01234567'; git -C "$dir" -c advice.detachedHead=false checkout --quiet FETCH_HEAD; make -C "$dir" install'
+[OK] Extensão comcommit@exemplo.test instalada de https://git.exemplo.test/comcommit.git.
+[AVISO] semcommit@exemplo.test: sem commit fixado em extensoes.txt — instalando o que estiver na branch principal de https://git.exemplo.test/semcommit.git.
+[INFO] [dry-run] dnf install -y make
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git init --quiet "$dir"; git -C "$dir" fetch --quiet --depth 1 'https://git.exemplo.test/semcommit.git' 'HEAD'; git -C "$dir" -c advice.detachedHead=false checkout --quiet FETCH_HEAD; make -C "$dir" install'
+[OK] Extensão semcommit@exemplo.test instalada de https://git.exemplo.test/semcommit.git.
+[INFO] [dry-run] baixar https://extensions.gnome.org/download-extension/dash-to-dock@micxgx.gmail.com.shell-extension.zip?version_tag=301 -> /tmp/post-install-teste/dash-to-dock@micxgx.gmail.com.zip
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gnome-extensions install --force '/tmp/post-install-teste/dash-to-dock@micxgx.gmail.com.zip''
+[OK] Extensão dash-to-dock@micxgx.gmail.com instalada.
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; gsettings set org.gnome.shell disable-user-extensions false; gsettings set org.gnome.shell enabled-extensions '['\''compativel@exemplo.test'\'', '\''comcommit@exemplo.test'\'', '\''semcommit@exemplo.test'\'', '\''dash-to-dock@micxgx.gmail.com'\'']'; gsettings set org.gnome.shell disabled-extensions '['\''ding@rastersoft.com'\'']'; dconf load /org/gnome/shell/extensions/ < '/opt/post-install/GNOME/extensoes.dconf''
+[OK] 4 extensões ativadas e configuradas (as novas carregam no próximo login).
+
+== atalhos_gnome (Atalhos do GNOME)
+[INFO] Gradia não instalado: instalando via Flatpak para os atalhos...
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub be.alexandervanhee.gradia
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; dconf load /org/gnome/ < '/opt/post-install/GNOME/atalhos.dconf''
+[OK] Atalhos do GNOME aplicados.
+
+== nautilus (Nautilus: VSCode, copiar caminho e Projetos)
+[INFO] Instalando extensões do VSCode e de copiar caminho para o Nautilus...
+[INFO] [dry-run] dnf install -y nautilus-python python3-gobject wl-clipboard xclip git
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; git clone --quiet 'https://github.com/vinicgobbi/vscode_nautilus.git' "$dir/vscode_nautilus"; git -C "$dir/vscode_nautilus" -c advice.detachedHead=false checkout --quiet '<vscodeNautilusCommit>'; bash "$dir/vscode_nautilus/install.sh"; git clone --quiet 'https://github.com/vinicgobbi/nautilus-copypath.git' "$dir/nautilus-copypath"; git -C "$dir/nautilus-copypath" -c advice.detachedHead=false checkout --quiet '<copypathCommit>'; bash "$dir/nautilus-copypath/install.sh"'
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; if [[ "$LANG" == pt_* ]]; then DIR_NAME="Projetos"; else DIR_NAME="Projects"; fi; PROJECTS_DIR="$HOME/$DIR_NAME"; mkdir -p "$PROJECTS_DIR"; xdg-user-dirs-update --set PROJECTS "$PROJECTS_DIR"; BOOKMARKS_FILE="$HOME/.config/gtk-3.0/bookmarks"; mkdir -p "$(dirname "$BOOKMARKS_FILE")"; touch "$BOOKMARKS_FILE"; grep -q "file://$PROJECTS_DIR" "$BOOKMARKS_FILE" || echo "file://$PROJECTS_DIR" >> "$BOOKMARKS_FILE"'
+[OK] Extensões do Nautilus instaladas e pasta de projetos criada.
+
+== apps_gnome (Favoritos e pastas do menu de apps)
+[INFO] 3 apps visíveis no menu.
+[INFO] Favoritos: org.gnome.Nautilus.desktop, org.gnome.Ptyxis.desktop, firefox.desktop
+[INFO] Pasta Sistema: 2 apps
+[INFO] Fora das pastas (sem categoria conhecida): firefox.desktop
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; gsettings set org.gnome.shell favorite-apps '['\''org.gnome.Nautilus.desktop'\'', '\''org.gnome.Ptyxis.desktop'\'', '\''firefox.desktop'\'']'; dconf reset -f /org/gnome/desktop/app-folders/; dconf load /org/gnome/desktop/app-folders/ <<'POST_INSTALL_PASTAS'; [/]; folder-children=['games', 'sistema']; [folders/games]; name='Games'; translate=false; categories=['Game']; apps=@as []; excluded-apps=@as []; [folders/sistema]; name='Sistema'; translate=false; categories=['System', 'Settings', 'TerminalEmulator']; apps=['org.gnome.Nautilus.desktop']; excluded-apps=@as []; POST_INSTALL_PASTAS; gsettings reset org.gnome.shell app-picker-layout'
+[OK] Favoritos e pastas do menu de apps aplicados.
+
 == limpeza (Limpeza final)
 [INFO] Limpando o sistema...
 [INFO] [dry-run] dnf autoremove -y
@@ -203,4 +259,5 @@
 [INFO] Recomenda-se reiniciar a máquina para aplicar as mudanças de grupo e kernel.
 
 == Consultas que o cenário não responde (falham na máquina falsa)
+comando: flatpak info be.alexandervanhee.gradia
 comando: getent group libvirt

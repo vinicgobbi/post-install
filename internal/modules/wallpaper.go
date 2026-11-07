@@ -37,6 +37,7 @@ gsettings set org.gnome.desktop.background picture-options 'zoom'`
 		c.Log.Successf("Papel de parede aplicado: %s", destino)
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // userHome devolve a home do usuário alvo (via NSS, cobrindo contas de domínio).
