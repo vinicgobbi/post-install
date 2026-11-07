@@ -17,27 +17,35 @@ var rust = Module{
 	Title: "Rust, eza, topgrade e cargo-update",
 	Desc:  "Rust stable pelo mise e compilação de eza, topgrade e cargo-update (cargo install-update, usado pelo topgrade para atualizar o que veio do cargo) via cargo",
 	Deps:  []string{"mise"},
+	// O cargo-update compila com libgit2/libcurl/libssh2 (embutidos se
+	// faltarem no sistema), o que exige CMake, pkg-config e os cabeçalhos do
+	// OpenSSL.
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando o Rust pelo mise e compilando eza/topgrade/cargo-update via cargo...")
-		// O cargo-update compila com libgit2/libcurl/libssh2 (embutidos se
-		// faltarem no sistema), o que exige CMake, pkg-config e os cabeçalhos
-		// do OpenSSL.
-		buildPkgs := []string{"build-essential", "cmake", "pkg-config", "libssl-dev"}
-		err := step(
-			func() error { return c.install(buildPkgs...) },
-			func() error {
-				return c.AsUser(`set -e
+		return instalarRust(c, "build-essential", "cmake", "pkg-config", "libssl-dev")
+	},
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarRust(c, "gcc", "gcc-c++", "make", "cmake", "pkgconf-pkg-config", "openssl-devel")
+		},
+	},
+}
+
+func instalarRust(c *Ctx, buildPkgs ...string) error {
+	c.Log.Infof("Instalando o Rust pelo mise e compilando eza/topgrade/cargo-update via cargo...")
+	err := step(
+		func() error { return c.install(buildPkgs...) },
+		func() error {
+			return c.AsUser(`set -e
 mise use -g rust@stable
 mise exec -- cargo install --locked eza topgrade cargo-update
 `)
-			},
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Rust (mise), eza, topgrade e cargo-update instalados para %s.", c.User)
-		return nil
-	},
+		},
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Rust (mise), eza, topgrade e cargo-update instalados para %s.", c.User)
+	return nil
 }
 
 var gitGCM = Module{
@@ -65,6 +73,45 @@ var gitGCM = Module{
 		c.Log.Successf("Git Credential Manager instalado e configurado para %s.", c.User)
 		return nil
 	},
+	Fedora: &Variante{
+		Run: instalarGCMTarball,
+	},
+}
+
+// gcmDir é onde o .tar.gz do GCM é extraído: o mesmo layout do .deb
+// (/usr/local/share/gcm-core, com o link em /usr/local/bin), em vez do
+// "tar -C /usr/local/bin" das instruções, que espalharia as bibliotecas .so
+// e o NOTICE no /usr/local/bin.
+const gcmDir = "/usr/local/share/gcm-core"
+
+// instalarGCMTarball: não há RPM do GCM; a release publica o .tar.gz.
+func instalarGCMTarball(c *Ctx) error {
+	c.Log.Infof("Instalando o Git Credential Manager...")
+	asset, err := latestReleaseAsset(c, "git-ecosystem/git-credential-manager", gcmTarGz)
+	if err != nil {
+		return err
+	}
+	tgz := c.Temp("gcm.tar.gz")
+	err = step(
+		func() error { return downloadAsset(c, asset, tgz) },
+		func() error { return c.install("git") },
+		func() error { return c.RemoveAll(gcmDir) },
+		func() error { return c.MkdirAll(gcmDir, 0o755) },
+		// Como root, o tar manteria o dono gravado no arquivo (o da máquina
+		// de build); --no-same-owner deixa tudo com o root, como no .deb.
+		func() error { return c.Run("tar", "--no-same-owner", "-xzf", tgz, "-C", gcmDir) },
+		func() error {
+			return c.Symlink("../share/gcm-core/git-credential-manager", "/usr/local/bin/git-credential-manager")
+		},
+		func() error {
+			return c.AsUser(`git-credential-manager configure && git config --global credential.credentialStore secretservice`)
+		},
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Git Credential Manager instalado e configurado para %s.", c.User)
+	return nil
 }
 
 // O Podman roda sem daemon e sem root: não há grupo com poder de root como o
@@ -76,28 +123,39 @@ var podman = Module{
 	Title: "Podman",
 	Desc:  "Podman e podman-compose pelos repositórios do Ubuntu (sem daemon e sem root); o usuário recebe faixas de subuid/subgid se ainda não tiver, e imagens sem registry (ex.: \"nginx\") vêm do Docker Hub",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando o Podman e o podman-compose...")
-		err := step(
-			func() error { return c.install("podman", "podman-compose", "uidmap") },
-			func() error { return garantirSubIDs(c, "/etc/subuid") },
-			func() error { return garantirSubIDs(c, "/etc/subgid") },
-			func() error { return c.MkdirAll("/etc/containers/registries.conf.d", 0o755) },
-			func() error {
-				return c.WriteFile("/etc/containers/registries.conf.d/50-post-install.conf",
-					"# Nomes curtos de imagem (ex.: \"nginx\", comuns em compose.yaml) vêm do Docker Hub — post-install\n"+
-						"unqualified-search-registries = [\"docker.io\"]\n", 0o644)
-			},
-		)
-		if err != nil {
-			return err
-		}
-		// Aplica as faixas novas a um armazenamento que já exista.
-		if err := c.AsUser(`podman system migrate`); err != nil {
-			c.Log.Warnf("Falha no 'podman system migrate': %v", err)
-		}
-		c.Log.Successf("Podman e podman-compose instalados para %s (rootless).", c.User)
-		return nil
+		return instalarPodman(c, "podman", "podman-compose", "uidmap")
 	},
+	// O newuidmap/newgidmap do Fedora já vêm no shadow-utils.
+	Fedora: &Variante{
+		Desc: "Podman e podman-compose pelos repositórios do Fedora (sem daemon e sem root); o usuário recebe faixas de subuid/subgid se ainda não tiver, e imagens sem registry (ex.: \"nginx\") vêm do Docker Hub",
+		Run: func(c *Ctx) error {
+			return instalarPodman(c, "podman", "podman-compose")
+		},
+	},
+}
+
+func instalarPodman(c *Ctx, pkgs ...string) error {
+	c.Log.Infof("Instalando o Podman e o podman-compose...")
+	err := step(
+		func() error { return c.install(pkgs...) },
+		func() error { return garantirSubIDs(c, "/etc/subuid") },
+		func() error { return garantirSubIDs(c, "/etc/subgid") },
+		func() error { return c.MkdirAll("/etc/containers/registries.conf.d", 0o755) },
+		func() error {
+			return c.WriteFile("/etc/containers/registries.conf.d/50-post-install.conf",
+				"# Nomes curtos de imagem (ex.: \"nginx\", comuns em compose.yaml) vêm do Docker Hub — post-install\n"+
+					"unqualified-search-registries = [\"docker.io\"]\n", 0o644)
+		},
+	)
+	if err != nil {
+		return err
+	}
+	// Aplica as faixas novas a um armazenamento que já exista.
+	if err := c.AsUser(`podman system migrate`); err != nil {
+		c.Log.Warnf("Falha no 'podman system migrate': %v", err)
+	}
+	c.Log.Successf("Podman e podman-compose instalados para %s (rootless).", c.User)
+	return nil
 }
 
 // tamanhoSubID é o tamanho padrão de faixa do useradd (SUB_UID_COUNT).
@@ -173,6 +231,28 @@ var vscode = Module{
 		c.Log.Successf("VSCode instalado.")
 		return nil
 	},
+	// https://code.visualstudio.com/docs/setup/linux (RHEL/Fedora): a mesma
+	// chave da Microsoft do Ubuntu, conferida antes.
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o VSCode pelo repositório da Microsoft...")
+			err := step(
+				func() error {
+					chave, err := instalarChaveRPM(c, "https://packages.microsoft.com/keys/microsoft.asc", "microsoft.asc", fprMicrosoft)
+					if err != nil {
+						return err
+					}
+					return repoRPM(c, "vscode", "Visual Studio Code", "https://packages.microsoft.com/yumrepos/vscode", chave)
+				},
+				func() error { return c.install("code") },
+			)
+			if err != nil {
+				return err
+			}
+			c.Log.Successf("VSCode instalado.")
+			return nil
+		},
+	},
 }
 
 var golang = Module{
@@ -188,6 +268,7 @@ var golang = Module{
 		c.Log.Successf("Go instalado.")
 		return nil
 	},
+	Fedora: &Variante{Desc: "Go pelo pacote golang do Fedora"},
 }
 
 // scriptNode instala o Node LTS e o pnpm pelo mise e tira dos rc a
@@ -217,6 +298,7 @@ var node = Module{
 		c.Log.Successf("Node LTS e pnpm instalados pelo mise para %s.", c.User)
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 var phpSQLServer = Module{
@@ -269,6 +351,54 @@ var phpSQLServer = Module{
 		c.Log.Successf("PHP, Composer, ferramentas e extensões do SQL Server instalados.")
 		return nil
 	},
+	Fedora: &Variante{
+		Desc: "PHP, Composer, as ferramentas do SQL Server (msodbcsql18 e mssql-tools18, pelo repositório da Microsoft para o RHEL) e as extensões sqlsrv/pdo_sqlsrv via PECL",
+		Run:  instalarPHPSQLServerFedora,
+	},
+}
+
+// instalarPHPSQLServerFedora: a Microsoft não publica o msodbcsql18 e o
+// mssql-tools18 para o Fedora; os do RHEL (versão em c.Sys.MSRepoVersion,
+// de versoes.go) costumam funcionar. O repositório do RHEL 10 é assinado
+// com a chave de 2025 e confere também os metadados (repo_gpgcheck).
+func instalarPHPSQLServerFedora(c *Ctx) error {
+	c.Log.Infof("Instalando PHP, Composer e as ferramentas do SQL Server...")
+	rhel := c.Sys.MSRepoVersion
+	c.Log.Warnf("A Microsoft não publica o msodbcsql18/mssql-tools18 para o Fedora: usando o repositório do RHEL %s, que costuma funcionar.", rhel)
+	err := step(
+		func() error {
+			chave, err := instalarChaveRPM(c, "https://packages.microsoft.com/keys/microsoft-2025.asc", "microsoft-2025.asc", fprMicrosoft2025)
+			if err != nil {
+				return err
+			}
+			return repoRPM(c, "mssql-release", "Microsoft Production (RHEL "+rhel+")",
+				"https://packages.microsoft.com/rhel/"+rhel+"/prod/", chave, "repo_gpgcheck=1")
+		},
+		func() error { return c.install("php", "php-cli", "php-devel", "php-pear", "php-xml", "composer") },
+		func() error {
+			return c.installEnv([]string{"ACCEPT_EULA=Y"}, "msodbcsql18", "mssql-tools18", "unixODBC-devel")
+		},
+		func() error {
+			return c.WriteFile("/etc/profile.d/mssql-tools.sh", `export PATH="$PATH:/opt/mssql-tools18/bin"`+"\n", 0o644)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// No Fedora não há phpenmod: cada .ini de /etc/php.d é carregado em ordem,
+	// e o pdo_sqlsrv precisa vir depois do 20-pdo.ini.
+	c.Log.Infof("Compilando e habilitando as extensões sqlsrv/pdo_sqlsrv...")
+	err = step(
+		func() error { return c.Run("pecl", "install", "sqlsrv", "pdo_sqlsrv") },
+		func() error { return c.WriteFile("/etc/php.d/20-sqlsrv.ini", "extension=sqlsrv.so\n", 0o644) },
+		func() error { return c.WriteFile("/etc/php.d/30-pdo_sqlsrv.ini", "extension=pdo_sqlsrv.so\n", 0o644) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("PHP, Composer, ferramentas e extensões do SQL Server instalados.")
+	return nil
 }
 
 // scriptRuby instala o Ruby pelo mise e o Bundler e o Jekyll como gems dele.
@@ -299,26 +429,38 @@ var ruby = Module{
 	Title: "Ruby, Bundler e Jekyll",
 	Desc:  "Ruby pelo mise (compilado na máquina) e, como gems dele, Bundler e Jekyll; o Bundler instala as gems de cada projeto em vendor/bundle",
 	Deps:  []string{"mise"},
+	// O que o ruby-build (usado pelo mise) pede em cada distribuição; também
+	// serve às gems nativas.
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando as dependências de compilação do Ruby...")
-		// O que o ruby-build (usado pelo mise) pede no Ubuntu; também serve às
-		// gems nativas.
-		pkgs := []string{"build-essential", "autoconf", "patch", "libssl-dev", "libyaml-dev", "libreadline-dev",
-			"zlib1g-dev", "libgmp-dev", "libncurses-dev", "libffi-dev", "libgdbm-dev", "uuid-dev"}
-		if err := c.install(pkgs...); err != nil {
-			return err
-		}
-
-		c.Log.Infof("Instalando Ruby, Bundler e Jekyll pelo mise para %s (o Ruby é compilado; leva alguns minutos)...", c.User)
-		// "path vendor/bundle" (global, em ~/.bundle/config): o bundle install
-		// de cada projeto grava as gems dentro do próprio projeto. O Jekyll já
-		// ignora vendor/ no build, e o .gitignore do "jekyll new" também.
-		if err := c.AsUser(scriptRuby); err != nil {
-			return err
-		}
-		c.Log.Successf("Ruby (mise), Bundler e Jekyll instalados para %s (projetos em vendor/bundle).", c.User)
-		return nil
+		return instalarRuby(c, "build-essential", "autoconf", "patch", "libssl-dev", "libyaml-dev", "libreadline-dev",
+			"zlib1g-dev", "libgmp-dev", "libncurses-dev", "libffi-dev", "libgdbm-dev", "uuid-dev")
 	},
+	// A lista da wiki do ruby-build para o Fedora (zlib-ng-compat-devel do 40
+	// em diante), mais gmp e uuid como no Ubuntu.
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarRuby(c, "autoconf", "gcc", "patch", "make", "bzip2", "openssl-devel", "libyaml-devel",
+				"libffi-devel", "readline-devel", "zlib-ng-compat-devel", "gdbm-devel", "ncurses-devel", "perl-FindBin",
+				"gmp-devel", "libuuid-devel")
+		},
+	},
+}
+
+func instalarRuby(c *Ctx, pkgs ...string) error {
+	c.Log.Infof("Instalando as dependências de compilação do Ruby...")
+	if err := c.install(pkgs...); err != nil {
+		return err
+	}
+
+	c.Log.Infof("Instalando Ruby, Bundler e Jekyll pelo mise para %s (o Ruby é compilado; leva alguns minutos)...", c.User)
+	// "path vendor/bundle" (global, em ~/.bundle/config): o bundle install
+	// de cada projeto grava as gems dentro do próprio projeto. O Jekyll já
+	// ignora vendor/ no build, e o .gitignore do "jekyll new" também.
+	if err := c.AsUser(scriptRuby); err != nil {
+		return err
+	}
+	c.Log.Successf("Ruby (mise), Bundler e Jekyll instalados para %s (projetos em vendor/bundle).", c.User)
+	return nil
 }
 
 // O mise vem do repositório oficial dele: pelo extrepo no Ubuntu 22.04 e
@@ -354,6 +496,29 @@ var mise = Module{
 		}
 		c.Log.Successf("mise instalado e ativado no shell de %s.", c.User)
 		return nil
+	},
+	// https://mise.jdx.dev/installing-mise.html: o repositório RPM oficial
+	// (mise.jdx.dev/rpm/mise.repo), com a chave conferida antes.
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o mise pelo repositório RPM oficial...")
+			err := step(
+				func() error {
+					chave, err := instalarChaveRPM(c, "https://mise.jdx.dev/gpg-key.pub", "mise.asc", fprMise)
+					if err != nil {
+						return err
+					}
+					return repoRPM(c, "mise", "mise", "https://mise.jdx.dev/rpm", chave)
+				},
+				func() error { return c.install("mise") },
+				func() error { return c.AsUser(scriptMise) },
+			)
+			if err != nil {
+				return err
+			}
+			c.Log.Successf("mise instalado e ativado no shell de %s.", c.User)
+			return nil
+		},
 	},
 }
 
@@ -394,6 +559,7 @@ var claudeCode = Module{
 		c.Log.Successf("Claude Code instalado para %s.", c.User)
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // O deploy-dev se instala sozinho (install copia para ~/.local/bin e põe a
@@ -436,6 +602,7 @@ install -m 0755 ` + shQuote(dest) + ` "$dir/deploy-dev"
 		c.Log.Successf("deploy-dev instalado em ~/.local/bin para %s.", c.User)
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // conferirSHA256 compara o arquivo com o .sha256 publicado na release
@@ -498,4 +665,9 @@ func downloadAsset(c *Ctx, a releaseAsset, dest string) error {
 
 func gcmDeb(name string) bool {
 	return strings.HasSuffix(name, ".deb") && strings.Contains(name, "linux-x64")
+}
+
+// gcmTarGz: gcm-linux-x64-<versão>.tar.gz, sem o pacote de símbolos.
+func gcmTarGz(name string) bool {
+	return strings.HasPrefix(name, "gcm-linux-x64-") && strings.HasSuffix(name, ".tar.gz") && !strings.Contains(name, "symbols")
 }

@@ -272,6 +272,13 @@ func fedoraLimpo(t *testing.T, versao string) cenario {
 		http: map[string]string{
 			"https://gitea.com/api/v1/repos/gitea/tea/releases/latest":                               `{"tag_name":"v0.11.1"}`,
 			"https://gitea.com/gitea/tea/releases/download/v0.11.1/tea-0.11.1-linux-amd64.xz.sha256": sha + "  tea-0.11.1-linux-amd64.xz\n",
+			"https://api.github.com/repos/git-ecosystem/git-credential-manager/releases/latest": `{"assets":[
+				{"name":"gcm-linux-x64-3.0.2-symbols.tar.gz","browser_download_url":"https://github.com/git-ecosystem/git-credential-manager/releases/download/v3.0.2/gcm-linux-x64-3.0.2-symbols.tar.gz","digest":"sha256:` + sha + `"},
+				{"name":"gcm-linux-x64-3.0.2.deb","browser_download_url":"https://github.com/git-ecosystem/git-credential-manager/releases/download/v3.0.2/gcm-linux-x64-3.0.2.deb","digest":"sha256:` + sha + `"},
+				{"name":"gcm-linux-x64-3.0.2.tar.gz","browser_download_url":"https://github.com/git-ecosystem/git-credential-manager/releases/download/v3.0.2/gcm-linux-x64-3.0.2.tar.gz","digest":"sha256:` + sha + `"}]}`,
+			"https://api.github.com/repos/vinicgobbi/deploy-tools/releases/latest": `{"assets":[
+				{"name":"deploy-dev-linux-amd64","browser_download_url":"https://github.com/vinicgobbi/deploy-tools/releases/download/v1.0.0/deploy-dev-linux-amd64","digest":"sha256:` + sha + `"},
+				{"name":"deploy-dev-linux-amd64.sha256","browser_download_url":"https://github.com/vinicgobbi/deploy-tools/releases/download/v1.0.0/deploy-dev-linux-amd64.sha256","digest":""}]}`,
 		},
 		semResposta: map[string]bool{},
 	}

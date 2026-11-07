@@ -422,4 +422,8 @@ func TestPara(t *testing.T) {
 	if u, _ := m.Para(sysinfo.Ubuntu); u.Desc != "no Ubuntu" || u.Run(nil) != nil {
 		t.Error("no Ubuntu deveria valer o próprio módulo")
 	}
+	m.Fedora = &Variante{}
+	if f, ok := m.Para(sysinfo.Fedora); !ok || f.Run == nil || f.Run(nil) != nil || f.Desc != "no Ubuntu" {
+		t.Error("variante vazia deveria reaproveitar o Run e a descrição do Ubuntu")
+	}
 }

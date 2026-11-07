@@ -80,6 +80,91 @@
 [INFO] [dry-run] udevadm trigger --subsystem-match=hidraw
 [OK] Regras UDEV do Solaar configuradas.
 
+== git_gcm (Git Credential Manager)
+[INFO] Instalando o Git Credential Manager...
+[INFO] [dry-run] baixar https://github.com/git-ecosystem/git-credential-manager/releases/download/v3.0.2/gcm-linux-x64-3.0.2.tar.gz -> /tmp/post-install-teste/gcm.tar.gz
+[INFO] [dry-run] dnf install -y git
+[INFO] [dry-run] rm -rf /usr/local/share/gcm-core
+[INFO] [dry-run] mkdir -p /usr/local/share/gcm-core
+[INFO] [dry-run] tar --no-same-owner -xzf /tmp/post-install-teste/gcm.tar.gz -C /usr/local/share/gcm-core
+[INFO] [dry-run] ln -sf ../share/gcm-core/git-credential-manager /usr/local/bin/git-credential-manager
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; git-credential-manager configure && git config --global credential.credentialStore secretservice'
+[OK] Git Credential Manager instalado e configurado para ana.
+
+== podman (Podman)
+[INFO] Instalando o Podman e o podman-compose...
+[INFO] [dry-run] dnf install -y podman podman-compose
+[INFO] [dry-run] mkdir -p /etc/containers/registries.conf.d
+[INFO] [dry-run] escrever /etc/containers/registries.conf.d/50-post-install.conf (146 bytes)
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; podman system migrate'
+[OK] Podman e podman-compose instalados para ana (rootless).
+
+== vscode (Visual Studio Code)
+[INFO] Instalando o VSCode pelo repositório da Microsoft...
+[INFO] [dry-run] baixar https://packages.microsoft.com/keys/microsoft.asc -> /tmp/post-install-teste/microsoft.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/microsoft.asc /etc/pki/rpm-gpg/microsoft.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/vscode.repo (154 bytes)
+[INFO] [dry-run] dnf install -y code
+[OK] VSCode instalado.
+
+== go (Go)
+[INFO] Instalando o Go...
+[INFO] [dry-run] dnf install -y golang
+[OK] Go instalado.
+
+== mise (mise)
+[INFO] Instalando o mise pelo repositório RPM oficial...
+[INFO] [dry-run] baixar https://mise.jdx.dev/gpg-key.pub -> /tmp/post-install-teste/mise.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/mise.asc /etc/pki/rpm-gpg/mise.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/mise.repo (111 bytes)
+[INFO] [dry-run] dnf install -y mise
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sh=$(basename "$rc" rc | tr -d .); grep -qF 'mise activate' "$rc" || printf '\n# mise (Node, pnpm, Ruby, Rust) — post-install\neval "$(mise activate %s)"\n' "$sh" >> "$rc"; done'
+[OK] mise instalado e ativado no shell de ana.
+
+== node (Node.js e pnpm (mise))
+[INFO] Instalando o Node LTS e o pnpm pelo mise para ana...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; mise use -g node@lts pnpm@latest; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sed -i -e '/^# fnm (Node) — post-install$/d' \; -e '/^export PATH="\$HOME\/\.local\/share\/fnm:\$PATH"$/d' \; -e '/^eval "\$(fnm env --shell [a-z]*)"$/d' "$rc"; done'
+[OK] Node LTS e pnpm instalados pelo mise para ana.
+
+== php_sqlserver (PHP e SQL Server)
+[INFO] Instalando PHP, Composer e as ferramentas do SQL Server...
+[AVISO] A Microsoft não publica o msodbcsql18/mssql-tools18 para o Fedora: usando o repositório do RHEL 10, que costuma funcionar.
+[INFO] [dry-run] baixar https://packages.microsoft.com/keys/microsoft-2025.asc -> /tmp/post-install-teste/microsoft-2025.asc
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/microsoft-2025.asc /etc/pki/rpm-gpg/microsoft-2025.asc
+[INFO] [dry-run] escrever /etc/yum.repos.d/mssql-release.repo (192 bytes)
+[INFO] [dry-run] dnf install -y php php-cli php-devel php-pear php-xml composer
+[INFO] [dry-run] ACCEPT_EULA=Y dnf install -y msodbcsql18 mssql-tools18 unixODBC-devel
+[INFO] [dry-run] escrever /etc/profile.d/mssql-tools.sh (43 bytes)
+[INFO] Compilando e habilitando as extensões sqlsrv/pdo_sqlsrv...
+[INFO] [dry-run] pecl install sqlsrv pdo_sqlsrv
+[INFO] [dry-run] escrever /etc/php.d/20-sqlsrv.ini (20 bytes)
+[INFO] [dry-run] escrever /etc/php.d/30-pdo_sqlsrv.ini (24 bytes)
+[OK] PHP, Composer, ferramentas e extensões do SQL Server instalados.
+
+== rust (Rust, eza, topgrade e cargo-update)
+[INFO] Instalando o Rust pelo mise e compilando eza/topgrade/cargo-update via cargo...
+[INFO] [dry-run] dnf install -y gcc gcc-c++ make cmake pkgconf-pkg-config openssl-devel
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; mise use -g rust@stable; mise exec -- cargo install --locked eza topgrade cargo-update'
+[OK] Rust (mise), eza, topgrade e cargo-update instalados para ana.
+
+== ruby (Ruby, Bundler e Jekyll)
+[INFO] Instalando as dependências de compilação do Ruby...
+[INFO] [dry-run] dnf install -y autoconf gcc patch make bzip2 openssl-devel libyaml-devel libffi-devel readline-devel zlib-ng-compat-devel gdbm-devel ncurses-devel perl-FindBin gmp-devel libuuid-devel
+[INFO] Instalando Ruby, Bundler e Jekyll pelo mise para ana (o Ruby é compilado; leva alguns minutos)...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do; [ -f "$rc" ] || continue; sed -i -e '/^# Gems do Ruby na home do usuário (gem\/bundle sem sudo) — post-install$/d' \; -e '/^export GEM_HOME="\$HOME\/\.local\/share\/gem"$/d' \; -e '/^export PATH="\$GEM_HOME\/bin:\$PATH"$/d' "$rc"; done; unset GEM_HOME; for gem in bundler jekyll; do; grep -qxF "$gem" "$HOME/.default-gems" 2>/dev/null || echo "$gem" >> "$HOME/.default-gems"; done; mise use -g ruby@latest; mise exec -- gem install --no-document bundler jekyll; mise exec -- bundle config set --global path vendor/bundle'
+[OK] Ruby (mise), Bundler e Jekyll instalados para ana (projetos em vendor/bundle).
+
+== claude_code (Claude Code)
+[INFO] Instalando o Claude Code...
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; curl -fsSL https://claude.ai/install.sh | bash'
+[OK] Claude Code instalado para ana.
+
+== deploy_dev (deploy-dev)
+[INFO] Instalando o deploy-dev (última release do deploy-tools)...
+[INFO] [dry-run] baixar https://github.com/vinicgobbi/deploy-tools/releases/download/v1.0.0/deploy-dev-linux-amd64 -> /tmp/post-install-teste/deploy-dev-linux-amd64
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; install -m 0755 '/tmp/post-install-teste/deploy-dev-linux-amd64' "$dir/deploy-dev"; "$dir/deploy-dev" install --add-to-path'
+[OK] deploy-dev instalado em ~/.local/bin para ana.
+
 == limpeza (Limpeza final)
 [INFO] Limpando o sistema...
 [INFO] [dry-run] dnf autoremove -y

@@ -105,3 +105,16 @@ func TestRemoverLibreofficeFedoraSemNada(t *testing.T) {
 		}
 	}
 }
+
+func TestGcmTarGz(t *testing.T) {
+	for nome, want := range map[string]bool{
+		"gcm-linux-x64-3.0.2.tar.gz":         true,
+		"gcm-linux-x64-3.0.2-symbols.tar.gz": false,
+		"gcm-linux-arm64-3.0.2.tar.gz":       false,
+		"gcm-linux-x64-3.0.2.deb":            false,
+	} {
+		if got := gcmTarGz(nome); got != want {
+			t.Errorf("gcmTarGz(%q) = %v, esperado %v", nome, got, want)
+		}
+	}
+}

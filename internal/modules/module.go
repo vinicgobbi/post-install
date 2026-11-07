@@ -40,7 +40,9 @@ type Module struct {
 
 // Variante é como o módulo trabalha numa distribuição que não o Ubuntu.
 // Title e Desc vazios e Deps nil herdam os do módulo (Deps vazio, mas não
-// nil, tira as dependências).
+// nil, tira as dependências). Run nil reaproveita o do Ubuntu, para módulos
+// que já funcionam igual (só usam c.install, que escolhe o apt ou o dnf, o
+// mise, o curl...).
 type Variante struct {
 	Title string
 	Desc  string
@@ -63,7 +65,9 @@ func (m Module) Para(f sysinfo.Familia) (Module, bool) {
 	}
 	out := m
 	out.Fedora = nil
-	out.Run = v.Run
+	if v.Run != nil {
+		out.Run = v.Run
+	}
 	if v.Title != "" {
 		out.Title = v.Title
 	}
@@ -206,6 +210,13 @@ const (
 	fprTailscale    = "2596A99EAAB33821893C0A79458CA832957F5868"
 	// Google Linux Packages Signing Authority (Chrome).
 	fprGoogle = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
+	// Chave de 2025 da Microsoft, que assina os repositórios do RHEL 10
+	// (packages.microsoft.com/keys/microsoft-2025.asc; o fingerprint também
+	// está em learn.microsoft.com/linux/packages).
+	fprMicrosoft2025 = "AA86F75E427A19DD33346403EE4D7792F748182B"
+	// mise releases <release@mise.jdx.dev> (mise.jdx.dev/gpg-key.pub, o
+	// mesmo fingerprint publicado no keys.openpgp.org).
+	fprMise = "24853EC9F655CE80B48E6C3A8B81C9D17413A06D"
 )
 
 // instalarChaveAPT baixa uma chave para /etc/apt/keyrings (ou outro destino)
@@ -238,18 +249,25 @@ func instalarChaveRPM(c *Ctx, url, nome string, fprs ...string) (string, error) 
 }
 
 // repoRPM grava /etc/yum.repos.d/<nome>.repo, com a assinatura dos pacotes
-// conferida pela chave local (gpgkey=file://...).
-func repoRPM(c *Ctx, nome, titulo, baseurl, chave string) error {
-	return c.WriteFile("/etc/yum.repos.d/"+nome+".repo", conteudoRepoRPM(nome, titulo, baseurl, chave), 0o644)
+// conferida pela chave local (gpgkey=file://...). O nome é o mesmo arquivo
+// das instruções oficiais de cada repositório, para quem já o configurou à
+// mão não ficar com o repositório duplicado. extras são linhas a mais (ex.:
+// "repo_gpgcheck=1").
+func repoRPM(c *Ctx, nome, titulo, baseurl, chave string, extras ...string) error {
+	return c.WriteFile("/etc/yum.repos.d/"+nome+".repo", conteudoRepoRPM(nome, titulo, baseurl, chave, extras...), 0o644)
 }
 
-func conteudoRepoRPM(nome, titulo, baseurl, chave string) string {
-	return "[" + nome + "]\n" +
+func conteudoRepoRPM(nome, titulo, baseurl, chave string, extras ...string) string {
+	s := "[" + nome + "]\n" +
 		"name=" + titulo + "\n" +
 		"baseurl=" + baseurl + "\n" +
 		"enabled=1\n" +
 		"gpgcheck=1\n" +
 		"gpgkey=file://" + chave + "\n"
+	for _, e := range extras {
+		s += e + "\n"
+	}
+	return s
 }
 
 func (c *Ctx) ensureFlathub() error {
