@@ -1,3 +1,22 @@
+## v3.1.0 (2026-11-07)
+
+### Feat
+
+- **fedora**: libera o suporte ao Fedora Workstation
+- **fedora**: adiciona as variantes dos módulos de GNOME e aparência
+- **fedora**: adiciona as variantes dos módulos de Rede e virtualização
+- **fedora**: adiciona as variantes dos módulos de Desenvolvimento
+- **fedora**: adiciona as variantes dos módulos de Aplicativos
+- **fedora**: adiciona as variantes dos módulos de Sistema e Terminal
+- **sysinfo**: reconhece o Fedora Workstation e confirma versões não testadas
+
+### Refactor
+
+- **modules**: mantém a consulta do apt-cache depois da mensagem
+- **modules**: deixa a importação da chave RPM para o dnf
+- **modules**: prepara os módulos para variantes por distribuição
+- **runner**: permite trocar a máquina consultada pelo dry-run
+
 ## v3.0.0 (2026-11-06)
 
 ### BREAKING CHANGE
