@@ -6,3 +6,7 @@ logs/
 
 OVPN/*
 !OVPN/README.md
+
+# Resumos gerados pelos scripts de atualização (corpo dos PRs automáticos)
+/pins-resumo.md
+/versoes-resumo.md

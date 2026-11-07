@@ -1,0 +1,51 @@
+# Toda semana (ou à mão): confere as versões do Ubuntu (LTS com suporte
+# padrão) e do Fedora (em manutenção) e o repositório da Microsoft de cada
+# uma, e abre/atualiza um PR na development quando internal/sysinfo/versoes.go
+# muda — uma versão nova entra, uma fora de suporte sai. O PR é a
+# notificação; a mudança chega às máquinas na próxima release.
+#
+# Requer, em Settings → Actions → General, "Allow GitHub Actions to create and
+# approve pull requests" (o mesmo do pins.yml).
+name: Versões suportadas
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # segunda, 06:00 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: development
+      - name: Conferir versões
+        env:
+          VERSOES_RESUMO: ${{ runner.temp }}/versoes-resumo.md
+        run: bash scripts/atualizar-versoes.sh
+      - name: Montar descrição do PR
+        run: |
+          {
+            echo "Mudanças nas versões suportadas encontradas pelo workflow \`versoes.yml\`:"
+            echo
+            cat "$RUNNER_TEMP/versoes-resumo.md"
+            echo
+            echo "Fontes: [distro-info-data](https://salsa.debian.org/debian/distro-info-data/-/blob/main/ubuntu.csv) (Ubuntu), [Bodhi](https://bodhi.fedoraproject.org/releases/) (Fedora) e [packages.microsoft.com](https://packages.microsoft.com/config/)."
+            echo
+            echo "Uma versão que **sai** passa a ser recusada; uma que **entra** deixa de pedir confirmação. Antes de mergear uma versão nova, vale rodar o post-install nela (VM)."
+          } > "$RUNNER_TEMP/pr.md"
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: versoes/atualizacao
+          base: development
+          commit-message: "fix(sysinfo): atualiza as versões suportadas"
+          title: "fix(sysinfo): atualiza as versões suportadas"
+          body-path: ${{ runner.temp }}/pr.md
+          delete-branch: true

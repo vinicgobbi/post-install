@@ -57,6 +57,9 @@ type Config struct {
 	UpdateVersion string
 	ApplyUpdate   func() error
 	RerunCommand  string
+	// VersaoAceita (--allow-untested-version) pula a confirmação para seguir
+	// numa versão da distribuição não testada (Sys.NaoTestada).
+	VersaoAceita bool
 }
 
 type state int
@@ -64,6 +67,7 @@ type state int
 const (
 	stateUser state = iota
 	stateAtualizacao
+	stateVersao
 	stateWallpaper
 	stateExtensoes
 	stateSelect
@@ -92,6 +96,9 @@ type Model struct {
 	atualizado        bool
 	updErr            string
 	depoisAtualizacao state
+
+	versaoChoice int // 0 = sair, 1 = continuar
+	depoisVersao state
 
 	cursor int
 	sel    []bool
@@ -152,6 +159,11 @@ func New(cfg Config) Model {
 	if cfg.DetectedUser == "" {
 		m.typing = true
 		m.input.Focus()
+	}
+	// A confirmação da versão vem antes da tela que seria a primeira; a
+	// oferta de atualização, antes de tudo.
+	if cfg.Sys.NaoTestada && !cfg.DryRun && !cfg.VersaoAceita {
+		m.depoisVersao, m.state = m.state, stateVersao
 	}
 	if cfg.UpdateVersion != "" && !cfg.DryRun && cfg.ApplyUpdate != nil {
 		m.depoisAtualizacao, m.state = m.state, stateAtualizacao
@@ -269,6 +281,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateUser(msg)
 		case stateAtualizacao:
 			return m.updateAtualizacao(msg)
+		case stateVersao:
+			return m.updateVersao(msg)
 		case stateWallpaper:
 			return m.updateWallpaper(msg)
 		case stateExtensoes:
@@ -965,6 +979,8 @@ func (m Model) View() string {
 		v = m.viewUser()
 	case stateAtualizacao:
 		v = m.viewAtualizacao()
+	case stateVersao:
+		v = m.viewVersao()
 	case stateWallpaper:
 		v = m.viewWallpaper()
 	case stateExtensoes:
