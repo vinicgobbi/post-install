@@ -310,6 +310,20 @@ internal/
    ```
 2. Inclua-o em `All()` (`internal/modules/module.go`) entre os módulos do
    mesmo grupo — um teste garante que cada grupo fica junto e na ordem.
+3. O `Run` é o caminho do Ubuntu. Para o módulo existir também no Fedora,
+   preencha `Fedora` com uma `Variante` (sem ela, o módulo fica indisponível
+   lá: some da TUI e do `--list`, e `--modules` só avisa). `Title`/`Desc`
+   vazios e `Deps` nil herdam os do módulo:
+   ```go
+   Fedora: &Variante{
+       Desc: "Descrição no Fedora", // opcional
+       Run: func(c *Ctx) error {
+           return c.install("pacote-no-fedora") // dnf no Fedora
+       },
+   },
+   ```
+   `Disponiveis(sys)` devolve a lista já adaptada à distribuição detectada;
+   no Ubuntu, é a própria `All()`.
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -319,7 +333,13 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 - `c.Probe(...)`/`c.Output(...)` — consultas somente-leitura (rodam mesmo no dry-run)
 - `c.AsUser(script)` — shell como o usuário alvo (`su - usuario -c`)
 - `c.install(...)`, `c.garantir(comando, pacote)`, `c.flatpakInstall(...)`
+- `c.install(...)` usa o `apt` no Ubuntu e o `dnf` no Fedora (os nomes de
+  pacote são os da distribuição); `c.pacoteInstalado(pkg)` consulta o `dpkg`
+  ou o `rpm`
 - `instalarChaveAPT(c, url, destino, fingerprints...)` — chave de repositório conferida
+- `instalarChaveRPM(c, url, nome, fingerprints...)` e `repoRPM(c, nome, título, baseurl, chave)` —
+  chave conferida em `/etc/pki/rpm-gpg` (com `rpm --import`) e `.repo` em
+  `/etc/yum.repos.d` com `gpgcheck=1`
 - `c.Download(url, destino)`, `c.Temp(nome)`, `c.WriteFile(...)`, `c.AppendFile(...)`
 - `c.Log.Infof/Successf/Warnf(...)` — avisos marcam o módulo como "concluído com avisos"
 - `c.Exists(...)`, `c.LookPath(...)`, `c.ReadFile(...)`, `c.Stat(...)`, `c.FileExists(...)`,
