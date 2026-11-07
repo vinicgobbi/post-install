@@ -38,20 +38,45 @@ var tailscale = Module{
 	Title: "Tailscale + Trayscale",
 	Desc:  "Tailscale (VPN mesh, pelo repositório oficial) e o cliente gráfico Trayscale via Flatpak",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando o Tailscale e o Trayscale...")
-		err := step(
-			func() error { return instalarTailscalePacote(c) },
-			func() error { return c.Run("systemctl", "enable", "--now", "tailscaled") },
-			c.ensureFlathub,
-			func() error { return c.flatpakInstall("dev.deedles.Trayscale") },
-			func() error { return c.Run("tailscale", "set", "--operator="+c.User) },
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Tailscale instalado e '%s' definido como operator.", c.User)
-		return nil
+		return instalarTailscale(c, instalarTailscalePacote, (*Ctx).ensureFlathub)
 	},
+	Fedora: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarTailscale(c, instalarTailscaleRPM, (*Ctx).ensureFlathubFedora)
+		},
+	},
+}
+
+// instalarTailscaleRPM segue https://pkgs.tailscale.com/stable/#fedora: o
+// repositório RPM oficial, com a mesma chave do Ubuntu (conferida antes) e
+// os metadados assinados.
+func instalarTailscaleRPM(c *Ctx) error {
+	chave, err := instalarChaveRPM(c, "https://pkgs.tailscale.com/stable/fedora/repo.gpg", "tailscale.gpg", fprTailscale)
+	if err != nil {
+		return errorf("repositório do Tailscale indisponível: %w", err)
+	}
+	return step(
+		func() error {
+			return repoRPM(c, "tailscale", "Tailscale stable", "https://pkgs.tailscale.com/stable/fedora/$basearch", chave, "repo_gpgcheck=1")
+		},
+		func() error { return c.install("tailscale") },
+	)
+}
+
+func instalarTailscale(c *Ctx, pacote, flathub func(*Ctx) error) error {
+	c.Log.Infof("Instalando o Tailscale e o Trayscale...")
+	err := step(
+		func() error { return pacote(c) },
+		func() error { return c.Run("systemctl", "enable", "--now", "tailscaled") },
+		func() error { return flathub(c) },
+		func() error { return c.flatpakInstall("dev.deedles.Trayscale") },
+		func() error { return c.Run("tailscale", "set", "--operator="+c.User) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Tailscale instalado e '%s' definido como operator.", c.User)
+	return nil
 }
 
 var firewall = Module{
@@ -66,6 +91,21 @@ var firewall = Module{
 		}
 		c.Log.Successf("ufw e gufw instalados.")
 		return nil
+	},
+	// O Fedora usa o firewalld, que já vem ativo (o ufw conflitaria com ele);
+	// o equivalente ao gufw é o firewall-config. A zona padrão do
+	// Workstation fica como está, como no Ubuntu o módulo não cria regras.
+	Fedora: &Variante{
+		Title: "Firewall (firewall-config)",
+		Desc:  "Instala o firewall-config, a interface gráfica do firewalld que já vem ativo no Fedora (não muda a zona nem cria regras)",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o firewall-config...")
+			if err := c.install("firewall-config"); err != nil {
+				return err
+			}
+			c.Log.Successf("firewall-config instalado; o firewalld segue com a configuração padrão do Fedora.")
+			return nil
+		},
 	},
 }
 
@@ -125,6 +165,7 @@ var ovpn = Module{
 		}
 		return nil
 	},
+	Fedora: &Variante{},
 }
 
 // conexoesNM interpreta a saída de "nmcli -g NAME,TYPE connection show"
@@ -168,6 +209,12 @@ func avisarPermissaoOVPN(c *Ctx, arquivo string) {
 
 // O pacote "-gnome" traz o diálogo de autenticação GTK.
 func instalarPluginOpenVPN(c *Ctx) error {
+	if c.fedora() {
+		if c.pacoteInstalado("NetworkManager-openvpn-gnome") {
+			return nil
+		}
+		return c.install("NetworkManager-openvpn-gnome")
+	}
 	if c.pacoteInstalado("network-manager-openvpn") {
 		return nil
 	}
@@ -198,11 +245,7 @@ var virtManager = Module{
 	Desc:  "QEMU/KVM, libvirt e a interface gráfica virt-manager para máquinas virtuais",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Instalando virt-manager (QEMU/KVM + libvirt)...")
-
-		if cpu, err := c.ReadFile("/proc/cpuinfo"); err == nil &&
-			!strings.Contains(string(cpu), "vmx") && !strings.Contains(string(cpu), "svm") {
-			c.Log.Warnf("CPU sem suporte a virtualização por hardware (VT-x/AMD-V) ou não habilitado na BIOS/UEFI — o KVM pode não funcionar.")
-		}
+		avisarSemVirtualizacao(c)
 
 		// "qemu-kvm" virou pacote virtual em versões recentes do Ubuntu;
 		// "qemu-system-x86" é o pacote real que o provê.
@@ -219,4 +262,46 @@ var virtManager = Module{
 		c.Log.Successf("virt-manager instalado. '%s' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).", c.User)
 		return nil
 	},
+	Fedora: &Variante{
+		Run: instalarVirtManagerFedora,
+	},
+}
+
+// driversLibvirt são os daemons modulares que o virt-manager usa com o QEMU
+// (https://libvirt.org/daemons.html): no Fedora o libvirt roda assim, cada
+// driver no seu virt<driver>d, iniciado pelos sockets do systemd, em vez do
+// libvirtd monolítico do Ubuntu.
+var driversLibvirt = []string{"qemu", "network", "nodedev", "nwfilter", "secret", "storage"}
+
+func socketsLibvirt() []string {
+	var out []string
+	for _, d := range driversLibvirt {
+		out = append(out, "virt"+d+"d.socket", "virt"+d+"d-ro.socket", "virt"+d+"d-admin.socket")
+	}
+	return out
+}
+
+func instalarVirtManagerFedora(c *Ctx) error {
+	c.Log.Infof("Instalando virt-manager (QEMU/KVM + libvirt)...")
+	avisarSemVirtualizacao(c)
+	pkgs := []string{"virt-manager", "qemu-kvm", "libvirt-daemon-kvm", "libvirt-daemon-config-network"}
+	err := step(
+		func() error { return c.install(pkgs...) },
+		func() error { return c.Run("systemctl", append([]string{"enable", "--now"}, socketsLibvirt()...)...) },
+		func() error { return c.addUserToGroup("libvirt") },
+		func() error { return c.addUserToGroup("kvm") },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("virt-manager instalado. '%s' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).", c.User)
+	return nil
+}
+
+// avisarSemVirtualizacao avisa quando a CPU não anuncia VT-x/AMD-V.
+func avisarSemVirtualizacao(c *Ctx) {
+	if cpu, err := c.ReadFile("/proc/cpuinfo"); err == nil &&
+		!strings.Contains(string(cpu), "vmx") && !strings.Contains(string(cpu), "svm") {
+		c.Log.Warnf("CPU sem suporte a virtualização por hardware (VT-x/AMD-V) ou não habilitado na BIOS/UEFI — o KVM pode não funcionar.")
+	}
 }

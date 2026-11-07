@@ -165,6 +165,35 @@
 [INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT; install -m 0755 '/tmp/post-install-teste/deploy-dev-linux-amd64' "$dir/deploy-dev"; "$dir/deploy-dev" install --add-to-path'
 [OK] deploy-dev instalado em ~/.local/bin para ana.
 
+== tailscale (Tailscale + Trayscale)
+[INFO] Instalando o Tailscale e o Trayscale...
+[INFO] [dry-run] baixar https://pkgs.tailscale.com/stable/fedora/repo.gpg -> /tmp/post-install-teste/tailscale.gpg
+[INFO] [dry-run] install -D -m 0644 /tmp/post-install-teste/tailscale.gpg /etc/pki/rpm-gpg/tailscale.gpg
+[INFO] [dry-run] escrever /etc/yum.repos.d/tailscale.repo (175 bytes)
+[INFO] [dry-run] dnf install -y tailscale
+[INFO] [dry-run] systemctl enable --now tailscaled
+[INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+[INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
+[INFO] [dry-run] flatpak install -y flathub dev.deedles.Trayscale
+[INFO] [dry-run] tailscale set --operator=ana
+[OK] Tailscale instalado e 'ana' definido como operator.
+
+== firewall (Firewall (firewall-config))
+[INFO] Instalando o firewall-config...
+[INFO] [dry-run] dnf install -y firewall-config
+[OK] firewall-config instalado; o firewalld segue com a configuração padrão do Fedora.
+
+== ovpn (Importar perfis OpenVPN)
+[INFO] Importando perfis OpenVPN para o NetworkManager...
+[AVISO] Nenhum arquivo .ovpn encontrado em /opt/post-install/OVPN — pulando importação.
+
+== virt_manager (virt-manager (QEMU/KVM))
+[INFO] Instalando virt-manager (QEMU/KVM + libvirt)...
+[INFO] [dry-run] dnf install -y virt-manager qemu-kvm libvirt-daemon-kvm libvirt-daemon-config-network
+[INFO] [dry-run] systemctl enable --now virtqemud.socket virtqemud-ro.socket virtqemud-admin.socket virtnetworkd.socket virtnetworkd-ro.socket virtnetworkd-admin.socket virtnodedevd.socket virtnodedevd-ro.socket virtnodedevd-admin.socket virtnwfilterd.socket virtnwfilterd-ro.socket virtnwfilterd-admin.socket virtsecretd.socket virtsecretd-ro.socket virtsecretd-admin.socket virtstoraged.socket virtstoraged-ro.socket virtstoraged-admin.socket
+[INFO] [dry-run] usermod -aG kvm ana
+[OK] virt-manager instalado. 'ana' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).
+
 == limpeza (Limpeza final)
 [INFO] Limpando o sistema...
 [INFO] [dry-run] dnf autoremove -y
@@ -174,3 +203,4 @@
 [INFO] Recomenda-se reiniciar a máquina para aplicar as mudanças de grupo e kernel.
 
 == Consultas que o cenário não responde (falham na máquina falsa)
+comando: getent group libvirt
