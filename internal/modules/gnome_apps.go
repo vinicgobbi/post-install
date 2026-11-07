@@ -2,10 +2,10 @@ package modules
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -17,7 +17,7 @@ var appsGnome = Module{
 	Title: "Favoritos e pastas do menu de apps",
 	Desc:  "Fixa os apps de GNOME/favoritos.txt na barra de favoritos e recria as pastas do menu de apps por categoria (GNOME/pastas.txt), conforme os apps instalados na máquina",
 	Run: func(c *Ctx) error {
-		if _, err := lookPath("gnome-shell"); err != nil {
+		if _, err := c.LookPath("gnome-shell"); err != nil {
 			c.Log.Warnf("GNOME Shell não instalado: pulando favoritos e pastas.")
 			return nil
 		}
@@ -25,13 +25,13 @@ var appsGnome = Module{
 		if err != nil {
 			return err
 		}
-		apps := appsInstalados(dirsAplicativos(home), desktopsAtuais(c))
+		apps := appsInstalados(c, dirsAplicativos(home), desktopsAtuais(c))
 		c.Log.Infof("%d apps visíveis no menu.", len(apps))
 
 		var script strings.Builder
 		script.WriteString("set -e\n")
 
-		if favs, err := lerFavoritos(filepath.Join(c.GNOMEDir, "favoritos.txt")); errors.Is(err, os.ErrNotExist) {
+		if favs, err := lerFavoritos(c, filepath.Join(c.GNOMEDir, "favoritos.txt")); errors.Is(err, os.ErrNotExist) {
 			c.Log.Warnf("GNOME/favoritos.txt não encontrado: mantendo os favoritos atuais.")
 		} else if err != nil {
 			return err
@@ -41,7 +41,7 @@ var appsGnome = Module{
 			script.WriteString("gsettings set org.gnome.shell favorite-apps " + shQuote(strv(escolhidos)) + "\n")
 		}
 
-		pastas, err := lerPastas(filepath.Join(c.GNOMEDir, "pastas.txt"))
+		pastas, err := lerPastas(c, filepath.Join(c.GNOMEDir, "pastas.txt"))
 		if errors.Is(err, os.ErrNotExist) {
 			c.Log.Warnf("GNOME/pastas.txt não encontrado: mantendo as pastas atuais.")
 		} else if err != nil {
@@ -61,7 +61,7 @@ var appsGnome = Module{
 			// GNOME reordenar tudo.
 			script.WriteString("dconf reset -f /org/gnome/desktop/app-folders/\n")
 			script.WriteString("dconf load /org/gnome/desktop/app-folders/ <<'POST_INSTALL_PASTAS'\n")
-			script.WriteString(dconfPastas(pastas, org, diretorioExiste))
+			script.WriteString(dconfPastas(pastas, org, func(nome string) bool { return diretorioExiste(c, nome) }))
 			script.WriteString("POST_INSTALL_PASTAS\n")
 			script.WriteString("gsettings reset org.gnome.shell app-picker-layout\n")
 		}
@@ -87,14 +87,13 @@ type pasta struct {
 // lerPastas lê as seções "[Nome]" com "diretorio = X.directory",
 // "categorias = A B" e "apps = x y", na ordem do arquivo (que é a
 // prioridade).
-func lerPastas(path string) ([]pasta, error) {
-	f, err := os.Open(path)
+func lerPastas(a arquivos, path string) ([]pasta, error) {
+	data, err := a.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 	var out []pasta
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
 		linha := strings.TrimSpace(sc.Text())
 		if linha == "" || strings.HasPrefix(linha, "#") {
@@ -124,14 +123,13 @@ func lerPastas(path string) ([]pasta, error) {
 }
 
 // lerFavoritos lê um favorito por linha, com alternativas separadas por "|".
-func lerFavoritos(path string) ([][]string, error) {
-	f, err := os.Open(path)
+func lerFavoritos(a arquivos, path string) ([][]string, error) {
+	data, err := a.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 	var out [][]string
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
 		linha := strings.TrimSpace(sc.Text())
 		if linha == "" || strings.HasPrefix(linha, "#") {
@@ -190,11 +188,11 @@ func desktopsAtuais(c *Ctx) []string {
 // appsInstalados devolve os apps visíveis no menu (ID do .desktop ->
 // categorias). O ID de um arquivo em subpasta segue a especificação:
 // applications/kde/foo.desktop -> kde-foo.desktop.
-func appsInstalados(dirs, desktops []string) map[string][]string {
+func appsInstalados(a arquivos, dirs, desktops []string) map[string][]string {
 	vistos := map[string]bool{}
 	apps := map[string][]string{}
 	for _, dir := range dirs {
-		filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		a.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".desktop") {
 				return nil
 			}
@@ -207,7 +205,7 @@ func appsInstalados(dirs, desktops []string) map[string][]string {
 				return nil
 			}
 			vistos[id] = true
-			if cats, visivel := lerDesktop(path, desktops); visivel {
+			if cats, visivel := lerDesktop(a, path, desktops); visivel {
 				apps[id] = cats
 			}
 			return nil
@@ -219,15 +217,14 @@ func appsInstalados(dirs, desktops []string) map[string][]string {
 // lerDesktop lê o grupo [Desktop Entry] e diz se o app aparece no menu do
 // GNOME (Type=Application, sem NoDisplay/Hidden, respeitando OnlyShowIn,
 // NotShowIn e TryExec), devolvendo as categorias.
-func lerDesktop(path string, desktops []string) (cats []string, visivel bool) {
-	f, err := os.Open(path)
+func lerDesktop(a arquivos, path string, desktops []string) (cats []string, visivel bool) {
+	data, err := a.ReadFile(path)
 	if err != nil {
 		return nil, false
 	}
-	defer f.Close()
 	kv := map[string]string{}
 	dentro := false
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(bytes.NewReader(data))
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	for sc.Scan() {
 		linha := strings.TrimSpace(sc.Text())
@@ -264,18 +261,18 @@ func lerDesktop(path string, desktops []string) (cats []string, visivel bool) {
 		return nil, false
 	case cruza(lista("NotShowIn"), desktops):
 		return nil, false
-	case kv["TryExec"] != "" && !executavel(kv["TryExec"]):
+	case kv["TryExec"] != "" && !executavel(a, kv["TryExec"]):
 		return nil, false
 	}
 	return lista("Categories"), true
 }
 
-func executavel(prog string) bool {
+func executavel(a arquivos, prog string) bool {
 	if filepath.IsAbs(prog) {
-		info, err := os.Stat(prog)
+		info, err := a.Stat(prog)
 		return err == nil && info.Mode()&0o111 != 0
 	}
-	_, err := exec.LookPath(prog)
+	_, err := a.LookPath(prog)
 	return err == nil
 }
 
@@ -383,9 +380,9 @@ func gvStrv(items []string) string {
 
 // diretorioExiste diz se um arquivo .directory está instalado (o GNOME
 // procura em desktop-directories dos diretórios de dados do XDG).
-func diretorioExiste(nome string) bool {
+func diretorioExiste(a arquivos, nome string) bool {
 	for _, d := range []string{"/usr/local/share/desktop-directories", "/usr/share/desktop-directories"} {
-		if fileExists(filepath.Join(d, nome)) {
+		if existe(a, filepath.Join(d, nome)) {
 			return true
 		}
 	}

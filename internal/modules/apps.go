@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/vinicgobbi/post-install/internal/config"
-	"github.com/vinicgobbi/post-install/internal/runner"
 )
 
 var solaar = Module{
@@ -32,7 +31,7 @@ var solaar = Module{
 
 		// O pacote da PPA já traz a regra em /usr/lib/udev/rules.d; só
 		// o Flatpak (que não instala nada fora do sandbox) precisa dela aqui.
-		if regraSolaarInstalada() {
+		if regraSolaarInstalada(c) {
 			c.Log.Infof("Regra UDEV do Solaar já instalada pelo pacote.")
 			return nil
 		}
@@ -81,9 +80,9 @@ const solaarTag = "1.1.20"
 var regraSolaar string
 
 // regraSolaarInstalada diz se algum pacote já instalou a regra do Solaar.
-func regraSolaarInstalada() bool {
+func regraSolaarInstalada(c *Ctx) bool {
 	for _, dir := range []string{"/usr/lib/udev/rules.d", "/lib/udev/rules.d"} {
-		if fileExists(filepath.Join(dir, regraSolaarNome)) {
+		if c.FileExists(filepath.Join(dir, regraSolaarNome)) {
 			return true
 		}
 	}
@@ -94,7 +93,7 @@ func instalarSolaar(c *Ctx) error {
 	c.Log.Infof("Instalando Solaar pela PPA solaar-unifying/stable (sempre atualizada)...")
 	err := step(
 		func() error {
-			if runner.Exists("add-apt-repository") {
+			if c.Exists("add-apt-repository") {
 				return nil
 			}
 			return c.install("software-properties-common")

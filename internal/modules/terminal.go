@@ -5,8 +5,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/vinicgobbi/post-install/internal/runner"
 )
 
 // pacotesFerramentas devolve os utilitários de terminal. O FUSE 2 é para AppImages:
@@ -108,8 +106,8 @@ var ferramentas = Module{
 
 		// No Ubuntu o "bat" instala o binário como "batcat" por conflito de
 		// nome; cria um link para "bat" funcionar em todo lugar.
-		if !runner.Exists("bat") {
-			if batcat, err := lookPath("batcat"); err == nil {
+		if !c.Exists("bat") {
+			if batcat, err := c.LookPath("batcat"); err == nil {
 				if err := c.Symlink(batcat, "/usr/local/bin/bat"); err != nil {
 					return err
 				}
@@ -135,7 +133,7 @@ var shell = Module{
 		// domínio (AD/LDAP via sssd/winbind) resolvem por NSS, mas não estão
 		// no arquivo. A resolução restrita à fonte "files" distingue os casos.
 		if c.Probe("getent", "-s", "files", "passwd", c.User) {
-			zsh, err := lookPath("zsh")
+			zsh, err := c.LookPath("zsh")
 			if err != nil {
 				return errorf("zsh não encontrado: %w", err)
 			}

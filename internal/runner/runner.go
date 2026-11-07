@@ -34,6 +34,9 @@ type Runner struct {
 	// WorkDir é um diretório temporário exclusivo desta execução, removido
 	// pelo módulo de limpeza.
 	WorkDir string
+	// Host substitui a máquina real nas consultas (nil = máquina real).
+	// Veja host.go.
+	Host Host
 }
 
 // baseEnv é aplicado a todo comando: execução sem prompts do apt.
@@ -119,6 +122,10 @@ func (r *Runner) Probe(name string, args ...string) bool {
 }
 
 func (r *Runner) quiet(name string, args ...string) error {
+	if r.Host != nil {
+		_, err := r.consultarHost(name, args)
+		return err
+	}
 	cmd := r.command(nil, name, args...)
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
@@ -130,6 +137,10 @@ func (r *Runner) quiet(name string, args ...string) error {
 // Output executa uma consulta somente-leitura e devolve o stdout. Roda mesmo
 // em DryRun.
 func (r *Runner) Output(name string, args ...string) (string, error) {
+	if r.Host != nil {
+		out, err := r.consultarHost(name, args)
+		return string(out), err
+	}
 	cmd := r.command(nil, name, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -275,7 +286,11 @@ func (r *Runner) Get(url string, timeout time.Duration) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "post-install")
-	resp, err := getClient.Do(req)
+	client := getClient
+	if r.Host != nil {
+		client = &http.Client{Transport: r.Host.Transport(), CheckRedirect: semDowngrade}
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

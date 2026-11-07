@@ -265,6 +265,7 @@ internal/
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
     gnome_apps.go           #   favoritos e pastas do menu de apps (por categoria)
+    golden_test.go          #   testes golden do dry-run (cenários em testdata/golden/)
   config/flatpaks.go        # listas de Flatpaks (apps e jogos)
   update/                   # verificação e aplicação de versão nova (release do GitHub)
   tui/                      # interface Bubble Tea
@@ -307,6 +308,27 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 - `instalarChaveAPT(c, url, destino, fingerprints...)` — chave de repositório conferida
 - `c.Download(url, destino)`, `c.Temp(nome)`, `c.WriteFile(...)`, `c.AppendFile(...)`
 - `c.Log.Infof/Successf/Warnf(...)` — avisos marcam o módulo como "concluído com avisos"
+- `c.Exists(...)`, `c.LookPath(...)`, `c.ReadFile(...)`, `c.Stat(...)`, `c.FileExists(...)`,
+  `c.Glob(...)` — consultas à máquina (no lugar de `os.*`/`exec.LookPath`)
+
+Toda consulta à máquina ou à rede passa pelo `Ctx` porque os **testes
+golden** trocam a máquina por uma falsa. `golden_test.go` descreve cenários
+(Ubuntu 22.04, 24.04 e 26.04 recém-instalados e um 26.04 já configurado),
+roda todos os módulos em dry-run contra cada um e compara o resultado com
+`internal/modules/testdata/golden/<cenário>.txt`. Uma mudança em qualquer
+módulo, inclusive na lista de Flatpaks, aparece como diferença nesses
+arquivos. Se a mudança for intencional, regrave e revise o diff antes de
+commitar:
+
+```bash
+go test ./internal/modules -run TestGolden -update
+git diff internal/modules/testdata/golden/
+```
+
+Os commits e versões fixados pelo `pins.yml` aparecem normalizados (ex.:
+`<dotfilesCommit>`), então os PRs de atualização dos pins não mexem nos
+golden. Os arquivos de `GNOME/` usados nos testes são fixtures próprias, em
+`internal/modules/testdata/gnome/`.
 
 ## Detecção de sistema (`internal/sysinfo`)
 

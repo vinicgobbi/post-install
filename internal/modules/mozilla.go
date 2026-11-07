@@ -3,8 +3,6 @@ package modules
 import (
 	"strconv"
 	"strings"
-
-	"github.com/vinicgobbi/post-install/internal/runner"
 )
 
 // No Ubuntu, os pacotes "firefox" e "thunderbird" do repositório oficial são
@@ -83,7 +81,7 @@ func instalarFirefoxThunderbird(c *Ctx) error {
 // usuário ainda não tem um), para não perder favoritos, senhas e e-mails.
 // Sem --purge: o snapd guarda um snapshot automático por alguns dias.
 func removerSnapsMozilla(c *Ctx) {
-	if !runner.Exists("snap") {
+	if !c.Exists("snap") {
 		return
 	}
 	perfis := map[string]struct{ origem, destino string }{
