@@ -25,7 +25,7 @@ gsconnect@andyholmes.github.io
 lockkeys@vaina.lt
 
 # Repositório git
-nowbar@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowbar.git 49a8e3aa84dfa80fcbcd9462a4a7ecc4fa25aca0
+nowpill@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowpill.git e5340ede6fb7e13f42aca1b0129ff5c2ad3fba67
 
 # Vêm com o Ubuntu ("sistema": só existem nele; com "|": no Fedora, entra a
 # equivalente do extensions.gnome.org)
