@@ -458,7 +458,7 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
 - `extensoes.txt` — uma extensão (UUID) por linha; `#` comenta, o prefixo
   `-` mantém a extensão desativada (ex.: `-ding@rastersoft.com`) e uma URL
   git depois do UUID instala a extensão do repositório em vez do
-  extensions.gnome.org (ex.: a Now Bar). Depois da URL, opcionalmente, vem o
+  extensions.gnome.org (ex.: a Now Pill). Depois da URL, opcionalmente, vem o
   commit (ou tag) a instalar — recomendado, para uma mudança na branch
   principal não chegar sozinha às instalações (sem ele, o módulo avisa).
   A mesma lista serve às duas distribuições, com duas marcações:
@@ -654,7 +654,7 @@ Tudo o que é fixado tem quem avise quando sai versão nova — com um PR na
 - **Actions e módulos Go** — o Dependabot (`.github/dependabot.yml`), toda
   semana. As actions ficam fixadas pelo SHA do commit, com a tag num
   comentário.
-- **Commits dos repositórios pessoais, Now Bar e regra UDEV do Solaar** — o workflow `.github/workflows/pins.yml`, todo dia (ou à mão
+- **Commits dos repositórios pessoais, Now Pill e regra UDEV do Solaar** — o workflow `.github/workflows/pins.yml`, todo dia (ou à mão
   em Actions → Pins → Run workflow). Ele roda `scripts/atualizar-pins.sh`,
   que confere o último commit/tag de cada um, atualiza o pin e abre o PR `fix: atualiza versões fixadas` com links de
   comparação para revisar o que mudou. Se a regra do Solaar mudar, o PR

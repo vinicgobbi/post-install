@@ -35,7 +35,7 @@ show-mounts=false
 capslock-indicator='when-active'
 numlock-indicator='when-active'
 
-[nowbar]
+[nowpill]
 max-width=220
 panel-box='left'
 pill-width='fit'

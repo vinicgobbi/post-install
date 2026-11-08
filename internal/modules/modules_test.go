@@ -124,8 +124,8 @@ func TestLerListaExtensoes(t *testing.T) {
 	if !slices.Equal(desativar, []string{"ding@rastersoft.com"}) {
 		t.Errorf("desativar = %v", desativar)
 	}
-	if !slices.Contains(ativar, "nowbar@vinicgobbi.dev.br") || git["nowbar@vinicgobbi.dev.br"].Repo != "https://github.com/vinicgobbi/gnome-extension-nowbar.git" ||
-		len(git["nowbar@vinicgobbi.dev.br"].Ref) != 40 || len(git) != 1 {
+	if !slices.Contains(ativar, "nowpill@vinicgobbi.dev.br") || git["nowpill@vinicgobbi.dev.br"].Repo != "https://github.com/vinicgobbi/gnome-extension-nowpill.git" ||
+		len(git["nowpill@vinicgobbi.dev.br"].Ref) != 40 || len(git) != 1 {
 		t.Errorf("git = %v", git)
 	}
 }
