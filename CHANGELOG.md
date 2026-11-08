@@ -1,3 +1,9 @@
+## v3.1.1 (2026-11-08)
+
+### Fix
+
+- **gnome**: atualiza a Now Pill para a 2.0.0 e corrige o UUID dela
+
 ## v3.1.0 (2026-11-07)
 
 ### Feat
