@@ -1,6 +1,6 @@
 module github.com/vinicgobbi/post-install
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0
