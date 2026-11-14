@@ -194,14 +194,14 @@
 [INFO] [dry-run] usermod -aG kvm ana
 [OK] virt-manager instalado. 'ana' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).
 
-== temas_yaru (Ícones Yaru e tema adw-gtk3)
+== temas_yaru (Ícones Yaru, tema adw-gtk3 e botões das janelas)
 [INFO] Instalando os ícones Yaru e o tema adw-gtk3...
 [INFO] [dry-run] dnf install -y yaru-icon-theme adw-gtk3-theme
 [INFO] [dry-run] flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 [INFO] [dry-run] flatpak remote-modify --enable --no-filter flathub
 [INFO] [dry-run] flatpak install -y flathub org.gtk.Gtk3theme.adw-gtk3 org.gtk.Gtk3theme.adw-gtk3-dark
-[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark"; gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"'
-[OK] Ícones Yaru-dark e tema adw-gtk3-dark aplicados (nos apps Flatpak, a partir da próxima abertura de cada app).
+[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark"; gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"; gsettings set org.gnome.desktop.wm.preferences button-layout "appmenu:minimize,maximize,close"'
+[OK] Ícones Yaru-dark, tema adw-gtk3-dark (nos apps Flatpak, a partir da próxima abertura de cada app) e botões de minimizar e maximizar aplicados.
 
 == papel_parede (Papel de parede)
 [INFO] Aplicando o papel de parede 'paisagem.jpg'...

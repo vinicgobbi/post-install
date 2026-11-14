@@ -46,9 +46,11 @@ var temasYaru = Module{
 	// No Fedora, só os ícones são do Yaru; o tema segue o libadwaita, com o
 	// adw-gtk3 (o visual do libadwaita para os apps GTK 3) no sistema e nos
 	// Flatpaks, pelo Flathub. Os ícones do sistema os Flatpaks já enxergam.
+	// O GNOME puro também só mostra o botão de fechar nas janelas: os de
+	// minimizar e maximizar voltam, como no Ubuntu.
 	Fedora: &Variante{
-		Title: "Ícones Yaru e tema adw-gtk3",
-		Desc:  "Ícones Yaru (Yaru-dark) e o tema adw-gtk3-dark (o visual do libadwaita nos apps GTK 3), também nos apps Flatpak",
+		Title: "Ícones Yaru, tema adw-gtk3 e botões das janelas",
+		Desc:  "Ícones Yaru (Yaru-dark) e o tema adw-gtk3-dark (o visual do libadwaita nos apps GTK 3), também nos apps Flatpak, e os botões de minimizar e maximizar nas janelas",
 		Run:   aplicarYaruAdwGtk3,
 	},
 	// No Mint, o tema padrão é o Mint-Y: além dos ícones, o tema dos apps
@@ -87,9 +89,11 @@ func instalarYaru(c *Ctx, extra string) error {
 }
 
 // scriptIconesAdwGtk3 aplica os ícones Yaru-dark e o adw-gtk3-dark (escuro,
-// combinando com os ícones) como o usuário.
+// combinando com os ícones) como o usuário, e põe os botões de minimizar e
+// maximizar ao lado do de fechar (o padrão do Fedora é "appmenu:close").
 const scriptIconesAdwGtk3 = `gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark"
 gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"
+gsettings set org.gnome.desktop.wm.preferences button-layout "appmenu:minimize,maximize,close"
 `
 
 func aplicarYaruAdwGtk3(c *Ctx) error {
@@ -104,7 +108,7 @@ func aplicarYaruAdwGtk3(c *Ctx) error {
 	if err != nil {
 		return err
 	}
-	c.Log.Successf("Ícones Yaru-dark e tema adw-gtk3-dark aplicados (nos apps Flatpak, a partir da próxima abertura de cada app).")
+	c.Log.Successf("Ícones Yaru-dark, tema adw-gtk3-dark (nos apps Flatpak, a partir da próxima abertura de cada app) e botões de minimizar e maximizar aplicados.")
 	return nil
 }
 
