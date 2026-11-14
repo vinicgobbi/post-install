@@ -1,7 +1,7 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Ubuntu ou Fedora Workstation recém-instalada: mirrors, atualização do sistema, Podman,
+workstation Ubuntu, Fedora Workstation, Linux Mint (Cinnamon) ou Zorin OS (Core) recém-instalada: mirrors, atualização do sistema, Podman,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
@@ -19,15 +19,22 @@ VSCode"/"Copiar caminho" no Nautilus.
 - **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`), nas
   **versões em manutenção** — hoje **43, 44 e 45**. Todos os módulos existem
   nele, com os mesmos IDs; veja [No Fedora](#no-fedora) o que muda em cada
-  um.
+  um;
+- **Linux Mint com Cinnamon** (`ID=linuxmint` e o `cinnamon` instalado) e
+  **Zorin OS Core** (`ID=zorin` e o `gnome-shell` instalado), nas versões com
+  **base** numa das LTS do Ubuntu da lista (pelo `UBUNTU_CODENAME`) — hoje o
+  Mint 21.x e 22.x e o Zorin OS 17 e 18. Veja
+  [No Linux Mint e no Zorin OS](#no-linux-mint-e-no-zorin-os).
 
 A lista de versões fica em
 [`internal/sysinfo/versoes.go`](internal/sysinfo/versoes.go) e é mantida
 pelo workflow `versoes.yml` (veja [Versões suportadas](#versões-suportadas)).
 
 Qualquer outro sistema faz o programa parar com uma mensagem clara em vez de
-continuar em um estado incerto — inclusive derivados do Ubuntu (Linux Mint,
-Pop!_OS, Zorin...), sabores com outro desktop (Kubuntu, Xubuntu...), versões
+continuar em um estado incerto — inclusive outros derivados do Ubuntu
+(Pop!_OS, elementary...), as outras edições do Mint e do Zorin (MATE, Xfce,
+Lite e o LMDE, com base Debian), um Mint ou Zorin com base fora da lista,
+sabores com outro desktop (Kubuntu, Xubuntu...), versões
 fora do suporte padrão ou interinas entre as LTS suportadas, e as variantes
 atômicas do Fedora (Silverblue, Kinoite).
 
@@ -87,10 +94,44 @@ nomes das instruções oficiais) e as chaves, conferidas pelo fingerprint, em
 | `tailscale` | repositório RPM oficial |
 | `firewall` | `firewall-config`, a interface do firewalld, que o Fedora já traz ativo (a zona padrão não muda) |
 | `virt_manager` | libvirt com os daemons modulares (`virtqemud`...), o padrão do Fedora |
-| `temas_yaru` | só os **ícones** Yaru-dark; o tema é o **adw-gtk3-dark** (o visual do libadwaita nos apps GTK 3), também nos Flatpaks |
+| `temas_yaru` | só os **ícones** Yaru-dark; o tema é o **adw-gtk3-dark** (o visual do libadwaita nos apps GTK 3), também nos Flatpaks; e os botões de **minimizar e maximizar** voltam às janelas (`button-layout` `appmenu:minimize,maximize,close`) |
 | `extensoes_gnome` | no lugar da dock, do AppIndicator e do Tiling Assistant do Ubuntu, as equivalentes do extensions.gnome.org (veja [Extensões do GNOME](#extensões-do-gnome)) |
 | `nautilus` | `nautilus-python` e `python3-gobject` |
 | `go`, `node`, `claude_code`, `deploy_dev`, `ovpn`, `papel_parede`, `atalhos_gnome`, `apps_gnome` | iguais |
+
+## No Linux Mint e no Zorin OS
+
+Os dois usam o `apt` e os repositórios da base Ubuntu, então os módulos
+funcionam como no Ubuntu da base (ex.: o Mint 22 e o Zorin OS 18 como o
+Ubuntu 24.04): o codinome, o repositório da Microsoft, o formato do
+repositório da Mozilla e a origem do mise seguem a base. A TUI mostra, por
+exemplo, `Linux Mint 22.2 (base Ubuntu 24.04, noble)`.
+
+Nos dois:
+
+| ID | No Mint e no Zorin |
+|----|--------------------|
+| `mirrors` | só os repositórios da base Ubuntu mudam (no Mint, em `/etc/apt/sources.list.d/official-package-repositories.list`); o do Mint ou do Zorin fica como está |
+| `firefox_thunderbird` | também pelo repositório da Mozilla (prioridade 1000), no lugar dos `.deb` da distribuição; sem snaps, a remoção deles não faz nada |
+| `mise` | com base anterior à 26.04, pelo repositório APT oficial (`mise.jdx.dev/deb`, chave conferida), já que o `extrepo` não reconhece a distribuição |
+
+No **Zorin OS** (GNOME), o resto é igual ao Ubuntu; o `extensoes_gnome`
+ativa a barra de tarefas e o AppIndicator que vêm com o Zorin no lugar da
+dock e do AppIndicator do Ubuntu, sem baixar o Dash to Dock por cima da
+barra (veja [Extensões do GNOME](#extensões-do-gnome)).
+
+No **Linux Mint** (Cinnamon), os módulos do desktop têm uma variante do
+Cinnamon, com os mesmos IDs:
+
+| ID | No Mint |
+|----|---------|
+| `flatpaks` | só o Flathub e a lista de apps (o Mint já traz o Flatpak, e a loja dele mostra os Flatpaks); sem o GNOME Software com o plugin snap, que puxaria o snapd que o Mint bloqueia |
+| `temas_yaru` | os mesmos temas, mais o **tema dos apps** e os ícones em Yaru-dark (`org.cinnamon.desktop.interface`); o tema do painel do Cinnamon não muda |
+| `papel_parede` | `org.cinnamon.desktop.background` |
+| `atalhos_gnome` | **Atalhos do Cinnamon**: `GNOME/atalhos-cinnamon.dconf` carregado em `/org/cinnamon/` (Print e Shift+Super+S abrem o Gradia; Shift+Print e Alt+Print continuam com o Cinnamon) |
+| `nautilus` | **Nemo**: ações do Nemo (`~/.local/share/nemo/actions`) "Abrir com o VSCode" (na seleção ou no fundo da pasta) e "Copiar caminho", e a pasta Projetos |
+| `apps_gnome` | só os **favoritos do menu** (`org.cinnamon favorite-apps`), com as alternativas do Mint em `favoritos.txt`; o menu do Cinnamon não tem pastas |
+| `extensoes_gnome` | **indisponível** (as extensões do GNOME Shell não rodam no Cinnamon) |
 
 ## Módulos
 
@@ -359,6 +400,11 @@ internal/
    ```
    `Disponiveis(sys)` devolve a lista já adaptada à distribuição detectada;
    no Ubuntu, é a própria `All()`.
+4. O Zorin OS usa o `Run` do Ubuntu. No Linux Mint também, a menos que o
+   campo `Mint` tenha uma `Variante` — necessária nos módulos que mexem no
+   desktop (o Mint usa o Cinnamon). `Mint: &Variante{Indisponivel: true}`
+   tira o módulo do Mint. Um teste garante que todo módulo do grupo "GNOME
+   e aparência" tem a variante do Mint.
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -382,7 +428,8 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 
 Toda consulta à máquina ou à rede passa pelo `Ctx` porque os **testes
 golden** trocam a máquina por uma falsa. `golden_test.go` descreve cenários
-(Ubuntu 22.04, 24.04 e 26.04 recém-instalados e um 26.04 já configurado),
+(Ubuntu 22.04, 24.04 e 26.04 recém-instalados, um 26.04 já configurado,
+o Fedora 44, o Linux Mint 22 e o Zorin OS 18),
 roda todos os módulos em dry-run contra cada um e compara o resultado com
 `internal/modules/testdata/golden/<cenário>.txt`. Uma mudança em qualquer
 módulo, inclusive na lista de Flatpaks, aparece como diferença nesses
@@ -404,9 +451,15 @@ golden. Os arquivos de `GNOME/` usados nos testes são fixtures próprias, em
 `sysinfo.Detect` lê `/etc/os-release`, recusa o que não for suportado (veja
 [Sistemas suportados](#sistemas-suportados)) e preenche:
 
-- `Familia` — `ubuntu` ou `fedora` (este só com `VARIANT_ID=workstation`)
-- `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`), usado
-  na URL do repositório do Tailscale e no teste de mirrors; vazio no Fedora
+- `Familia` — `ubuntu` ou `fedora` (este só com `VARIANT_ID=workstation`);
+  o Linux Mint e o Zorin OS são da família `ubuntu`
+- `Desktop` — `Cinnamon` no Mint (confere o binário `cinnamon`), `GNOME`
+  nos outros (confere o `gnome-shell`)
+- `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`; no
+  Mint e no Zorin, o da base), usado na URL do repositório do Tailscale e no
+  teste de mirrors; vazio no Fedora
+- `UbuntuVersion` — a versão do Ubuntu (no Mint e no Zorin, a da base,
+  tirada de `versoes.go` pelo codinome); vazio no Fedora
 - `MSRepoVersion` — a versão nas URLs do repositório da Microsoft
   (msodbcsql/mssql-tools), tirada de `versoes.go`: no Ubuntu, a da própria LTS
   (ou a da última da lista, nas mais novas); no Fedora, a do RHEL
@@ -464,14 +517,16 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
   A mesma lista serve às duas distribuições, com duas marcações:
   - `a | b` — equivalentes: a primeira que vier com o sistema é ativada; se
     nenhuma vier, a **última** da linha é baixada do extensions.gnome.org
-    (ex.: `ubuntu-dock@ubuntu.com | dash-to-dock@micxgx.gmail.com` — no
-    Ubuntu, a dock dele; no Fedora, o Dash to Dock, que usa as mesmas
-    preferências de `extensoes.dconf`);
+    (ex.: `ubuntu-dock@ubuntu.com | zorin-taskbar@zorinos.com | dash-to-dock@micxgx.gmail.com`
+    — no Ubuntu, a dock dele; no Zorin, a barra de tarefas dele; no Fedora,
+    o Dash to Dock, que usa as mesmas preferências de `extensoes.dconf`);
   - `uuid sistema` — só é ativada se vier com o sistema, nunca é baixada
     (ex.: as do snapd, que só existem no Ubuntu);
 - `extensoes.dconf` — as preferências delas, no formato do `dconf dump`;
 - `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
-  `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
+  `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome));
+- `atalhos-cinnamon.dconf` — os atalhos no Linux Mint (Cinnamon), no formato
+  do Cinnamon (o `binding` é uma lista).
 
 O módulo `extensoes_gnome`, como o usuário alvo:
 
@@ -692,8 +747,9 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 
 ## Requisitos
 
-- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, ou Fedora Workstation 43, 44 ou
-  45 (ou mais novos, com confirmação) — veja
+- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, Fedora Workstation 43, 44 ou
+  45 (ou mais novos, com confirmação), ou Linux Mint (Cinnamon) e Zorin OS
+  (Core) com uma dessas bases Ubuntu — veja
   [Sistemas suportados](#sistemas-suportados).
 - Acesso root (`sudo`) — exceto em `--dry-run`.
 - Terminal interativo para a TUI (sem ele, o modo texto é usado).

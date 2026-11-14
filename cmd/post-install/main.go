@@ -1,5 +1,5 @@
-// post-install configura uma workstation Ubuntu ou Fedora Workstation
-// recém-instalada: mirrors,
+// post-install configura uma workstation Ubuntu, Fedora Workstation, Linux
+// Mint (Cinnamon) ou Zorin OS (Core) recém-instalada: mirrors,
 // atualização, repositórios, Podman/VSCode/PHP/SQL Server, Flatpaks,
 // Tailscale, Chrome, Bitwarden, temas, ambiente do usuário, mise (Node, pnpm,
 // Rust, Ruby), Claude Code,
