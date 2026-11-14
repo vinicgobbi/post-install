@@ -2,6 +2,7 @@ package sysinfo
 
 import (
 	"bufio"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -12,20 +13,22 @@ func kv(s string) map[string]string {
 
 func TestFromRelease(t *testing.T) {
 	tests := []struct {
-		name       string
-		osRelease  string
-		familia    Familia
-		codename   string
-		msVersion  string
-		warnings   int
-		naoTestada bool
-		wantErr    bool
+		name      string
+		osRelease string
+		familia   Familia
+		codename  string
+		msVersion string
+		// ubuntuVersion vazio = não confere (casos antigos, ou o Fedora).
+		ubuntuVersion string
+		warnings      int
+		naoTestada    bool
+		wantErr       bool
 	}{
 		{name: "ubuntu jammy", osRelease: `ID=ubuntu
 ID_LIKE=debian
 VERSION_ID="22.04"
 VERSION_CODENAME=jammy
-UBUNTU_CODENAME=jammy`, familia: Ubuntu, codename: "jammy", msVersion: "22.04"},
+UBUNTU_CODENAME=jammy`, familia: Ubuntu, codename: "jammy", msVersion: "22.04", ubuntuVersion: "22.04"},
 		{name: "ubuntu noble", osRelease: `ID=ubuntu
 ID_LIKE=debian
 VERSION_ID="24.04"
@@ -36,14 +39,39 @@ VERSION_ID="26.04"
 UBUNTU_CODENAME=resolute`, familia: Ubuntu, codename: "resolute", msVersion: "26.04"},
 		{name: "ubuntu futuro usa fallback e pede confirmação", osRelease: `ID=ubuntu
 VERSION_ID="26.10"
-UBUNTU_CODENAME=zesty2`, familia: Ubuntu, codename: "zesty2", msVersion: "26.04", warnings: 2, naoTestada: true},
+UBUNTU_CODENAME=zesty2`, familia: Ubuntu, codename: "zesty2", msVersion: "26.04", ubuntuVersion: "26.10", warnings: 2, naoTestada: true},
 		{name: "ubuntu focal nao suportado", osRelease: `ID=ubuntu
 VERSION_ID="20.04"
 UBUNTU_CODENAME=focal`, wantErr: true},
 		{name: "ubuntu interina antiga nao suportada", osRelease: `ID=ubuntu
 VERSION_ID="25.04"
 UBUNTU_CODENAME=plucky`, wantErr: true},
-		{name: "mint nao suportado", osRelease: `ID=linuxmint
+		{name: "mint 22 pela base noble", osRelease: `ID=linuxmint
+ID_LIKE="ubuntu debian"
+VERSION_ID="22.2"
+VERSION_CODENAME=zara
+UBUNTU_CODENAME=noble`, familia: Ubuntu, codename: "noble", msVersion: "24.04", ubuntuVersion: "24.04"},
+		{name: "mint 21 pela base jammy", osRelease: `ID=linuxmint
+VERSION_ID="21.3"
+VERSION_CODENAME=virginia
+UBUNTU_CODENAME=jammy`, familia: Ubuntu, codename: "jammy", msVersion: "22.04", ubuntuVersion: "22.04"},
+		{name: "mint com base fora do suporte", osRelease: `ID=linuxmint
+VERSION_ID="20.3"
+UBUNTU_CODENAME=focal`, wantErr: true},
+		{name: "lmde nao suportado", osRelease: `ID=linuxmint
+ID_LIKE=debian
+VERSION_ID="7"
+VERSION_CODENAME=gigi
+DEBIAN_CODENAME=trixie`, wantErr: true},
+		{name: "zorin 18 pela base noble", osRelease: `ID=zorin
+ID_LIKE="ubuntu debian"
+VERSION_ID="18"
+VERSION_CODENAME=noble
+UBUNTU_CODENAME=noble`, familia: Ubuntu, codename: "noble", msVersion: "24.04", ubuntuVersion: "24.04"},
+		{name: "zorin 17 pela base jammy", osRelease: `ID=zorin
+VERSION_ID="17"
+UBUNTU_CODENAME=jammy`, familia: Ubuntu, codename: "jammy", msVersion: "22.04", ubuntuVersion: "22.04"},
+		{name: "pop nao suportado", osRelease: `ID=pop
 ID_LIKE="ubuntu debian"
 UBUNTU_CODENAME=noble`, wantErr: true},
 		{name: "debian nao suportado", osRelease: `ID=debian
@@ -75,7 +103,43 @@ PRETTY_NAME="Fedora Linux 44 (Workstation Edition)"`, familia: Fedora, msVersion
 				len(info.Warnings) != tt.warnings || info.NaoTestada != tt.naoTestada {
 				t.Errorf("resultado inesperado: %+v", info)
 			}
+			if tt.ubuntuVersion != "" && info.UbuntuVersion != tt.ubuntuVersion {
+				t.Errorf("UbuntuVersion = %q, esperado %q", info.UbuntuVersion, tt.ubuntuVersion)
+			}
 		})
+	}
+}
+
+// O Mint exige o Cinnamon; as outras, o GNOME Shell (o que recusa o Mint
+// MATE/Xfce e o Zorin Lite).
+func TestConferirDesktop(t *testing.T) {
+	tests := []struct {
+		id      string
+		bins    []string
+		want    Desktop
+		wantErr bool
+	}{
+		{id: "ubuntu", bins: []string{"gnome-shell"}, want: GNOME},
+		{id: "ubuntu", bins: []string{"cinnamon"}, wantErr: true},
+		{id: IDZorin, bins: []string{"gnome-shell"}, want: GNOME},
+		{id: IDZorin, bins: []string{"xfce4-session"}, wantErr: true},
+		{id: IDMint, bins: []string{"cinnamon"}, want: Cinnamon},
+		{id: IDMint, bins: []string{"cinnamon", "gnome-shell"}, want: Cinnamon},
+		{id: IDMint, bins: []string{"mate-session"}, wantErr: true},
+		{id: "fedora", bins: []string{"gnome-shell"}, want: GNOME},
+	}
+	for _, tt := range tests {
+		info := &Info{ID: tt.id, PrettyName: tt.id}
+		err := conferirDesktop(info, func(bin string) bool { return slices.Contains(tt.bins, bin) })
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("%s com %v: esperava erro", tt.id, tt.bins)
+			}
+			continue
+		}
+		if err != nil || info.Desktop != tt.want {
+			t.Errorf("%s com %v: Desktop = %q, erro %v; esperado %q", tt.id, tt.bins, info.Desktop, err, tt.want)
+		}
 	}
 }
 
@@ -115,5 +179,9 @@ func TestSummary(t *testing.T) {
 	}
 	if s := (&Info{PrettyName: "Fedora Linux 44 (Workstation Edition)"}).Summary(); s != "Fedora Linux 44 (Workstation Edition)" {
 		t.Errorf("Summary do Fedora = %q", s)
+	}
+	mint := &Info{ID: IDMint, PrettyName: "Linux Mint 22.2", Codename: "noble", UbuntuVersion: "24.04"}
+	if s := mint.Summary(); s != "Linux Mint 22.2 (base Ubuntu 24.04, noble)" {
+		t.Errorf("Summary do Mint = %q", s)
 	}
 }
