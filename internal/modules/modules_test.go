@@ -422,8 +422,14 @@ func TestDisponiveisUbuntu(t *testing.T) {
 // As dependências de cada módulo disponível também estão disponíveis na
 // mesma distribuição, e cada variante tem Run.
 func TestDisponiveisCoerentes(t *testing.T) {
-	for _, f := range []sysinfo.Familia{sysinfo.Ubuntu, sysinfo.Fedora} {
-		mods := Disponiveis(&sysinfo.Info{Familia: f})
+	for _, sys := range []*sysinfo.Info{
+		{Familia: sysinfo.Ubuntu},
+		{Familia: sysinfo.Fedora},
+		{Familia: sysinfo.Ubuntu, ID: sysinfo.IDMint},
+		{Familia: sysinfo.Ubuntu, ID: sysinfo.IDZorin},
+	} {
+		f := string(sys.Familia) + "/" + sys.ID
+		mods := Disponiveis(sys)
 		ids := map[string]bool{}
 		for _, m := range mods {
 			ids[m.ID] = true
@@ -458,6 +464,72 @@ func TestPara(t *testing.T) {
 	m.Fedora = &Variante{}
 	if f, ok := m.Para(sysinfo.Fedora); !ok || f.Run == nil || f.Run(nil) != nil || f.Desc != "no Ubuntu" {
 		t.Error("variante vazia deveria reaproveitar o Run e a descrição do Ubuntu")
+	}
+}
+
+// A variante do Mint fica por cima do módulo do Ubuntu; sem ela, o Mint usa
+// o próprio módulo do Ubuntu, e Indisponivel o tira da lista.
+func TestParaSistemaMint(t *testing.T) {
+	mint := &sysinfo.Info{Familia: sysinfo.Ubuntu, ID: sysinfo.IDMint}
+	zorin := &sysinfo.Info{Familia: sysinfo.Ubuntu, ID: sysinfo.IDZorin}
+	m := Module{ID: "x", Title: "X", Desc: "no Ubuntu", Run: func(*Ctx) error { return nil }}
+	if u, ok := m.ParaSistema(mint); !ok || u.Desc != "no Ubuntu" {
+		t.Error("sem variante, o Mint deveria usar o módulo do Ubuntu")
+	}
+	falhou := errorf("mint")
+	m.Mint = &Variante{Title: "No Mint", Run: func(*Ctx) error { return falhou }}
+	if v, ok := m.ParaSistema(mint); !ok || v.Title != "No Mint" || v.Desc != "no Ubuntu" || v.Run(nil) != falhou || v.Mint != nil {
+		t.Errorf("variante do Mint mal aplicada: %+v", v)
+	}
+	if z, ok := m.ParaSistema(zorin); !ok || z.Title != "X" || z.Run(nil) != nil {
+		t.Error("o Zorin deveria usar o módulo do Ubuntu")
+	}
+	m.Mint = &Variante{Indisponivel: true}
+	if _, ok := m.ParaSistema(mint); ok {
+		t.Error("Indisponivel deveria tirar o módulo do Mint")
+	}
+}
+
+// No Mint (Cinnamon) só as extensões do GNOME ficam de fora; os outros
+// módulos do grupo do desktop têm variante do Cinnamon.
+func TestModulosNoMint(t *testing.T) {
+	disp := map[string]Module{}
+	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Ubuntu, ID: sysinfo.IDMint}) {
+		disp[m.ID] = m
+	}
+	for _, m := range All() {
+		_, ok := disp[m.ID]
+		if m.ID == "extensoes_gnome" {
+			if ok {
+				t.Error("extensoes_gnome não deveria estar disponível no Mint")
+			}
+			continue
+		}
+		if !ok {
+			t.Errorf("%s indisponível no Mint", m.ID)
+		}
+		if m.Grupo == GrupoGNOME && m.Mint == nil {
+			t.Errorf("%s (grupo %s) sem variante do Mint: rodaria os comandos do GNOME no Cinnamon", m.ID, GrupoGNOME)
+		}
+	}
+}
+
+func TestTrocarMirrorUbuntu(t *testing.T) {
+	const m = "http://mirror.exemplo.br/ubuntu/"
+	casos := map[string]string{
+		// Ubuntu 22.04 (uma linha) e o deb822 do 24.04 em diante.
+		"deb http://archive.ubuntu.com/ubuntu/ jammy main\ndeb http://security.ubuntu.com/ubuntu/ jammy-security main\n": "deb " + m + " jammy main\ndeb " + m + " jammy-security main\n",
+		"URIs: http://archive.ubuntu.com/ubuntu/\nSuites: noble\n":                                                       "URIs: " + m + "\nSuites: noble\n",
+		"URIs: mirror://mirrors.ubuntu.com/mirrors.txt":                                                                  "URIs: " + m,
+		// Linux Mint: sem a barra final, e o repositório do Mint fica.
+		"deb http://packages.linuxmint.com zara main upstream import backport\ndeb http://archive.ubuntu.com/ubuntu noble main\n": "deb http://packages.linuxmint.com zara main upstream import backport\ndeb " + m + " noble main\n",
+		// Outros endereços não mudam.
+		"deb http://archive.ubuntu.com/ubuntu-ports noble main\n": "deb http://archive.ubuntu.com/ubuntu-ports noble main\n",
+	}
+	for in, want := range casos {
+		if got := trocarMirrorUbuntu(in, m); got != want {
+			t.Errorf("trocarMirrorUbuntu(%q) = %q, esperado %q", in, got, want)
+		}
 	}
 }
 

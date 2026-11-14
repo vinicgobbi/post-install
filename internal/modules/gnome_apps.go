@@ -73,6 +73,37 @@ var appsGnome = Module{
 		return nil
 	},
 	Fedora: &Variante{},
+	// O menu do Cinnamon já separa os apps pelas categorias e não tem pastas
+	// configuráveis: só os favoritos dele (org.cinnamon favorite-apps).
+	Mint: &Variante{
+		Title: "Favoritos do menu de apps",
+		Desc:  "Fixa os apps de GNOME/favoritos.txt nos favoritos do menu do Cinnamon, conforme os apps instalados na máquina",
+		Run:   aplicarFavoritosCinnamon,
+	},
+}
+
+func aplicarFavoritosCinnamon(c *Ctx) error {
+	home, err := userHome(c)
+	if err != nil {
+		return err
+	}
+	favs, err := lerFavoritos(c, filepath.Join(c.GNOMEDir, "favoritos.txt"))
+	if errors.Is(err, os.ErrNotExist) {
+		c.Log.Warnf("GNOME/favoritos.txt não encontrado: mantendo os favoritos atuais.")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	apps := appsInstalados(c, dirsAplicativos(home), desktopsAtuais(c))
+	c.Log.Infof("%d apps visíveis no menu.", len(apps))
+	escolhidos := escolherFavoritos(favs, apps)
+	c.Log.Infof("Favoritos: %s", strings.Join(escolhidos, ", "))
+	if err := c.AsUser("gsettings set org.cinnamon favorite-apps " + shQuote(strv(escolhidos))); err != nil {
+		return err
+	}
+	c.Log.Successf("Favoritos do menu de apps aplicados.")
+	return nil
 }
 
 // ---- Configuração ----
@@ -177,9 +208,13 @@ func dirsAplicativos(home string) []string {
 	}
 }
 
-// desktopsAtuais são os nomes que o GNOME usa em OnlyShowIn/NotShowIn (o
-// Ubuntu acrescenta "ubuntu", como em XDG_CURRENT_DESKTOP=ubuntu:GNOME).
+// desktopsAtuais são os nomes que o desktop usa em OnlyShowIn/NotShowIn (o
+// Ubuntu acrescenta "ubuntu", como em XDG_CURRENT_DESKTOP=ubuntu:GNOME; o
+// Cinnamon é "X-Cinnamon").
 func desktopsAtuais(c *Ctx) []string {
+	if c.mint() {
+		return []string{"X-Cinnamon"}
+	}
 	if c.Sys.ID == "ubuntu" {
 		return []string{"ubuntu", "GNOME"}
 	}

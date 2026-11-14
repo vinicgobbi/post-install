@@ -116,6 +116,9 @@ var extensoesGnome = Module{
 		return nil
 	},
 	Fedora: &Variante{},
+	// As extensões do GNOME Shell não rodam no Cinnamon (que tem os próprios
+	// applets e extensões, sem equivalente na lista).
+	Mint: &Variante{Indisponivel: true},
 }
 
 // extGit é a origem de uma extensão instalada de um repositório git. Ref é o

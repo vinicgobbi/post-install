@@ -14,30 +14,47 @@ var papelParede = Module{
 	Title: "Papel de parede",
 	Desc:  "Copia o papel de parede escolhido para ~/.local/share/backgrounds e aplica no GNOME",
 	Run: func(c *Ctx) error {
-		if c.Wallpaper == "" {
-			c.Log.Infof("Nenhum papel de parede escolhido: mantendo o atual.")
-			return nil
-		}
-		home, err := userHome(c)
-		if err != nil {
-			return err
-		}
-		// Mesmo lugar onde o próprio GNOME guarda as imagens escolhidas em
-		// Configurações → Plano de fundo.
-		destino := filepath.Join(home, ".local/share/backgrounds", filepath.Base(c.Wallpaper))
-		uri := (&url.URL{Scheme: "file", Path: destino}).String()
-
-		c.Log.Infof("Aplicando o papel de parede '%s'...", filepath.Base(c.Wallpaper))
-		aplicar := `gsettings set org.gnome.desktop.background picture-uri ` + shQuote(uri) + `
+		return aplicarPapelParede(c, func(uri string) string {
+			return `gsettings set org.gnome.desktop.background picture-uri ` + shQuote(uri) + `
 gsettings set org.gnome.desktop.background picture-uri-dark ` + shQuote(uri) + `
 gsettings set org.gnome.desktop.background picture-options 'zoom'`
-		if err := c.AsUser("set -e\ninstall -D -m 0644 " + shQuote(c.Wallpaper) + " " + shQuote(destino) + "\n" + aplicar); err != nil {
-			return err
-		}
-		c.Log.Successf("Papel de parede aplicado: %s", destino)
-		return nil
+		})
 	},
 	Fedora: &Variante{},
+	Mint: &Variante{
+		Desc: "Copia o papel de parede escolhido para ~/.local/share/backgrounds e aplica no Cinnamon",
+		Run: func(c *Ctx) error {
+			return aplicarPapelParede(c, func(uri string) string {
+				return `gsettings set org.cinnamon.desktop.background picture-uri ` + shQuote(uri) + `
+gsettings set org.cinnamon.desktop.background picture-options 'zoom'`
+			})
+		},
+	},
+}
+
+// aplicarPapelParede copia a imagem escolhida e roda, como o usuário, os
+// comandos que gsettings devolve para a URI da cópia.
+func aplicarPapelParede(c *Ctx, gsettings func(uri string) string) error {
+	if c.Wallpaper == "" {
+		c.Log.Infof("Nenhum papel de parede escolhido: mantendo o atual.")
+		return nil
+	}
+	home, err := userHome(c)
+	if err != nil {
+		return err
+	}
+	// Mesmo lugar onde o próprio GNOME guarda as imagens escolhidas em
+	// Configurações → Plano de fundo.
+	destino := filepath.Join(home, ".local/share/backgrounds", filepath.Base(c.Wallpaper))
+	uri := (&url.URL{Scheme: "file", Path: destino}).String()
+
+	c.Log.Infof("Aplicando o papel de parede '%s'...", filepath.Base(c.Wallpaper))
+	aplicar := gsettings(uri)
+	if err := c.AsUser("set -e\ninstall -D -m 0644 " + shQuote(c.Wallpaper) + " " + shQuote(destino) + "\n" + aplicar); err != nil {
+		return err
+	}
+	c.Log.Successf("Papel de parede aplicado: %s", destino)
+	return nil
 }
 
 // userHome devolve a home do usuário alvo (via NSS, cobrindo contas de domínio).

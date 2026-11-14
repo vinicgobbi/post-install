@@ -12,21 +12,36 @@ var atalhosGnome = Module{
 	Title: "Atalhos do GNOME",
 	Desc:  "Aplica GNOME/atalhos.dconf: Print e Shift+Super+S abrem o Gradia, gravação de tela em Shift+Super+R e volume de 2 em 2%",
 	Run: func(c *Ctx) error {
-		conf := filepath.Join(c.GNOMEDir, "atalhos.dconf")
-		if !c.FileExists(conf) {
-			c.Log.Warnf("%s não encontrado: pulando atalhos.", conf)
-			return nil
-		}
-		if err := garantirFlatpak(c, gradiaFlatpak, "Gradia"); err != nil {
-			return err
-		}
-		if err := c.AsUser("dconf load /org/gnome/ < " + shQuote(conf)); err != nil {
-			return err
-		}
-		c.Log.Successf("Atalhos do GNOME aplicados.")
-		return nil
+		return aplicarAtalhos(c, "atalhos.dconf", "/org/gnome/", "GNOME")
 	},
 	Fedora: &Variante{},
+	// O Cinnamon guarda os atalhos em outro lugar e em outro formato (o
+	// binding é uma lista), daí o arquivo próprio.
+	Mint: &Variante{
+		Title: "Atalhos do Cinnamon",
+		Desc:  "Aplica GNOME/atalhos-cinnamon.dconf: Print e Shift+Super+S abrem o Gradia",
+		Run: func(c *Ctx) error {
+			return aplicarAtalhos(c, "atalhos-cinnamon.dconf", "/org/cinnamon/", "Cinnamon")
+		},
+	},
+}
+
+// aplicarAtalhos carrega o arquivo de GNOMEDir no caminho do dconf dado,
+// depois de garantir o Gradia, que os atalhos chamam.
+func aplicarAtalhos(c *Ctx, arquivo, caminho, desktop string) error {
+	conf := filepath.Join(c.GNOMEDir, arquivo)
+	if !c.FileExists(conf) {
+		c.Log.Warnf("%s não encontrado: pulando atalhos.", conf)
+		return nil
+	}
+	if err := garantirFlatpak(c, gradiaFlatpak, "Gradia"); err != nil {
+		return err
+	}
+	if err := c.AsUser("dconf load " + caminho + " < " + shQuote(conf)); err != nil {
+		return err
+	}
+	c.Log.Successf("Atalhos do %s aplicados.", desktop)
+	return nil
 }
 
 // garantirFlatpak instala um app chamado por atalho (ex.: o Gradia, que

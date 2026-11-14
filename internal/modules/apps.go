@@ -214,6 +214,24 @@ var flatpaks = Module{
 			return nil
 		},
 	},
+	// O Mint já traz o Flatpak e o Flathub, e a loja dele (mintinstall) já
+	// mostra os Flatpaks. O plugin snap do GNOME Software puxaria o snapd,
+	// que o Mint bloqueia (/etc/apt/preferences.d/nosnap.pref).
+	Mint: &Variante{
+		Desc: "Flathub e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Configurando Flatpak e instalando apps...")
+			if err := step(
+				func() error { return c.garantir("flatpak", "flatpak") },
+				c.ensureFlathub,
+				func() error { return c.flatpakInstall(config.Flatpaks...) },
+			); err != nil {
+				return err
+			}
+			c.Log.Successf("Aplicativos Flatpak instalados.")
+			return nil
+		},
+	},
 }
 
 var flatpaksJogos = Module{

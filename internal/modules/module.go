@@ -1,8 +1,9 @@
 // Package modules contém as etapas da pós-instalação. Cada módulo pertence a
 // um grupo e é autocontido (configura o próprio repositório, se precisar);
 // a ordem de execução é a ordem da lista em All. O Run de cada módulo é o
-// caminho do Ubuntu; a variante do Fedora fica no campo Fedora, e
-// Disponiveis devolve a lista já adaptada à distribuição detectada.
+// caminho do Ubuntu (e do Zorin OS); a variante do Fedora fica no campo
+// Fedora, a do Linux Mint (Cinnamon) no campo Mint, e Disponiveis devolve a
+// lista já adaptada à distribuição detectada.
 package modules
 
 import (
@@ -36,6 +37,9 @@ type Module struct {
 	Run func(c *Ctx) error
 	// Fedora é a variante do Fedora Workstation (nil = indisponível nele).
 	Fedora *Variante
+	// Mint é a variante do Linux Mint com Cinnamon, que é da família Ubuntu:
+	// nil = igual ao Ubuntu; Indisponivel = some no Mint.
+	Mint *Variante
 }
 
 // Variante é como o módulo trabalha numa distribuição que não o Ubuntu.
@@ -48,23 +52,39 @@ type Variante struct {
 	Desc  string
 	Deps  []string
 	Run   func(c *Ctx) error
+	// Indisponivel tira o módulo da distribuição (ex.: as extensões do GNOME
+	// no Mint, que usa o Cinnamon).
+	Indisponivel bool
 }
 
 // Para devolve o módulo como ele roda na família dada, e se está disponível
 // nela.
 func (m Module) Para(f sysinfo.Familia) (Module, bool) {
-	var v *Variante
 	switch f {
 	case sysinfo.Ubuntu, "":
 		return m, true
 	case sysinfo.Fedora:
-		v = m.Fedora
+		return m.aplicar(m.Fedora)
 	}
-	if v == nil {
+	return Module{}, false
+}
+
+// ParaSistema é o Para da família do sistema e, no Linux Mint, com a
+// variante do Mint por cima (sem ela, vale o módulo do Ubuntu).
+func (m Module) ParaSistema(sys *sysinfo.Info) (Module, bool) {
+	if sys.Mint() && m.Mint != nil {
+		return m.aplicar(m.Mint)
+	}
+	return m.Para(sys.Familia)
+}
+
+// aplicar devolve o módulo com a variante v (nil = indisponível).
+func (m Module) aplicar(v *Variante) (Module, bool) {
+	if v == nil || v.Indisponivel {
 		return Module{}, false
 	}
 	out := m
-	out.Fedora = nil
+	out.Fedora, out.Mint = nil, nil
 	if v.Run != nil {
 		out.Run = v.Run
 	}
@@ -85,7 +105,7 @@ func (m Module) Para(f sysinfo.Familia) (Module, bool) {
 func Disponiveis(sys *sysinfo.Info) []Module {
 	var out []Module
 	for _, m := range All() {
-		if mm, ok := m.Para(sys.Familia); ok {
+		if mm, ok := m.ParaSistema(sys); ok {
 			out = append(out, mm)
 		}
 	}
@@ -166,6 +186,9 @@ func All() []Module {
 
 // fedora diz se o sistema é da família Fedora (sem Sys, vale o Ubuntu).
 func (c *Ctx) fedora() bool { return c.Sys != nil && c.Sys.Familia == sysinfo.Fedora }
+
+// mint diz se o sistema é o Linux Mint (com Cinnamon).
+func (c *Ctx) mint() bool { return c.Sys != nil && c.Sys.Mint() }
 
 // install instala pacotes de forma não interativa, com o apt no Ubuntu e o
 // dnf no Fedora. Os nomes são os da distribuição: cada variante passa os

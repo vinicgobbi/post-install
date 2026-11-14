@@ -10,13 +10,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 var mirrors = Module{
 	ID:    "mirrors",
 	Grupo: GrupoSistema,
 	Title: "Otimizar mirrors",
-	Desc:  "Aponta o APT para o mirror do Ubuntu mais rápido medido nesta rede",
+	Desc:  "Aponta o APT para o mirror do Ubuntu mais rápido medido nesta rede (no Mint e no Zorin, os repositórios da base Ubuntu)",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Otimizando a seleção de espelhos (mirrors) do APT...")
 		return otimizarMirrorsUbuntu(c)
@@ -62,12 +63,7 @@ func otimizarMirrorsUbuntu(c *Ctx) error {
 		c.Log.Successf("Mirror mais rápido nos testes: %s", mirror)
 	}
 
-	repl := strings.NewReplacer(
-		"http://archive.ubuntu.com/ubuntu/", mirror,
-		"http://security.ubuntu.com/ubuntu/", mirror,
-		"mirror://mirrors.ubuntu.com/mirrors.txt", mirror,
-	)
-	for _, arquivo := range []string{"/etc/apt/sources.list", "/etc/apt/sources.list.d/ubuntu.sources"} {
+	for _, arquivo := range arquivosFontesUbuntu {
 		info, err := c.Stat(arquivo)
 		if err != nil {
 			continue
@@ -76,12 +72,33 @@ func otimizarMirrorsUbuntu(c *Ctx) error {
 		if err != nil {
 			return err
 		}
-		if err := c.WriteFile(arquivo, repl.Replace(string(data)), info.Mode().Perm()); err != nil {
+		if err := c.WriteFile(arquivo, trocarMirrorUbuntu(string(data), mirror), info.Mode().Perm()); err != nil {
 			return err
 		}
 	}
 	c.Log.Successf("APT otimizado: repositórios apontando para o mirror com melhor tempo de resposta medido agora.")
 	return nil
+}
+
+// arquivosFontesUbuntu são os arquivos do APT com os repositórios do Ubuntu:
+// os do próprio Ubuntu (o formato de uma linha até o 22.04 e o deb822 do
+// 24.04 em diante) e o do Linux Mint, que junta os repositórios dele aos da
+// base Ubuntu (o do Mint não muda). O Zorin usa os do Ubuntu.
+var arquivosFontesUbuntu = []string{
+	"/etc/apt/sources.list",
+	"/etc/apt/sources.list.d/ubuntu.sources",
+	"/etc/apt/sources.list.d/official-package-repositories.list",
+}
+
+// reFonteUbuntu acha os endereços padrão do Ubuntu, com ou sem a barra final
+// (o Mint escreve "http://archive.ubuntu.com/ubuntu noble ...").
+var reFonteUbuntu = regexp.MustCompile(`(?:http://(?:archive|security)\.ubuntu\.com/ubuntu/?|mirror://mirrors\.ubuntu\.com/mirrors\.txt)(?:\s|$)`)
+
+// trocarMirrorUbuntu troca os endereços padrão do Ubuntu pelo mirror.
+func trocarMirrorUbuntu(conteudo, mirror string) string {
+	return reFonteUbuntu.ReplaceAllStringFunc(conteudo, func(m string) string {
+		return mirror + m[len(strings.TrimRightFunc(m, unicode.IsSpace)):]
+	})
 }
 
 var (

@@ -42,25 +42,7 @@ var temasYaru = Module{
 	Grupo: GrupoGNOME,
 	Title: "Temas Yaru (com Flatpak)",
 	Desc:  "Temas e ícones Yaru (ícones em Yaru-dark) e um hook do APT que sincroniza todas as variantes do tema com os apps Flatpak",
-	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando os temas e ícones Yaru...")
-		err := step(
-			func() error { return c.install("yaru-theme-gtk", "yaru-theme-icon", "flatpak") },
-			func() error { return c.WriteFile(yaruFlatpakScript, yaruFlatpakSync, 0o755) },
-			func() error { return c.WriteFile(yaruFlatpakHook, yaruFlatpakHookConf, 0o644) },
-			func() error { return c.Run(yaruFlatpakScript, "--force") },
-			func() error {
-				return c.Run("flatpak", "override", "--system",
-					"--filesystem=xdg-data/themes:ro", "--filesystem="+yaruFlatpakDir+":ro")
-			},
-			func() error { return c.AsUser(scriptLinksYaru) },
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.")
-		return nil
-	},
+	Run:   func(c *Ctx) error { return instalarYaru(c, "") },
 	// No Fedora, só os ícones são do Yaru; o tema segue o libadwaita, com o
 	// adw-gtk3 (o visual do libadwaita para os apps GTK 3) no sistema e nos
 	// Flatpaks, pelo Flathub. Os ícones do sistema os Flatpaks já enxergam.
@@ -69,6 +51,39 @@ var temasYaru = Module{
 		Desc:  "Ícones Yaru (Yaru-dark) e o tema adw-gtk3-dark (o visual do libadwaita nos apps GTK 3), também nos apps Flatpak",
 		Run:   aplicarYaruAdwGtk3,
 	},
+	// No Mint, o tema padrão é o Mint-Y: além dos ícones, o tema dos apps
+	// passa a ser o Yaru-dark (o tema do painel do Cinnamon fica como está).
+	Mint: &Variante{
+		Desc: "Temas e ícones Yaru (tema dos apps e ícones em Yaru-dark no Cinnamon) e um hook do APT que sincroniza todas as variantes do tema com os apps Flatpak",
+		Run:  func(c *Ctx) error { return instalarYaru(c, scriptYaruCinnamon) },
+	},
+}
+
+// scriptYaruCinnamon aplica o tema e os ícones Yaru-dark no Cinnamon.
+const scriptYaruCinnamon = `gsettings set org.cinnamon.desktop.interface gtk-theme "Yaru-dark"
+gsettings set org.cinnamon.desktop.interface icon-theme "Yaru-dark"
+`
+
+// instalarYaru instala os temas Yaru e os sincroniza com os Flatpaks; extra
+// é um script a mais rodado como o usuário (ex.: aplicar no Cinnamon).
+func instalarYaru(c *Ctx, extra string) error {
+	c.Log.Infof("Instalando os temas e ícones Yaru...")
+	err := step(
+		func() error { return c.install("yaru-theme-gtk", "yaru-theme-icon", "flatpak") },
+		func() error { return c.WriteFile(yaruFlatpakScript, yaruFlatpakSync, 0o755) },
+		func() error { return c.WriteFile(yaruFlatpakHook, yaruFlatpakHookConf, 0o644) },
+		func() error { return c.Run(yaruFlatpakScript, "--force") },
+		func() error {
+			return c.Run("flatpak", "override", "--system",
+				"--filesystem=xdg-data/themes:ro", "--filesystem="+yaruFlatpakDir+":ro")
+		},
+		func() error { return c.AsUser(scriptLinksYaru + extra) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.")
+	return nil
 }
 
 // scriptIconesAdwGtk3 aplica os ícones Yaru-dark e o adw-gtk3-dark (escuro,
@@ -120,6 +135,79 @@ var nautilus = Module{
 			return instalarNautilus(c, "nautilus-python", "python3-gobject", "wl-clipboard", "xclip", "git")
 		},
 	},
+	// O gerenciador de arquivos do Mint é o Nemo, que não carrega as
+	// extensões em Python do Nautilus: as mesmas opções viram ações do Nemo
+	// (arquivos .nemo_action do usuário).
+	Mint: &Variante{
+		Title: "Nemo: VSCode, copiar caminho e Projetos",
+		Desc:  "Adiciona 'Abrir com o VSCode' e 'Copiar caminho' ao menu de contexto do Nemo (ações do Nemo) e cria a pasta Projetos (diretório XDG e favorito na barra lateral)",
+		Run:   instalarAcoesNemo,
+	},
+}
+
+// scriptAcoesNemo grava as ações do usuário em ~/.local/share/nemo/actions:
+// abrir a seleção (ou, clicando no fundo, a pasta atual) no VSCode e copiar
+// os caminhos da seleção, um por linha, com o wl-copy no Wayland ou o xclip
+// no X11. Quote=double: o Nemo põe cada caminho entre aspas no Exec.
+const scriptAcoesNemo = `set -e
+dir="$HOME/.local/share/nemo/actions"
+mkdir -p "$dir"
+cat > "$dir/post-install-vscode.nemo_action" <<'ACAO'
+[Nemo Action]
+Name=Abrir com o VSCode
+Comment=Abre os itens selecionados no Visual Studio Code
+Exec=code %F
+Icon-Name=vscode
+Selection=notnone
+Extensions=any;
+Quote=double
+Dependencies=code;
+ACAO
+cat > "$dir/post-install-vscode-pasta.nemo_action" <<'ACAO'
+[Nemo Action]
+Name=Abrir com o VSCode
+Comment=Abre a pasta atual no Visual Studio Code
+Exec=code %P
+Icon-Name=vscode
+Selection=none
+Extensions=any;
+Quote=double
+Dependencies=code;
+ACAO
+cat > "$dir/post-install-copiar-caminho.sh" <<'ACAO'
+#!/bin/sh
+# Copia os caminhos recebidos, um por linha (ação do Nemo do post-install).
+if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null 2>&1; then
+    printf '%s\n' "$@" | head -c -1 | wl-copy
+else
+    printf '%s\n' "$@" | head -c -1 | xclip -selection clipboard
+fi
+ACAO
+chmod 0755 "$dir/post-install-copiar-caminho.sh"
+cat > "$dir/post-install-copiar-caminho.nemo_action" <<ACAO
+[Nemo Action]
+Name=Copiar caminho
+Comment=Copia o caminho dos itens selecionados
+Exec=$dir/post-install-copiar-caminho.sh %F
+Icon-Name=edit-copy
+Selection=notnone
+Extensions=any;
+Quote=double
+ACAO
+`
+
+func instalarAcoesNemo(c *Ctx) error {
+	c.Log.Infof("Adicionando as ações do VSCode e de copiar caminho ao Nemo...")
+	err := step(
+		func() error { return c.install("wl-clipboard", "xclip") },
+		func() error { return c.AsUser(scriptAcoesNemo) },
+		func() error { return c.AsUser(scriptPastaProjetos) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Ações do Nemo instaladas e pasta de projetos criada.")
+	return nil
 }
 
 func instalarNautilus(c *Ctx, deps ...string) error {
