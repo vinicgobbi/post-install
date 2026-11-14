@@ -122,9 +122,9 @@ const (
 )
 
 var ubuntus = map[string]sysinfo.Info{
-	"22.04": {Familia: sysinfo.Ubuntu, ID: "ubuntu", PrettyName: "Ubuntu 22.04.5 LTS", VersionID: "22.04", Codename: "jammy", MSRepoVersion: "22.04", Arch: "amd64"},
-	"24.04": {Familia: sysinfo.Ubuntu, ID: "ubuntu", PrettyName: "Ubuntu 24.04.3 LTS", VersionID: "24.04", Codename: "noble", MSRepoVersion: "24.04", Arch: "amd64"},
-	"26.04": {Familia: sysinfo.Ubuntu, ID: "ubuntu", PrettyName: "Ubuntu 26.04.1 LTS", VersionID: "26.04", Codename: "resolute", MSRepoVersion: "26.04", Arch: "amd64"},
+	"22.04": {Familia: sysinfo.Ubuntu, ID: "ubuntu", PrettyName: "Ubuntu 22.04.5 LTS", VersionID: "22.04", UbuntuVersion: "22.04", Codename: "jammy", MSRepoVersion: "22.04", Arch: "amd64"},
+	"24.04": {Familia: sysinfo.Ubuntu, ID: "ubuntu", PrettyName: "Ubuntu 24.04.3 LTS", VersionID: "24.04", UbuntuVersion: "24.04", Codename: "noble", MSRepoVersion: "24.04", Arch: "amd64"},
+	"26.04": {Familia: sysinfo.Ubuntu, ID: "ubuntu", PrettyName: "Ubuntu 26.04.1 LTS", VersionID: "26.04", UbuntuVersion: "26.04", Codename: "resolute", MSRepoVersion: "26.04", Arch: "amd64"},
 }
 
 var gnomeShell = map[string]string{"22.04": "42", "24.04": "46", "26.04": "50"}

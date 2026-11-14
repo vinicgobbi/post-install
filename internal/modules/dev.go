@@ -465,7 +465,10 @@ func instalarRuby(c *Ctx, pkgs ...string) error {
 
 // O mise vem do repositório oficial dele: pelo extrepo no Ubuntu 22.04 e
 // 24.04, e pela PPA jdxcode/mise do 26.04 em diante, como manda a
-// documentação (https://mise.jdx.dev/installing-mise.html).
+// documentação (https://mise.jdx.dev/installing-mise.html). No Mint e no
+// Zorin com base anterior à 26.04, o extrepo não reconhece a distribuição
+// (ele procura os dados pelo ID do os-release), então o repositório APT
+// entra direto, como a mesma documentação mostra para o apt.
 var mise = Module{
 	ID:    "mise",
 	Grupo: GrupoDesenvolvimento,
@@ -473,13 +476,25 @@ var mise = Module{
 	Desc:  "Gerenciador de versões de ferramentas (Node, pnpm, Ruby, Rust...) pelo repositório oficial, ativado no .zshrc e no .bashrc",
 	Run: func(c *Ctx) error {
 		var repo []func() error
-		if misePelaPPA(c.Sys.VersionID) {
+		switch {
+		case misePelaPPA(c.Sys.UbuntuVersion):
 			c.Log.Infof("Instalando o mise pela PPA jdxcode/mise...")
 			repo = []func() error{
 				func() error { return c.garantir("add-apt-repository", "software-properties-common") },
 				func() error { return c.Run("add-apt-repository", "-y", "ppa:jdxcode/mise") },
 			}
-		} else {
+		case c.Sys.Derivado():
+			c.Log.Infof("Instalando o mise pelo repositório APT oficial...")
+			repo = []func() error{
+				func() error {
+					return instalarChaveAPT(c, "https://mise.jdx.dev/gpg-key.pub", miseKeyring, fprMise)
+				},
+				func() error {
+					return c.WriteFile("/etc/apt/sources.list.d/mise.list",
+						"deb [signed-by="+miseKeyring+" arch="+c.Sys.Arch+"] https://mise.jdx.dev/deb stable main\n", 0o644)
+				},
+			}
+		default:
 			c.Log.Infof("Instalando o mise pelo extrepo...")
 			repo = []func() error{
 				func() error { return c.install("extrepo") },
@@ -522,6 +537,9 @@ var mise = Module{
 	},
 }
 
+// miseKeyring é a chave do repositório APT do mise (no Mint e no Zorin).
+const miseKeyring = "/etc/apt/keyrings/mise-archive-keyring.asc"
+
 // scriptMise ativa o mise no .zshrc e no .bashrc (uma vez só). Roda depois
 // do módulo shell, porque o instalador do Oh My Zsh troca o ~/.zshrc.
 const scriptMise = `for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
@@ -532,7 +550,8 @@ done
 `
 
 // misePelaPPA: a documentação do mise indica a PPA do Ubuntu 26.04 em diante
-// e o extrepo antes dele.
+// e o extrepo antes dele (a versão é a do Ubuntu, ou a da base no Mint e no
+// Zorin).
 func misePelaPPA(versao string) bool {
 	maior, menor, _ := strings.Cut(versao, ".")
 	ma, err1 := strconv.Atoi(maior)
