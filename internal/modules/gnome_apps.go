@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/vinicgobbi/post-install/internal/sysinfo"
 )
 
 var appsGnome = Module{
@@ -209,14 +211,14 @@ func dirsAplicativos(home string) []string {
 }
 
 // desktopsAtuais são os nomes que o desktop usa em OnlyShowIn/NotShowIn (o
-// Ubuntu acrescenta "ubuntu", como em XDG_CURRENT_DESKTOP=ubuntu:GNOME; o
-// Cinnamon é "X-Cinnamon").
+// Ubuntu acrescenta "ubuntu", como em XDG_CURRENT_DESKTOP=ubuntu:GNOME, e o
+// Zorin, "zorin"; o Cinnamon é "X-Cinnamon").
 func desktopsAtuais(c *Ctx) []string {
 	if c.mint() {
 		return []string{"X-Cinnamon"}
 	}
-	if c.Sys.ID == "ubuntu" {
-		return []string{"ubuntu", "GNOME"}
+	if c.Sys.ID == "ubuntu" || c.Sys.ID == sysinfo.IDZorin {
+		return []string{c.Sys.ID, "GNOME"}
 	}
 	return []string{"GNOME"}
 }

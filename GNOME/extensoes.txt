@@ -7,11 +7,12 @@
 # para uma mudança na branch principal não chegar sozinha às instalações.
 # Prefixo "-" = manter desativada (ex.: extensões que vêm com o Ubuntu).
 #
-# A mesma lista serve ao Ubuntu e ao Fedora:
+# A mesma lista serve ao Ubuntu, ao Zorin OS e ao Fedora (o Linux Mint usa o
+# Cinnamon, sem extensões do GNOME):
 # - "a | b": equivalentes. A primeira que vier com o sistema é ativada; se
 #   nenhuma vier, a ÚLTIMA da linha é baixada do extensions.gnome.org (ex.: a
-#   dock do Ubuntu e, no Fedora, o Dash to Dock, que usa as mesmas
-#   preferências de extensoes.dconf);
+#   dock do Ubuntu, a barra de tarefas do Zorin e, no Fedora, o Dash to Dock,
+#   que usa as mesmas preferências de extensoes.dconf);
 # - "uuid sistema": só é ativada se vier com o sistema; nunca é baixada.
 
 # extensions.gnome.org
@@ -27,12 +28,12 @@ lockkeys@vaina.lt
 # Repositório git
 nowpill@vinicgobbi.dev.br https://github.com/vinicgobbi/gnome-extension-nowpill.git e5340ede6fb7e13f42aca1b0129ff5c2ad3fba67
 
-# Vêm com o Ubuntu ("sistema": só existem nele; com "|": no Fedora, entra a
-# equivalente do extensions.gnome.org)
+# Vêm com o Ubuntu ("sistema": só existem nele; com "|": no Zorin, entra a
+# dele, e no Fedora, a equivalente do extensions.gnome.org)
 snapd-prompting@canonical.com       sistema
 snapd-search-provider@canonical.com sistema
 tiling-assistant@ubuntu.com         | tiling-assistant@leleat-on-github
-ubuntu-appindicators@ubuntu.com     | appindicatorsupport@rgcjonas.gmail.com
-ubuntu-dock@ubuntu.com              | dash-to-dock@micxgx.gmail.com
+ubuntu-appindicators@ubuntu.com     | zorin-appindicator@zorinos.com | appindicatorsupport@rgcjonas.gmail.com
+ubuntu-dock@ubuntu.com              | zorin-taskbar@zorinos.com      | dash-to-dock@micxgx.gmail.com
 web-search-provider@ubuntu.com      sistema
 -ding@rastersoft.com

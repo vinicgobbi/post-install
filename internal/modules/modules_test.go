@@ -128,6 +128,22 @@ func TestLerListaExtensoes(t *testing.T) {
 		len(git["nowpill@vinicgobbi.dev.br"].Ref) != 40 || len(git) != 1 {
 		t.Errorf("git = %v", git)
 	}
+
+	// Zorin: a barra e o AppIndicator dele entram no lugar dos do Ubuntu, sem
+	// baixar o Dash to Dock por cima da barra.
+	zorin, _, _, err := lerListaExtensoes(maquina("zorin-taskbar@zorinos.com", "zorin-appindicator@zorinos.com"), "/lista.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, uuid := range []string{"zorin-taskbar@zorinos.com", "zorin-appindicator@zorinos.com", "tiling-assistant@leleat-on-github"} {
+		if !slices.Contains(zorin, uuid) {
+			t.Errorf("Zorin sem %s: %v", uuid, zorin)
+		}
+	}
+	if slices.Contains(zorin, "dash-to-dock@micxgx.gmail.com") || slices.Contains(zorin, "appindicatorsupport@rgcjonas.gmail.com") ||
+		slices.ContainsFunc(zorin, func(u string) bool { return slices.Contains(doUbuntu, u) }) {
+		t.Errorf("Zorin com a dock/AppIndicator do Ubuntu ou do extensions.gnome.org: %v", zorin)
+	}
 }
 
 func TestParseStrvEMesclar(t *testing.T) {
