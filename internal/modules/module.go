@@ -2,7 +2,8 @@
 // um grupo e é autocontido (configura o próprio repositório, se precisar);
 // a ordem de execução é a ordem da lista em All. O Run de cada módulo é o
 // caminho do Ubuntu (e do Zorin OS); a variante do Fedora fica no campo
-// Fedora, a do Linux Mint (Cinnamon) no campo Mint, e Disponiveis devolve a
+// Fedora, as do Linux Mint (Cinnamon) e do Zorin OS nos campos Mint e Zorin,
+// e Disponiveis devolve a
 // lista já adaptada à distribuição detectada.
 package modules
 
@@ -40,6 +41,8 @@ type Module struct {
 	// Mint é a variante do Linux Mint com Cinnamon, que é da família Ubuntu:
 	// nil = igual ao Ubuntu; Indisponivel = some no Mint.
 	Mint *Variante
+	// Zorin é a variante do Zorin OS (GNOME, família Ubuntu), como a do Mint.
+	Zorin *Variante
 }
 
 // Variante é como o módulo trabalha numa distribuição que não o Ubuntu.
@@ -69,11 +72,14 @@ func (m Module) Para(f sysinfo.Familia) (Module, bool) {
 	return Module{}, false
 }
 
-// ParaSistema é o Para da família do sistema e, no Linux Mint, com a
-// variante do Mint por cima (sem ela, vale o módulo do Ubuntu).
+// ParaSistema é o Para da família do sistema e, no Linux Mint e no Zorin
+// OS, com a variante deles por cima (sem ela, vale o módulo do Ubuntu).
 func (m Module) ParaSistema(sys *sysinfo.Info) (Module, bool) {
 	if sys.Mint() && m.Mint != nil {
 		return m.aplicar(m.Mint)
+	}
+	if sys.ID == sysinfo.IDZorin && m.Zorin != nil {
+		return m.aplicar(m.Zorin)
 	}
 	return m.Para(sys.Familia)
 }
@@ -84,7 +90,7 @@ func (m Module) aplicar(v *Variante) (Module, bool) {
 		return Module{}, false
 	}
 	out := m
-	out.Fedora, out.Mint = nil, nil
+	out.Fedora, out.Mint, out.Zorin = nil, nil, nil
 	if v.Run != nil {
 		out.Run = v.Run
 	}

@@ -42,7 +42,7 @@ var temasYaru = Module{
 	Grupo: GrupoGNOME,
 	Title: "Temas Yaru (com Flatpak)",
 	Desc:  "Temas e ícones Yaru (ícones em Yaru-dark) e um hook do APT que sincroniza todas as variantes do tema com os apps Flatpak",
-	Run:   func(c *Ctx) error { return instalarYaru(c, "") },
+	Run:   instalarYaru,
 	// No Fedora, só os ícones são do Yaru; o tema segue o libadwaita, com o
 	// adw-gtk3 (o visual do libadwaita para os apps GTK 3) no sistema e nos
 	// Flatpaks, pelo Flathub. Os ícones do sistema os Flatpaks já enxergam.
@@ -53,22 +53,14 @@ var temasYaru = Module{
 		Desc:  "Ícones Yaru (Yaru-dark) e o tema adw-gtk3-dark (o visual do libadwaita nos apps GTK 3), também nos apps Flatpak, e os botões de minimizar e maximizar nas janelas",
 		Run:   aplicarYaruAdwGtk3,
 	},
-	// No Mint, o tema padrão é o Mint-Y: além dos ícones, o tema dos apps
-	// passa a ser o Yaru-dark (o tema do painel do Cinnamon fica como está).
-	Mint: &Variante{
-		Desc: "Temas e ícones Yaru (tema dos apps e ícones em Yaru-dark no Cinnamon) e um hook do APT que sincroniza todas as variantes do tema com os apps Flatpak",
-		Run:  func(c *Ctx) error { return instalarYaru(c, scriptYaruCinnamon) },
-	},
+	// O Mint e o Zorin têm a identidade visual deles (Mint-Y e os temas do
+	// Zorin): o post-install não mexe no tema nem nos ícones.
+	Mint:  &Variante{Indisponivel: true},
+	Zorin: &Variante{Indisponivel: true},
 }
 
-// scriptYaruCinnamon aplica o tema e os ícones Yaru-dark no Cinnamon.
-const scriptYaruCinnamon = `gsettings set org.cinnamon.desktop.interface gtk-theme "Yaru-dark"
-gsettings set org.cinnamon.desktop.interface icon-theme "Yaru-dark"
-`
-
-// instalarYaru instala os temas Yaru e os sincroniza com os Flatpaks; extra
-// é um script a mais rodado como o usuário (ex.: aplicar no Cinnamon).
-func instalarYaru(c *Ctx, extra string) error {
+// instalarYaru instala os temas Yaru e os sincroniza com os Flatpaks.
+func instalarYaru(c *Ctx) error {
 	c.Log.Infof("Instalando os temas e ícones Yaru...")
 	err := step(
 		func() error { return c.install("yaru-theme-gtk", "yaru-theme-icon", "flatpak") },
@@ -79,7 +71,7 @@ func instalarYaru(c *Ctx, extra string) error {
 			return c.Run("flatpak", "override", "--system",
 				"--filesystem=xdg-data/themes:ro", "--filesystem="+yaruFlatpakDir+":ro")
 		},
-		func() error { return c.AsUser(scriptLinksYaru + extra) },
+		func() error { return c.AsUser(scriptLinksYaru) },
 	)
 	if err != nil {
 		return err

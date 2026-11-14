@@ -500,24 +500,32 @@ func TestParaSistemaMint(t *testing.T) {
 	if z, ok := m.ParaSistema(zorin); !ok || z.Title != "X" || z.Run(nil) != nil {
 		t.Error("o Zorin deveria usar o módulo do Ubuntu")
 	}
+	m.Zorin = &Variante{Title: "No Zorin"}
+	if z, ok := m.ParaSistema(zorin); !ok || z.Title != "No Zorin" || z.Zorin != nil || z.Mint != nil {
+		t.Errorf("variante do Zorin mal aplicada: %+v", z)
+	}
+	if v, _ := m.ParaSistema(mint); v.Title == "No Zorin" {
+		t.Error("a variante do Zorin não vale no Mint")
+	}
 	m.Mint = &Variante{Indisponivel: true}
 	if _, ok := m.ParaSistema(mint); ok {
 		t.Error("Indisponivel deveria tirar o módulo do Mint")
 	}
 }
 
-// No Mint (Cinnamon) só as extensões do GNOME ficam de fora; os outros
-// módulos do grupo do desktop têm variante do Cinnamon.
+// No Mint (Cinnamon) só as extensões do GNOME e os temas ficam de fora; os
+// outros módulos do grupo do desktop têm variante do Cinnamon.
 func TestModulosNoMint(t *testing.T) {
 	disp := map[string]Module{}
 	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Ubuntu, ID: sysinfo.IDMint}) {
 		disp[m.ID] = m
 	}
+	fora := []string{"extensoes_gnome", "temas_yaru"}
 	for _, m := range All() {
 		_, ok := disp[m.ID]
-		if m.ID == "extensoes_gnome" {
+		if slices.Contains(fora, m.ID) {
 			if ok {
-				t.Error("extensoes_gnome não deveria estar disponível no Mint")
+				t.Errorf("%s não deveria estar disponível no Mint", m.ID)
 			}
 			continue
 		}
@@ -526,6 +534,19 @@ func TestModulosNoMint(t *testing.T) {
 		}
 		if m.Grupo == GrupoGNOME && m.Mint == nil {
 			t.Errorf("%s (grupo %s) sem variante do Mint: rodaria os comandos do GNOME no Cinnamon", m.ID, GrupoGNOME)
+		}
+	}
+}
+
+// No Zorin, só os temas ficam de fora (ele mantém a identidade visual dele).
+func TestModulosNoZorin(t *testing.T) {
+	disp := map[string]bool{}
+	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Ubuntu, ID: sysinfo.IDZorin}) {
+		disp[m.ID] = true
+	}
+	for _, m := range All() {
+		if want := m.ID != "temas_yaru"; disp[m.ID] != want {
+			t.Errorf("%s disponível no Zorin = %v, esperado %v", m.ID, disp[m.ID], want)
 		}
 	}
 }

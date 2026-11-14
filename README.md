@@ -114,6 +114,7 @@ Nos dois:
 | `mirrors` | só os repositórios da base Ubuntu mudam (no Mint, em `/etc/apt/sources.list.d/official-package-repositories.list`); o do Mint ou do Zorin fica como está |
 | `firefox_thunderbird` | também pelo repositório da Mozilla (prioridade 1000), no lugar dos `.deb` da distribuição; sem snaps, a remoção deles não faz nada |
 | `mise` | com base anterior à 26.04, pelo repositório APT oficial (`mise.jdx.dev/deb`, chave conferida), já que o `extrepo` não reconhece a distribuição |
+| `temas_yaru` | **indisponível**: o tema e os ícones da distribuição (Mint-Y, temas do Zorin) ficam como estão |
 
 No **Zorin OS** (GNOME), o resto é igual ao Ubuntu; o `extensoes_gnome`
 ativa a barra de tarefas e o AppIndicator que vêm com o Zorin no lugar da
@@ -126,7 +127,6 @@ Cinnamon, com os mesmos IDs:
 | ID | No Mint |
 |----|---------|
 | `flatpaks` | só o Flathub e a lista de apps (o Mint já traz o Flatpak, e a loja dele mostra os Flatpaks); sem o GNOME Software com o plugin snap, que puxaria o snapd que o Mint bloqueia |
-| `temas_yaru` | os mesmos temas, mais o **tema dos apps** e os ícones em Yaru-dark (`org.cinnamon.desktop.interface`); o tema do painel do Cinnamon não muda |
 | `papel_parede` | `org.cinnamon.desktop.background` |
 | `atalhos_gnome` | **Atalhos do Cinnamon**: `GNOME/atalhos-cinnamon.dconf` carregado em `/org/cinnamon/` (Print e Shift+Super+S abrem o Gradia; Shift+Print e Alt+Print continuam com o Cinnamon) |
 | `nautilus` | **Nemo**: ações do Nemo (`~/.local/share/nemo/actions`) "Abrir com o VSCode" (na seleção ou no fundo da pasta) e "Copiar caminho", e a pasta Projetos |
@@ -403,8 +403,9 @@ internal/
 4. O Zorin OS usa o `Run` do Ubuntu. No Linux Mint também, a menos que o
    campo `Mint` tenha uma `Variante` — necessária nos módulos que mexem no
    desktop (o Mint usa o Cinnamon). `Mint: &Variante{Indisponivel: true}`
-   tira o módulo do Mint. Um teste garante que todo módulo do grupo "GNOME
-   e aparência" tem a variante do Mint.
+   tira o módulo do Mint. O campo `Zorin` funciona do mesmo jeito no Zorin
+   OS. Um teste garante que todo módulo do grupo "GNOME e aparência" tem a
+   variante do Mint.
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:

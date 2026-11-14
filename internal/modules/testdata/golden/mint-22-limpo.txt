@@ -201,16 +201,6 @@
 [INFO] [dry-run] usermod -aG kvm ana
 [OK] virt-manager instalado. 'ana' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).
 
-== temas_yaru (Temas Yaru (com Flatpak))
-[INFO] Instalando os temas e ícones Yaru...
-[INFO] [dry-run] apt install -y yaru-theme-gtk yaru-theme-icon flatpak
-[INFO] [dry-run] escrever /usr/local/sbin/yaru-flatpak-sync (1331 bytes)
-[INFO] [dry-run] escrever /etc/apt/apt.conf.d/99yaru-flatpak (209 bytes)
-[INFO] [dry-run] /usr/local/sbin/yaru-flatpak-sync --force
-[INFO] [dry-run] flatpak override --system --filesystem=xdg-data/themes:ro --filesystem=/var/lib/yaru-flatpak/themes:ro
-[INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; mkdir -p "$HOME/.local/share/themes"; for tema in /var/lib/yaru-flatpak/themes/Yaru*; do; [ -d "$tema" ] || continue; link="$HOME/.local/share/themes/$(basename "$tema")"; if [ -L "$link" ] || [ ! -e "$link" ]; then; ln -sfn "$tema" "$link"; fi; done; gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark" 2>/dev/null || true; gsettings set org.cinnamon.desktop.interface gtk-theme "Yaru-dark"; gsettings set org.cinnamon.desktop.interface icon-theme "Yaru-dark"'
-[OK] Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.
-
 == papel_parede (Papel de parede)
 [INFO] Aplicando o papel de parede 'paisagem.jpg'...
 [INFO] [dry-run] su - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; install -D -m 0644 '/opt/post-install/Wallpapers/paisagem.jpg' '/home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.cinnamon.desktop.background picture-uri 'file:///home/ana/.local/share/backgrounds/paisagem.jpg'; gsettings set org.cinnamon.desktop.background picture-options 'zoom''
