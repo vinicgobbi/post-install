@@ -129,6 +129,9 @@ var ubuntus = map[string]sysinfo.Info{
 
 var gnomeShell = map[string]string{"22.04": "42", "24.04": "46", "26.04": "50"}
 
+// fixturesGNOME são os arquivos de testdata/gnome copiados para GNOME/.
+var fixturesGNOME = []string{"extensoes.txt", "extensoes.dconf", "atalhos.dconf", "atalhos-cinnamon.dconf", "favoritos.txt", "pastas.txt"}
+
 func arq(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s), Mode: 0o644} }
 
 // ubuntuLimpo é um Ubuntu Desktop recém-instalado: GNOME, snaps do Firefox
@@ -195,7 +198,7 @@ func ubuntuLimpo(t *testing.T, versao string) cenario {
 		}
 		h.arquivos["usr/share/applications/"+terminal] = arq("[Desktop Entry]\nType=Application\nCategories=GNOME;GTK;System;TerminalEmulator;\n")
 	}
-	for _, nome := range []string{"extensoes.txt", "extensoes.dconf", "atalhos.dconf", "favoritos.txt", "pastas.txt"} {
+	for _, nome := range fixturesGNOME {
 		b, err := os.ReadFile(filepath.Join("testdata/gnome", nome))
 		if err != nil {
 			t.Fatal(err)
@@ -290,7 +293,7 @@ func fedoraLimpo(t *testing.T, versao string) cenario {
 		},
 		semResposta: map[string]bool{},
 	}
-	for _, nome := range []string{"extensoes.txt", "extensoes.dconf", "atalhos.dconf", "favoritos.txt", "pastas.txt"} {
+	for _, nome := range fixturesGNOME {
 		b, err := os.ReadFile(filepath.Join("testdata/gnome", nome))
 		if err != nil {
 			t.Fatal(err)
@@ -300,6 +303,53 @@ func fedoraLimpo(t *testing.T, versao string) cenario {
 	return cenario{nome: "fedora-" + versao + "-limpo", sys: sys, host: h, wallpaper: dirPacote + "/Wallpapers/paisagem.jpg"}
 }
 
+// mintLimpo é um Linux Mint 22.2 (Cinnamon, base Ubuntu 24.04)
+// recém-instalado: sem GNOME Shell nem snap, com o Flatpak, o Nemo e os
+// repositórios do Mint e da base Ubuntu num arquivo só.
+func mintLimpo(t *testing.T) cenario {
+	c := ubuntuLimpo(t, "24.04")
+	c.nome = "mint-22-limpo"
+	c.sys = sysinfo.Info{Familia: sysinfo.Ubuntu, ID: sysinfo.IDMint, PrettyName: "Linux Mint 22.2", VersionID: "22.2",
+		Codename: "noble", UbuntuVersion: "24.04", MSRepoVersion: "24.04", Arch: "amd64", Desktop: sysinfo.Cinnamon}
+	h := c.host
+	h.binarios = map[string]bool{"cinnamon": true, "flatpak": true, "add-apt-repository": true}
+	for _, k := range []string{"snap list firefox", "snap list thunderbird", "gnome-shell --version",
+		"[ana] gsettings get org.gnome.shell enabled-extensions", "[ana] gsettings get org.gnome.shell disabled-extensions"} {
+		delete(h.comandos, k)
+	}
+	for _, f := range []string{"usr/share/gnome-shell/extensions/ubuntu-dock@ubuntu.com/metadata.json",
+		"var/lib/snapd/desktop/applications/firefox_firefox.desktop", "usr/share/applications/org.gnome.Nautilus.desktop",
+		"usr/share/applications/org.gnome.Settings.desktop", "etc/apt/sources.list.d/ubuntu.sources"} {
+		delete(h.arquivos, f)
+	}
+	h.arquivos["etc/apt/sources.list"] = arq("")
+	h.arquivos["etc/apt/sources.list.d/official-package-repositories.list"] = arq(
+		"deb http://packages.linuxmint.com zara main upstream import backport\n\n" +
+			"deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse\n" +
+			"deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse\n" +
+			"deb http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse\n")
+	h.arquivos["usr/share/applications/nemo.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=GNOME;GTK;Utility;Core;\n")
+	h.arquivos["usr/share/applications/cinnamon-settings.desktop"] = arq("[Desktop Entry]\nType=Application\nOnlyShowIn=X-Cinnamon;\nCategories=Settings;\n")
+	h.arquivos["usr/share/applications/firefox.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Network;WebBrowser;\n")
+	h.arquivos["usr/share/applications/so-no-gnome.desktop"] = arq("[Desktop Entry]\nType=Application\nOnlyShowIn=GNOME;\n")
+	return c
+}
+
+// zorinLimpo é um Zorin OS 18 Core (GNOME, base Ubuntu 24.04) recém-instalado:
+// a barra de tarefas e o AppIndicator do Zorin no lugar da dock do Ubuntu.
+func zorinLimpo(t *testing.T) cenario {
+	c := ubuntuLimpo(t, "24.04")
+	c.nome = "zorin-18-limpo"
+	c.sys = sysinfo.Info{Familia: sysinfo.Ubuntu, ID: sysinfo.IDZorin, PrettyName: "Zorin OS 18", VersionID: "18",
+		Codename: "noble", UbuntuVersion: "24.04", MSRepoVersion: "24.04", Arch: "amd64", Desktop: sysinfo.GNOME}
+	h := c.host
+	delete(h.arquivos, "usr/share/gnome-shell/extensions/ubuntu-dock@ubuntu.com/metadata.json")
+	h.arquivos["usr/share/gnome-shell/extensions/zorin-taskbar@zorinos.com/metadata.json"] = arq("{}")
+	h.arquivos["usr/share/applications/zorin-so.desktop"] = arq("[Desktop Entry]\nType=Application\nOnlyShowIn=zorin;\nCategories=Settings;\n")
+	h.comandos["[ana] gsettings get org.gnome.shell enabled-extensions"] = "['zorin-taskbar@zorinos.com', 'zorin-menu@zorinos.com']\n"
+	return c
+}
+
 func cenarios(t *testing.T) []cenario {
 	return []cenario{
 		ubuntuLimpo(t, "22.04"),
@@ -307,6 +357,8 @@ func cenarios(t *testing.T) []cenario {
 		ubuntuLimpo(t, "26.04"),
 		ubuntuConfigurado(t),
 		fedoraLimpo(t, "44"),
+		mintLimpo(t),
+		zorinLimpo(t),
 	}
 }
 
