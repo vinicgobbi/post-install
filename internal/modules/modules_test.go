@@ -445,6 +445,7 @@ func TestDisponiveisCoerentes(t *testing.T) {
 		{Familia: sysinfo.Ubuntu, ID: sysinfo.IDZorin},
 		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.GNOME},
 		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE},
+		{Familia: sysinfo.Fedora, ID: "fedora", Desktop: sysinfo.KDE},
 	} {
 		f := string(sys.Familia) + "/" + sys.ID + "/" + string(sys.Desktop)
 		mods := Disponiveis(sys)
@@ -567,18 +568,26 @@ func TestTodosNoArch(t *testing.T) {
 	}
 }
 
-// No KDE, só as extensões do GNOME, os favoritos/pastas e o tema ficam de
-// fora; os outros módulos do grupo do desktop têm variante do KDE.
+// No KDE (CachyOS e Fedora KDE), só as extensões do GNOME, os
+// favoritos/pastas e o tema ficam de fora; os outros módulos do grupo do
+// desktop têm variante do KDE.
 func TestModulosNoKDE(t *testing.T) {
-	disp := map[string]bool{}
-	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE}) {
-		disp[m.ID] = true
-	}
-	fora := []string{"extensoes_gnome", "apps_gnome", "temas_yaru"}
-	for _, m := range All() {
-		if want := !slices.Contains(fora, m.ID); disp[m.ID] != want {
-			t.Errorf("%s disponível no KDE = %v, esperado %v", m.ID, disp[m.ID], want)
+	for _, sys := range []*sysinfo.Info{
+		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE},
+		{Familia: sysinfo.Fedora, ID: "fedora", Desktop: sysinfo.KDE},
+	} {
+		disp := map[string]bool{}
+		for _, m := range Disponiveis(sys) {
+			disp[m.ID] = true
 		}
+		fora := []string{"extensoes_gnome", "apps_gnome", "temas_yaru"}
+		for _, m := range All() {
+			if want := !slices.Contains(fora, m.ID); disp[m.ID] != want {
+				t.Errorf("%s: %s disponível no KDE = %v, esperado %v", sys.Familia, m.ID, disp[m.ID], want)
+			}
+		}
+	}
+	for _, m := range All() {
 		if m.Grupo == GrupoGNOME && m.KDE == nil {
 			t.Errorf("%s (grupo %s) sem variante do KDE: rodaria os comandos do GNOME no Plasma", m.ID, GrupoGNOME)
 		}

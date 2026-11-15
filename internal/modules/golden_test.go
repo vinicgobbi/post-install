@@ -381,6 +381,24 @@ func cachyosLimpo(t *testing.T, desktop sysinfo.Desktop) cenario {
 	return c
 }
 
+// fedoraKDELimpo é um Fedora KDE Plasma recém-instalado: o Plasma no lugar
+// do GNOME, o Dolphin e o plugin OpenVPN ainda não instalado.
+func fedoraKDELimpo(t *testing.T) cenario {
+	c := fedoraLimpo(t, "44")
+	c.nome = "fedora-44-kde-limpo"
+	c.sys.PrettyName = "Fedora Linux 44 (KDE Plasma Desktop Edition)"
+	c.sys.Desktop = sysinfo.KDE
+	h := c.host
+	delete(h.binarios, "gnome-shell")
+	delete(h.binarios, "gnome-extensions")
+	h.binarios["plasmashell"] = true
+	delete(h.comandos, "rpm -q NetworkManager-openvpn-gnome")
+	delete(h.arquivos, "usr/share/applications/org.gnome.Nautilus.desktop")
+	delete(h.arquivos, "usr/share/applications/org.gnome.Ptyxis.desktop")
+	h.arquivos["usr/share/applications/org.kde.dolphin.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;FileManager;\n")
+	return c
+}
+
 func cenarios(t *testing.T) []cenario {
 	return []cenario{
 		ubuntuLimpo(t, "22.04"),
@@ -388,6 +406,7 @@ func cenarios(t *testing.T) []cenario {
 		ubuntuLimpo(t, "26.04"),
 		ubuntuConfigurado(t),
 		fedoraLimpo(t, "44"),
+		fedoraKDELimpo(t),
 		mintLimpo(t),
 		zorinLimpo(t),
 		cachyosLimpo(t, sysinfo.KDE),

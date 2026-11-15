@@ -3,7 +3,8 @@
 // a ordem de execução é a ordem da lista em All. O Run de cada módulo é o
 // caminho do Ubuntu (e do Zorin OS); a variante do Fedora fica no campo
 // Fedora, as do Linux Mint (Cinnamon) e do Zorin OS nos campos Mint e Zorin,
-// as do CachyOS nos campos Arch e KDE, e Disponiveis devolve a
+// a do CachyOS no campo Arch, a do KDE Plasma (CachyOS e Fedora KDE) no
+// campo KDE, e Disponiveis devolve a
 // lista já adaptada à distribuição detectada.
 package modules
 
@@ -47,8 +48,9 @@ type Module struct {
 	// Arch é a variante da família Arch (CachyOS) — nil = indisponível nela,
 	// como a do Fedora.
 	Arch *Variante
-	// KDE é a variante do CachyOS com KDE Plasma, por cima da do Arch (nil =
-	// igual à do Arch; Indisponivel = some no KDE).
+	// KDE é a variante do KDE Plasma (CachyOS e Fedora KDE), por cima da da
+	// família (nil = igual à da família; Indisponivel = some no KDE). Ela só
+	// usa o que é igual nas duas distribuições (pacotes de mesmo nome).
 	KDE *Variante
 }
 
@@ -82,10 +84,11 @@ func (m Module) Para(f sysinfo.Familia) (Module, bool) {
 }
 
 // ParaSistema é o Para da família do sistema e, no Linux Mint e no Zorin
-// OS, com a variante deles por cima (sem ela, vale o módulo do Ubuntu); no
-// CachyOS com KDE, a variante do KDE por cima da do Arch.
+// OS, com a variante deles por cima (sem ela, vale o módulo do Ubuntu); com o
+// KDE Plasma (CachyOS e Fedora KDE), a variante do KDE por cima da da
+// família.
 func (m Module) ParaSistema(sys *sysinfo.Info) (Module, bool) {
-	if sys.Familia == sysinfo.Arch && sys.Desktop == sysinfo.KDE && m.KDE != nil {
+	if sys.Desktop == sysinfo.KDE && m.KDE != nil {
 		return m.aplicar(m.KDE)
 	}
 	if sys.Mint() && m.Mint != nil {
@@ -208,6 +211,9 @@ func (c *Ctx) fedora() bool { return c.Sys != nil && c.Sys.Familia == sysinfo.Fe
 
 // arch diz se o sistema é da família Arch (CachyOS).
 func (c *Ctx) arch() bool { return c.Sys != nil && c.Sys.Familia == sysinfo.Arch }
+
+// kde diz se o desktop é o KDE Plasma (CachyOS ou Fedora KDE).
+func (c *Ctx) kde() bool { return c.Sys != nil && c.Sys.Desktop == sysinfo.KDE }
 
 // mint diz se o sistema é o Linux Mint (com Cinnamon).
 func (c *Ctx) mint() bool { return c.Sys != nil && c.Sys.Mint() }

@@ -178,7 +178,7 @@
 [INFO] [dry-run] tailscale set --operator=ana
 [OK] Tailscale instalado e 'ana' definido como operator.
 
-== firewall (Firewall (firewall-config))
+== firewall (Firewall (firewalld))
 [INFO] Instalando o firewall-config...
 [INFO] [dry-run] dnf install -y firewall-config
 [OK] firewall-config instalado; o firewalld segue com a configuração padrão do Fedora.
