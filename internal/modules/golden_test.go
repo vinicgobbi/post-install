@@ -50,15 +50,15 @@ type hostFalso struct {
 }
 
 // chaveComando identifica uma consulta. Os scripts rodados como o usuário
-// (su - usuario -c) viram "[usuario] <script>", sem o trecho fixo que o
+// (su -s /bin/bash - usuario -c) viram "[usuario] <script>", sem o trecho fixo que o
 // runner põe antes (o da sessão D-Bus, que termina no primeiro "fi").
 func chaveComando(name string, args []string) string {
-	if name == "su" && len(args) == 4 && args[0] == "-" && args[2] == "-c" {
-		script := args[3]
+	if name == "su" && len(args) == 6 && args[0] == "-s" && args[2] == "-" && args[4] == "-c" {
+		script := args[5]
 		if _, depois, ok := strings.Cut(script, "fi\n"); ok {
 			script = depois
 		}
-		return "[" + args[1] + "] " + strings.TrimSpace(script)
+		return "[" + args[3] + "] " + strings.TrimSpace(script)
 	}
 	return strings.Join(append([]string{name}, args...), " ")
 }

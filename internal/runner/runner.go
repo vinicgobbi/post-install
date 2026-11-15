@@ -166,13 +166,21 @@ export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi
 `
 
+// suArgs monta o "su" que roda script como o usuário alvo: login shell (com
+// $HOME e PATH corretos), sempre no bash. Sem o -s, o su usaria o shell de
+// login do usuário, que pode não ser compatível com sh (ex.: o fish, padrão
+// do CachyOS), e os scripts dos módulos são escritos para o bash.
+func (r *Runner) suArgs(script string) []string {
+	return []string{"-s", "/bin/bash", "-", r.User, "-c", userSession + script}
+}
+
 // AsUser executa um trecho de shell como o usuário alvo, em login shell (com
 // $HOME e PATH corretos e, se houver, a sessão D-Bus dele).
 func (r *Runner) AsUser(script string) error {
 	if r.User == "" {
 		return errors.New("usuário alvo não definido")
 	}
-	return r.Run("su", "-", r.User, "-c", userSession+script)
+	return r.Run("su", r.suArgs(script)...)
 }
 
 // OutputAsUser executa uma consulta somente-leitura como o usuário alvo (com
@@ -181,7 +189,7 @@ func (r *Runner) OutputAsUser(script string) (string, error) {
 	if r.User == "" {
 		return "", errors.New("usuário alvo não definido")
 	}
-	return r.Output("su", "-", r.User, "-c", userSession+script)
+	return r.Output("su", r.suArgs(script)...)
 }
 
 // Exists informa se um binário está no PATH.

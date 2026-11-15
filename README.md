@@ -413,7 +413,7 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 - `c.Run(...)`/`c.RunEnv(...)` — comando que altera o sistema (falha = erro)
 - `c.Try(...)` — comando que altera o sistema, silencioso, devolve `bool`
 - `c.Probe(...)`/`c.Output(...)` — consultas somente-leitura (rodam mesmo no dry-run)
-- `c.AsUser(script)` — shell como o usuário alvo (`su - usuario -c`)
+- `c.AsUser(script)` — shell como o usuário alvo (`su -s /bin/bash - usuario -c`: sempre no bash, mesmo que o shell de login dele seja outro, como o fish)
 - `c.install(...)`, `c.garantir(comando, pacote)`, `c.flatpakInstall(...)`
 - `c.install(...)` usa o `apt` no Ubuntu e o `dnf` no Fedora (os nomes de
   pacote são os da distribuição); `c.pacoteInstalado(pkg)` consulta o `dpkg`
@@ -501,7 +501,7 @@ recompilar. O módulo `papel_parede`, como o usuário alvo:
 2. aplica com `gsettings` (`picture-uri`, `picture-uri-dark` e
    `picture-options 'zoom'`).
 
-Os scripts que rodam como o usuário (`su - usuario`) usam a sessão D-Bus dele
+Os scripts que rodam como o usuário (`su -s /bin/bash - usuario`) usam a sessão D-Bus dele
 quando há uma sessão gráfica aberta; sem isso o `gsettings` descarta as
 alterações sem erro.
 
