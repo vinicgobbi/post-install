@@ -1,3 +1,9 @@
+## v3.3.0 (2026-11-15)
+
+### Feat
+
+- **modules**: recria o painel do plasma no kde
+
 ## v3.2.0 (2026-11-15)
 
 ### Feat
