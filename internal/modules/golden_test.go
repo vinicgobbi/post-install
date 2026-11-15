@@ -350,6 +350,37 @@ func zorinLimpo(t *testing.T) cenario {
 	return c
 }
 
+// cachyosLimpo é um CachyOS recém-instalado com o desktop dado: paru e
+// cachyos-rate-mirrors já instalados, sem Flatpak nem LibreOffice, com um
+// pacote órfão. No GNOME, o button-layout vem só com o fechar; no KDE, só
+// rodam os módulos com variante do KDE (ou a do Arch).
+func cachyosLimpo(t *testing.T, desktop sysinfo.Desktop) cenario {
+	c := fedoraLimpo(t, "44")
+	nome := map[sysinfo.Desktop]string{sysinfo.KDE: "kde", sysinfo.GNOME: "gnome"}[desktop]
+	c.nome = "cachyos-" + nome + "-limpo"
+	c.sys = sysinfo.Info{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, PrettyName: "CachyOS", Arch: "amd64", Desktop: desktop}
+	h := c.host
+	h.binarios = map[string]bool{"git": true, "curl": true, "paru": true, "cachyos-rate-mirrors": true}
+	for _, k := range []string{"rpm -q NetworkManager-openvpn-gnome", "rpm -qa libreoffice*"} {
+		delete(h.comandos, k)
+	}
+	h.comandos["pacman -Qq"] = "base\nlinux-cachyos\nfirefox\n"
+	h.comandos["pacman -Qdtq"] = "orfao-um\norfao-dois\n"
+	h.comandos["getent group kvm"] = "kvm:x:992:\n"
+	delete(h.arquivos, "usr/share/applications/org.gnome.Ptyxis.desktop")
+	if desktop == sysinfo.KDE {
+		h.binarios["plasmashell"] = true
+		delete(h.arquivos, "usr/share/applications/org.gnome.Nautilus.desktop")
+		h.arquivos["usr/share/applications/org.kde.dolphin.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;FileManager;\n")
+		return c
+	}
+	h.binarios["gnome-shell"] = true
+	h.binarios["gnome-extensions"] = true
+	h.arquivos["usr/share/applications/org.gnome.Console.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=GNOME;GTK;System;TerminalEmulator;\n")
+	h.comandos["[ana] gsettings get org.gnome.desktop.wm.preferences button-layout"] = "'appmenu:close'\n"
+	return c
+}
+
 func cenarios(t *testing.T) []cenario {
 	return []cenario{
 		ubuntuLimpo(t, "22.04"),
@@ -359,6 +390,8 @@ func cenarios(t *testing.T) []cenario {
 		fedoraLimpo(t, "44"),
 		mintLimpo(t),
 		zorinLimpo(t),
+		cachyosLimpo(t, sysinfo.KDE),
+		cachyosLimpo(t, sysinfo.GNOME),
 	}
 }
 
