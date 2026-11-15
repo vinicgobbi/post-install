@@ -1,3 +1,22 @@
+## v3.2.0 (2026-11-15)
+
+### Feat
+
+- **modules**: adiciona o fedora kde plasma
+- **sysinfo**: aceita o fedora kde plasma
+- **modules**: adiciona a família arch e as variantes do kde plasma
+- **sysinfo**: detecta o cachyos com kde plasma e gnome
+- **aparencia**: não altera o tema no linux mint e no zorin os
+- **aparencia**: ativa os botões de minimizar e maximizar no fedora
+- **gnome**: ativa as extensões que vêm com o zorin os
+- **modules**: adiciona variantes do linux mint (cinnamon e nemo)
+- **sysinfo**: detecta o linux mint cinnamon e o zorin os core
+
+### Fix
+
+- **runner**: roda os scripts do usuário sempre no bash
+- **modules**: usa a versão base do ubuntu nos derivados
+
 ## v3.1.2 (2026-11-14)
 
 ### Fix
