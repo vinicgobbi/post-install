@@ -71,6 +71,15 @@ UBUNTU_CODENAME=noble`, familia: Ubuntu, codename: "noble", msVersion: "24.04", 
 		{name: "zorin 17 pela base jammy", osRelease: `ID=zorin
 VERSION_ID="17"
 UBUNTU_CODENAME=jammy`, familia: Ubuntu, codename: "jammy", msVersion: "22.04", ubuntuVersion: "22.04"},
+		{name: "cachyos rolling", osRelease: `NAME="CachyOS Linux"
+PRETTY_NAME="CachyOS"
+ID=cachyos
+ID_LIKE=arch
+BUILD_ID=rolling`, familia: Arch},
+		{name: "arch puro nao suportado", osRelease: `ID=arch
+BUILD_ID=rolling`, wantErr: true},
+		{name: "manjaro nao suportado", osRelease: `ID=manjaro
+ID_LIKE=arch`, wantErr: true},
 		{name: "pop nao suportado", osRelease: `ID=pop
 ID_LIKE="ubuntu debian"
 UBUNTU_CODENAME=noble`, wantErr: true},
@@ -127,9 +136,16 @@ func TestConferirDesktop(t *testing.T) {
 		{id: IDMint, bins: []string{"cinnamon", "gnome-shell"}, want: Cinnamon},
 		{id: IDMint, bins: []string{"mate-session"}, wantErr: true},
 		{id: "fedora", bins: []string{"gnome-shell"}, want: GNOME},
+		{id: IDCachyOS, bins: []string{"plasmashell"}, want: KDE},
+		{id: IDCachyOS, bins: []string{"gnome-shell"}, want: GNOME},
+		{id: IDCachyOS, bins: []string{"plasmashell", "gnome-shell"}, want: KDE},
+		{id: IDCachyOS, bins: []string{"Hyprland"}, wantErr: true},
 	}
 	for _, tt := range tests {
 		info := &Info{ID: tt.id, PrettyName: tt.id}
+		if tt.id == IDCachyOS {
+			info.Familia = Arch
+		}
 		err := conferirDesktop(info, func(bin string) bool { return slices.Contains(tt.bins, bin) })
 		if tt.wantErr {
 			if err == nil {
@@ -179,6 +195,10 @@ func TestSummary(t *testing.T) {
 	}
 	if s := (&Info{PrettyName: "Fedora Linux 44 (Workstation Edition)"}).Summary(); s != "Fedora Linux 44 (Workstation Edition)" {
 		t.Errorf("Summary do Fedora = %q", s)
+	}
+	cachy := &Info{Familia: Arch, ID: IDCachyOS, PrettyName: "CachyOS", Desktop: KDE}
+	if s := cachy.Summary(); s != "CachyOS (KDE Plasma)" {
+		t.Errorf("Summary do CachyOS = %q", s)
 	}
 	mint := &Info{ID: IDMint, PrettyName: "Linux Mint 22.2", Codename: "noble", UbuntuVersion: "24.04"}
 	if s := mint.Summary(); s != "Linux Mint 22.2 (base Ubuntu 24.04, noble)" {

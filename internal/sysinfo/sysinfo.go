@@ -2,14 +2,14 @@
 // é suportado.
 //
 // São suportados de propósito só o Ubuntu (ID=ubuntu) e o Fedora
-// Workstation com GNOME, o Linux Mint com Cinnamon e o Zorin OS Core (com
-// GNOME). Outros derivados (Pop!_OS, elementary...), as outras edições do
+// Workstation com GNOME, o Linux Mint com Cinnamon, o Zorin OS Core (com
+// GNOME) e o CachyOS com KDE Plasma ou GNOME. Outros derivados (Pop!_OS, elementary...), as outras edições do
 // Mint e do Zorin (MATE, Xfce, Lite, LMDE), os sabores e spins com outro
 // desktop (Kubuntu, Fedora KDE...) e as variantes atômicas do Fedora
 // (Silverblue, Kinoite) divergem em repositórios, pacotes e configurações do
 // desktop, e "parecer" suportado não garante que os módulos funcionem sem
 // ajuste. As versões aceitas ficam em versoes.go; o Mint e o Zorin seguem as
-// da base Ubuntu (UBUNTU_CODENAME).
+// da base Ubuntu (UBUNTU_CODENAME); o CachyOS é rolling, sem versões.
 package sysinfo
 
 import (
@@ -28,6 +28,8 @@ type Familia string
 const (
 	Ubuntu Familia = "ubuntu"
 	Fedora Familia = "fedora"
+	// Arch é a família do CachyOS (pacman, AUR pelo paru), rolling.
+	Arch Familia = "arch"
 )
 
 // Desktop é o ambiente gráfico suportado na distribuição.
@@ -36,6 +38,7 @@ type Desktop string
 const (
 	GNOME    Desktop = "GNOME"
 	Cinnamon Desktop = "Cinnamon"
+	KDE      Desktop = "KDE"
 )
 
 // IDs (do /etc/os-release) dos derivados do Ubuntu suportados.
@@ -43,6 +46,9 @@ const (
 	IDMint  = "linuxmint"
 	IDZorin = "zorin"
 )
+
+// IDCachyOS é o ID do CachyOS no /etc/os-release (família Arch).
+const IDCachyOS = "cachyos"
 
 // fedoraHabilitado libera o Fedora Workstation em Detect (desligá-lo faz o
 // programa voltar a recusar o Fedora, mantendo a detecção).
@@ -112,6 +118,20 @@ func Detect() (*Info, error) {
 // Cinnamon no Mint e o GNOME nas outras. O sudo costuma limpar
 // XDG_CURRENT_DESKTOP (env_reset), então confere pelo binário.
 func conferirDesktop(info *Info, tem func(bin string) bool) error {
+	if info.Familia == Arch {
+		// O CachyOS oferece vários desktops na instalação; só o KDE Plasma
+		// (o padrão) e o GNOME são suportados. Com os dois instalados, vale
+		// o KDE.
+		switch {
+		case tem("plasmashell"):
+			info.Desktop = KDE
+		case tem("gnome-shell"):
+			info.Desktop = GNOME
+		default:
+			return fmt.Errorf("%s sem o KDE Plasma nem o GNOME não é suportado (só com KDE Plasma ou GNOME)", info.PrettyName)
+		}
+		return nil
+	}
 	if info.Mint() {
 		if !tem("cinnamon") {
 			return fmt.Errorf("%s sem o Cinnamon não é suportado (só a edição Cinnamon do Linux Mint)", info.PrettyName)
@@ -155,8 +175,12 @@ func fromRelease(rel map[string]string) (*Info, error) {
 	case "fedora":
 		info.Familia = Fedora
 		return fromFedora(info, rel)
+	case IDCachyOS:
+		// Rolling: não há versões a conferir (nem versão "não testada").
+		info.Familia = Arch
+		return info, nil
 	}
-	return nil, fmt.Errorf("distribuição não suportada: %s (só o Ubuntu, o Fedora Workstation, o Linux Mint Cinnamon e o Zorin OS Core)", info.PrettyName)
+	return nil, fmt.Errorf("distribuição não suportada: %s (só o Ubuntu, o Fedora Workstation, o Linux Mint Cinnamon, o Zorin OS Core e o CachyOS)", info.PrettyName)
 }
 
 func fromUbuntu(info *Info, rel map[string]string) (*Info, error) {
@@ -274,6 +298,9 @@ func juntar(itens []string) string {
 
 // Summary é a linha "Sistema detectado: ..." mostrada no início.
 func (i *Info) Summary() string {
+	if i.Familia == Arch && i.Desktop != "" {
+		return fmt.Sprintf("%s (%s)", i.PrettyName, nomeDesktop(i.Desktop))
+	}
 	if i.Derivado() && i.UbuntuVersion != "" {
 		return fmt.Sprintf("%s (base Ubuntu %s, %s)", i.PrettyName, i.UbuntuVersion, i.Codename)
 	}
@@ -281,6 +308,14 @@ func (i *Info) Summary() string {
 		return i.PrettyName
 	}
 	return fmt.Sprintf("%s (%s)", i.PrettyName, i.Codename)
+}
+
+// nomeDesktop é o nome do desktop para as mensagens.
+func nomeDesktop(d Desktop) string {
+	if d == KDE {
+		return "KDE Plasma"
+	}
+	return string(d)
 }
 
 func dpkgArch() string {
