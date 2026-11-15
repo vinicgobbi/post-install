@@ -568,8 +568,8 @@ func TestTodosNoArch(t *testing.T) {
 	}
 }
 
-// No KDE (CachyOS e Fedora KDE), só as extensões do GNOME, os
-// favoritos/pastas e o tema ficam de fora; os outros módulos do grupo do
+// No KDE (CachyOS e Fedora KDE), só as extensões do GNOME e o tema ficam de
+// fora (os favoritos viram o painel do Plasma); os outros módulos do grupo do
 // desktop têm variante do KDE.
 func TestModulosNoKDE(t *testing.T) {
 	for _, sys := range []*sysinfo.Info{
@@ -580,7 +580,7 @@ func TestModulosNoKDE(t *testing.T) {
 		for _, m := range Disponiveis(sys) {
 			disp[m.ID] = true
 		}
-		fora := []string{"extensoes_gnome", "apps_gnome", "temas_yaru"}
+		fora := []string{"extensoes_gnome", "temas_yaru"}
 		for _, m := range All() {
 			if want := !slices.Contains(fora, m.ID); disp[m.ID] != want {
 				t.Errorf("%s: %s disponível no KDE = %v, esperado %v", sys.Familia, m.ID, disp[m.ID], want)
