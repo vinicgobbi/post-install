@@ -126,6 +126,18 @@ var firefoxThunderbird = Module{
 		c.Log.Successf("Firefox e Thunderbird instalados pelos .deb da Mozilla.")
 		return nil
 	},
+	Arch: &Variante{
+		Title: "Firefox e Thunderbird",
+		Desc:  "Firefox e Thunderbird pelos pacotes dos repositórios oficiais",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o Firefox e o Thunderbird...")
+			if err := c.install("firefox", "thunderbird"); err != nil {
+				return err
+			}
+			c.Log.Successf("Firefox e Thunderbird instalados pelos repositórios oficiais.")
+			return nil
+		},
+	},
 	// No Fedora os dois já são RPM dos repositórios oficiais (sem snap): o
 	// Firefox vem no Workstation, e o Thunderbird só falta instalar.
 	Fedora: &Variante{

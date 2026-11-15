@@ -22,6 +22,23 @@ var mirrors = Module{
 		c.Log.Infof("Otimizando a seleção de espelhos (mirrors) do APT...")
 		return otimizarMirrorsUbuntu(c)
 	},
+	// O CachyOS traz o cachyos-rate-mirrors, que mede e reordena as listas
+	// de mirrors do Arch e do CachyOS.
+	Arch: &Variante{
+		Desc: "Reordena os mirrors do Arch e do CachyOS pela velocidade medida nesta rede (cachyos-rate-mirrors)",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Classificando os mirrors do Arch e do CachyOS (cachyos-rate-mirrors)...")
+			err := step(
+				func() error { return c.garantir("cachyos-rate-mirrors", "cachyos-rate-mirrors") },
+				func() error { return c.Run("cachyos-rate-mirrors") },
+			)
+			if err != nil {
+				return err
+			}
+			c.Log.Successf("Mirrors do pacman reordenados pela velocidade medida agora.")
+			return nil
+		},
+	},
 	Fedora: &Variante{
 		Desc: "Faz o dnf escolher o mirror de menor latência (fastestmirror) e baixar 10 pacotes em paralelo",
 		Run:  otimizarMirrorsFedora,

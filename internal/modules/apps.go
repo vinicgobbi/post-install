@@ -28,6 +28,23 @@ var solaar = Module{
 		}
 		return configurarSolaar(c)
 	},
+	// O pacote do Arch já traz a regra UDEV (com uaccess, sem o grupo
+	// plugdev); o Flatpak segue como alternativa.
+	Arch: &Variante{
+		Desc: "Instala o Solaar e a regra UDEV do receptor Logitech Unifying pelo pacote dos repositórios oficiais (com fallback para Flatpak) e o início junto da sessão, só na bandeja",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o Solaar pelos repositórios oficiais...")
+			if err := c.install("solaar"); err != nil {
+				c.Log.Warnf("Falha ao instalar o Solaar pelos repositórios (%v); instalando via Flatpak.", err)
+				if err := instalarSolaarFlatpak(c); err != nil {
+					return err
+				}
+			} else {
+				c.Log.Successf("Solaar instalado pelos repositórios oficiais.")
+			}
+			return configurarSolaar(c)
+		},
+	},
 	// No Fedora o solaar-udev traz a regra (com TAG+="uaccess", sem o grupo
 	// plugdev, que o Fedora não usa); o Flatpak segue como alternativa.
 	Fedora: &Variante{
@@ -162,6 +179,28 @@ var removerLibreoffice = Module{
 		c.Log.Successf("LibreOffice nativo removido.")
 		return nil
 	},
+	// O CachyOS não traz o LibreOffice; remove só se houver algum pacote.
+	Arch: &Variante{
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Removendo LibreOffice pré-instalado...")
+			out, _ := c.Output("pacman", "-Qq")
+			var pkgs []string
+			for _, p := range strings.Fields(out) {
+				if strings.HasPrefix(p, "libreoffice") {
+					pkgs = append(pkgs, p)
+				}
+			}
+			if len(pkgs) == 0 {
+				c.Log.Infof("LibreOffice nativo não está instalado.")
+				return nil
+			}
+			if err := c.Run("pacman", append([]string{"-Rns", "--noconfirm"}, pkgs...)...); err != nil {
+				return err
+			}
+			c.Log.Successf("LibreOffice nativo removido.")
+			return nil
+		},
+	},
 	// O Workstation traz o LibreOffice em RPM. "dnf remove" de um padrão sem
 	// nada instalado não é garantido como sucesso, então confere antes.
 	Fedora: &Variante{
@@ -198,6 +237,12 @@ var flatpaks = Module{
 		c.Log.Successf("Aplicativos Flatpak instalados.")
 		return nil
 	},
+	// No KDE, o Discover já mostra os Flatpaks; no GNOME do Arch, o GNOME
+	// Software também.
+	Arch: &Variante{
+		Desc: "Flathub e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
+		Run:  instalarFlatpaksFlathub,
+	},
 	// O Workstation já traz o Flatpak e o GNOME Software com suporte a ele.
 	Fedora: &Variante{
 		Desc: "Flathub (ativado e sem filtro) e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
@@ -219,19 +264,23 @@ var flatpaks = Module{
 	// que o Mint bloqueia (/etc/apt/preferences.d/nosnap.pref).
 	Mint: &Variante{
 		Desc: "Flathub e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
-		Run: func(c *Ctx) error {
-			c.Log.Infof("Configurando Flatpak e instalando apps...")
-			if err := step(
-				func() error { return c.garantir("flatpak", "flatpak") },
-				c.ensureFlathub,
-				func() error { return c.flatpakInstall(config.Flatpaks...) },
-			); err != nil {
-				return err
-			}
-			c.Log.Successf("Aplicativos Flatpak instalados.")
-			return nil
-		},
+		Run:  instalarFlatpaksFlathub,
 	},
+}
+
+// instalarFlatpaksFlathub garante o Flatpak e o Flathub e instala a lista,
+// sem mexer na loja de apps da distribuição.
+func instalarFlatpaksFlathub(c *Ctx) error {
+	c.Log.Infof("Configurando Flatpak e instalando apps...")
+	if err := step(
+		func() error { return c.garantir("flatpak", "flatpak") },
+		c.ensureFlathub,
+		func() error { return c.flatpakInstall(config.Flatpaks...) },
+	); err != nil {
+		return err
+	}
+	c.Log.Successf("Aplicativos Flatpak instalados.")
+	return nil
 }
 
 var flatpaksJogos = Module{
@@ -251,6 +300,7 @@ var flatpaksJogos = Module{
 		c.Log.Successf("Flatpaks de jogos instalados.")
 		return nil
 	},
+	Arch: &Variante{},
 	Fedora: &Variante{
 		Run: func(c *Ctx) error {
 			c.Log.Infof("Instalando Flatpaks de jogos...")
@@ -286,6 +336,17 @@ var bitwarden = Module{
 		}
 		c.Log.Successf("Bitwarden instalado nativamente.")
 		return nil
+	},
+	Arch: &Variante{
+		Desc: "Instala o Bitwarden desktop pelo pacote dos repositórios oficiais (necessário para integração nativa com o navegador)",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando Bitwarden nativo (integração com navegador)...")
+			if err := c.install("bitwarden"); err != nil {
+				return err
+			}
+			c.Log.Successf("Bitwarden instalado nativamente.")
+			return nil
+		},
 	},
 	// O .rpm oficial (instala em /opt/Bitwarden), como o .deb no Ubuntu.
 	Fedora: &Variante{
@@ -329,6 +390,19 @@ var chrome = Module{
 		}
 		c.Log.Successf("Google Chrome instalado.")
 		return nil
+	},
+	// O Chrome não está nos repositórios do Arch: vem do AUR (pacote
+	// google-chrome, que baixa o .deb oficial e confere o checksum).
+	Arch: &Variante{
+		Desc: "Instala o Google Chrome pelo AUR (google-chrome, com o paru)",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o Google Chrome pelo AUR...")
+			if err := c.instalarAUR("google-chrome"); err != nil {
+				return err
+			}
+			c.Log.Successf("Google Chrome instalado.")
+			return nil
+		},
 	},
 	Fedora: &Variante{
 		Desc: "Instala o Google Chrome pelo repositório RPM do Google, com a chave conferida pelo fingerprint",

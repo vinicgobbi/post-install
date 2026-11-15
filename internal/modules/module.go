@@ -3,7 +3,7 @@
 // a ordem de execução é a ordem da lista em All. O Run de cada módulo é o
 // caminho do Ubuntu (e do Zorin OS); a variante do Fedora fica no campo
 // Fedora, as do Linux Mint (Cinnamon) e do Zorin OS nos campos Mint e Zorin,
-// e Disponiveis devolve a
+// as do CachyOS nos campos Arch e KDE, e Disponiveis devolve a
 // lista já adaptada à distribuição detectada.
 package modules
 
@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"strings"
 
 	"github.com/vinicgobbi/post-install/internal/runner"
 	"github.com/vinicgobbi/post-install/internal/sysinfo"
@@ -43,6 +44,12 @@ type Module struct {
 	Mint *Variante
 	// Zorin é a variante do Zorin OS (GNOME, família Ubuntu), como a do Mint.
 	Zorin *Variante
+	// Arch é a variante da família Arch (CachyOS) — nil = indisponível nela,
+	// como a do Fedora.
+	Arch *Variante
+	// KDE é a variante do CachyOS com KDE Plasma, por cima da do Arch (nil =
+	// igual à do Arch; Indisponivel = some no KDE).
+	KDE *Variante
 }
 
 // Variante é como o módulo trabalha numa distribuição que não o Ubuntu.
@@ -68,13 +75,19 @@ func (m Module) Para(f sysinfo.Familia) (Module, bool) {
 		return m, true
 	case sysinfo.Fedora:
 		return m.aplicar(m.Fedora)
+	case sysinfo.Arch:
+		return m.aplicar(m.Arch)
 	}
 	return Module{}, false
 }
 
 // ParaSistema é o Para da família do sistema e, no Linux Mint e no Zorin
-// OS, com a variante deles por cima (sem ela, vale o módulo do Ubuntu).
+// OS, com a variante deles por cima (sem ela, vale o módulo do Ubuntu); no
+// CachyOS com KDE, a variante do KDE por cima da do Arch.
 func (m Module) ParaSistema(sys *sysinfo.Info) (Module, bool) {
+	if sys.Familia == sysinfo.Arch && sys.Desktop == sysinfo.KDE && m.KDE != nil {
+		return m.aplicar(m.KDE)
+	}
 	if sys.Mint() && m.Mint != nil {
 		return m.aplicar(m.Mint)
 	}
@@ -90,7 +103,7 @@ func (m Module) aplicar(v *Variante) (Module, bool) {
 		return Module{}, false
 	}
 	out := m
-	out.Fedora, out.Mint, out.Zorin = nil, nil, nil
+	out.Fedora, out.Mint, out.Zorin, out.Arch, out.KDE = nil, nil, nil, nil, nil
 	if v.Run != nil {
 		out.Run = v.Run
 	}
@@ -193,29 +206,73 @@ func All() []Module {
 // fedora diz se o sistema é da família Fedora (sem Sys, vale o Ubuntu).
 func (c *Ctx) fedora() bool { return c.Sys != nil && c.Sys.Familia == sysinfo.Fedora }
 
+// arch diz se o sistema é da família Arch (CachyOS).
+func (c *Ctx) arch() bool { return c.Sys != nil && c.Sys.Familia == sysinfo.Arch }
+
 // mint diz se o sistema é o Linux Mint (com Cinnamon).
 func (c *Ctx) mint() bool { return c.Sys != nil && c.Sys.Mint() }
 
-// install instala pacotes de forma não interativa, com o apt no Ubuntu e o
-// dnf no Fedora. Os nomes são os da distribuição: cada variante passa os
+// install instala pacotes de forma não interativa, com o apt no Ubuntu, o
+// dnf no Fedora e o pacman no Arch (só dos repositórios oficiais; o AUR é
+// com instalarAUR). Os nomes são os da distribuição: cada variante passa os
 // seus. Também aceita o caminho de um .deb/.rpm baixado.
 func (c *Ctx) install(pkgs ...string) error {
 	return c.installEnv(nil, pkgs...)
 }
 
 func (c *Ctx) installEnv(env []string, pkgs ...string) error {
+	if c.arch() {
+		return c.RunEnv(env, "pacman", append([]string{"-S", "--needed", "--noconfirm"}, pkgs...)...)
+	}
 	if c.fedora() {
 		return c.RunEnv(env, "dnf", append([]string{"install", "-y"}, pkgs...)...)
 	}
 	return c.RunEnv(env, "apt", append([]string{"install", "-y"}, pkgs...)...)
 }
 
-// pacoteInstalado consulta o gerenciador de pacotes (dpkg ou rpm).
+// pacoteInstalado consulta o gerenciador de pacotes (dpkg, rpm ou pacman).
 func (c *Ctx) pacoteInstalado(pkg string) bool {
+	if c.arch() {
+		return c.Probe("pacman", "-Q", pkg)
+	}
 	if c.fedora() {
 		return c.Probe("rpm", "-q", pkg)
 	}
 	return c.Probe("dpkg", "-s", pkg)
+}
+
+// sudoersAUR libera, só durante instalarAUR, o pacman sem senha para o
+// usuário alvo: o paru compila como usuário comum e chama o "sudo pacman"
+// no fim, o que pediria a senha sem um terminal para digitá-la.
+const sudoersAUR = "/etc/sudoers.d/90-post-install-aur"
+
+// instalarAUR instala pacotes do AUR com o paru (que o CachyOS traz), como o
+// usuário alvo: o makepkg não roda como root. --skipreview pula a revisão
+// interativa do PKGBUILD. O sudoers temporário é validado pelo visudo antes
+// de entrar no lugar e removido no fim, mesmo se a instalação falhar.
+func (c *Ctx) instalarAUR(pkgs ...string) (err error) {
+	if err := c.garantir("paru", "paru"); err != nil {
+		return err
+	}
+	tmp := c.Temp("sudoers-aur")
+	regra := c.User + " ALL=(root) NOPASSWD: /usr/bin/pacman\n"
+	defer func() {
+		if rmErr := c.RemoveAll(sudoersAUR); rmErr != nil && err == nil {
+			err = errorf("não foi possível remover %s: %w", sudoersAUR, rmErr)
+		}
+	}()
+	args := make([]string, len(pkgs))
+	for i, p := range pkgs {
+		args[i] = shQuote(p)
+	}
+	return step(
+		func() error { return c.WriteFile(tmp, regra, 0o440) },
+		func() error { return c.Run("visudo", "-cf", tmp) },
+		func() error { return c.Run("install", "-m", "0440", "-o", "root", "-g", "root", tmp, sudoersAUR) },
+		func() error {
+			return c.AsUser("paru -S --needed --noconfirm --skipreview " + strings.Join(args, " "))
+		},
+	)
 }
 
 // garantir instala pkg se o comando bin ainda não existir (ex.: o curl, que

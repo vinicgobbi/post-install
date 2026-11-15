@@ -35,6 +35,7 @@ func TestPacotesPorFamilia(t *testing.T) {
 	for f, want := range map[sysinfo.Familia]string{
 		sysinfo.Ubuntu: "[dry-run] apt install -y git curl",
 		sysinfo.Fedora: "[dry-run] dnf install -y git curl",
+		sysinfo.Arch:   "[dry-run] pacman -S --needed --noconfirm git curl",
 	} {
 		c, linhas := ctxDryRun(t, f, nil)
 		if err := c.install("git", "curl"); err != nil {
@@ -53,6 +54,33 @@ func TestPacotesPorFamilia(t *testing.T) {
 	}
 	if !ubu.pacoteInstalado("python3-nautilus") || ubu.pacoteInstalado("nautilus-python") {
 		t.Error("Ubuntu deveria consultar o dpkg")
+	}
+}
+
+// O AUR passa pelo paru como o usuário, com o pacman liberado no sudoers só
+// durante a instalação: a regra é validada antes de entrar no lugar e
+// removida no fim.
+func TestInstalarAUR(t *testing.T) {
+	h := &hostFalso{binarios: map[string]bool{"paru": true}, semResposta: map[string]bool{}}
+	c, linhas := ctxDryRun(t, sysinfo.Arch, h)
+	if err := c.instalarAUR("google-chrome", "visual-studio-code-bin"); err != nil {
+		t.Fatal(err)
+	}
+	esperado := []string{
+		"escrever /tmp/teste/sudoers-aur",
+		"visudo -cf /tmp/teste/sudoers-aur",
+		"install -m 0440 -o root -g root /tmp/teste/sudoers-aur " + sudoersAUR,
+		"paru -S --needed --noconfirm --skipreview 'google-chrome' 'visual-studio-code-bin'",
+		"rm -rf " + sudoersAUR,
+	}
+	i := 0
+	for _, l := range *linhas {
+		if i < len(esperado) && strings.Contains(l, esperado[i]) {
+			i++
+		}
+	}
+	if i != len(esperado) {
+		t.Errorf("faltou %q (na ordem) em:\n%s", esperado[i], strings.Join(*linhas, "\n"))
 	}
 }
 

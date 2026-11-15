@@ -74,6 +74,10 @@ var appsGnome = Module{
 		c.Log.Successf("Favoritos e pastas do menu de apps aplicados.")
 		return nil
 	},
+	Arch: &Variante{},
+	// Os favoritos do menu e os ícones fixados no painel do Plasma ficam em
+	// configurações internas dele, frágeis de editar por fora.
+	KDE:    &Variante{Indisponivel: true},
 	Fedora: &Variante{},
 	// O menu do Cinnamon já separa os apps pelas categorias e não tem pastas
 	// configuráveis: só os favoritos dele (org.cinnamon favorite-apps).

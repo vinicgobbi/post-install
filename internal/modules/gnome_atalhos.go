@@ -14,6 +14,14 @@ var atalhosGnome = Module{
 	Run: func(c *Ctx) error {
 		return aplicarAtalhos(c, "atalhos.dconf", "/org/gnome/", "GNOME")
 	},
+	Arch: &Variante{},
+	// No KDE, o Print continua com o Spectacle; ele ganha os atalhos que o
+	// GNOME tem aqui: Meta+Shift+S (região) e Meta+Shift+R (gravação).
+	KDE: &Variante{
+		Title: "Atalhos do KDE",
+		Desc:  "Meta+Shift+S captura uma região e Meta+Shift+R grava uma região com o Spectacle (o Print continua com o Spectacle)",
+		Run:   aplicarAtalhosKDE,
+	},
 	Fedora: &Variante{},
 	// O Cinnamon guarda os atalhos em outro lugar e em outro formato (o
 	// binding é uma lista), daí o arquivo próprio.
@@ -58,4 +66,25 @@ func garantirFlatpak(c *Ctx, app, nome string) error {
 		}
 	}
 	return step(c.garantirFlathub, func() error { return c.flatpakInstall(app) })
+}
+
+// scriptAtalhosKDE grava os atalhos do Spectacle no kglobalshortcutsrc
+// (grupo [services][org.kde.spectacle.desktop] do Plasma 6; vários atalhos
+// para a mesma ação são separados por tabulação). A captura de região mantém
+// o padrão (Meta+Shift+Print) e ganha o Meta+Shift+S.
+const scriptAtalhosKDE = `set -e
+kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RectangularRegionScreenShot "$(printf 'Meta+Shift+Print\tMeta+Shift+S')"
+kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RecordRegion "Meta+Shift+R"
+`
+
+func aplicarAtalhosKDE(c *Ctx) error {
+	c.Log.Infof("Configurando os atalhos do Spectacle...")
+	if err := step(
+		func() error { return c.install("spectacle") },
+		func() error { return c.AsUser(scriptAtalhosKDE) },
+	); err != nil {
+		return err
+	}
+	c.Log.Successf("Atalhos do KDE aplicados (Meta+Shift+S e Meta+Shift+R); valem a partir do próximo login.")
+	return nil
 }

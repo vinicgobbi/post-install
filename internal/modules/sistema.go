@@ -1,5 +1,7 @@
 package modules
 
+import "strings"
+
 var atualizacao = Module{
 	ID:    "atualizacao",
 	Grupo: GrupoSistema,
@@ -16,6 +18,16 @@ var atualizacao = Module{
 		}
 		c.Log.Successf("Sistema atualizado.")
 		return nil
+	},
+	Arch: &Variante{
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Atualizando pacotes do sistema...")
+			if err := c.Run("pacman", "-Syu", "--noconfirm"); err != nil {
+				return err
+			}
+			c.Log.Successf("Sistema atualizado.")
+			return nil
+		},
 	},
 	Fedora: &Variante{
 		Run: func(c *Ctx) error {
@@ -37,6 +49,17 @@ var limpeza = Module{
 	Run: func(c *Ctx) error {
 		return limpar(c, []string{"apt", "autoremove", "-y"}, []string{"apt", "clean"})
 	},
+	// "pacman -Qdtq" sai com erro quando não há órfãos.
+	Arch: &Variante{
+		Desc: "Remove pacotes órfãos e limpa o cache do pacman",
+		Run: func(c *Ctx) error {
+			var orfaos []string
+			if out, err := c.Output("pacman", "-Qdtq"); err == nil && strings.TrimSpace(out) != "" {
+				orfaos = append([]string{"pacman", "-Rns", "--noconfirm"}, strings.Fields(out)...)
+			}
+			return limpar(c, orfaos, []string{"pacman", "-Sc", "--noconfirm"})
+		},
+	},
 	Fedora: &Variante{
 		Desc: "Remove pacotes órfãos e limpa o cache do dnf",
 		Run: func(c *Ctx) error {
@@ -45,12 +68,17 @@ var limpeza = Module{
 	},
 }
 
-// limpar remove os órfãos, limpa o cache do gerenciador de pacotes e o
-// diretório de trabalho desta execução.
+// limpar remove os órfãos (orfaos nil = nada a remover), limpa o cache do
+// gerenciador de pacotes e o diretório de trabalho desta execução.
 func limpar(c *Ctx, orfaos, cache []string) error {
 	c.Log.Infof("Limpando o sistema...")
 	err := step(
-		func() error { return c.Run(orfaos[0], orfaos[1:]...) },
+		func() error {
+			if len(orfaos) == 0 {
+				return nil
+			}
+			return c.Run(orfaos[0], orfaos[1:]...)
+		},
 		func() error { return c.Run(cache[0], cache[1:]...) },
 	)
 	if err != nil {

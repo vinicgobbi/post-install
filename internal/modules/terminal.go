@@ -23,6 +23,10 @@ func pacotesFerramentas(c *Ctx) []string {
 // FUSE 2 é o fuse-libs.
 var pacotesFerramentasFedora = []string{"gh", "nmap", "pipx", "ffmpeg-free", "btop", "fuse-libs"}
 
+// pacotesFerramentasArch: os nomes do Arch (o gh é o github-cli, o pipx é o
+// python-pipx e o FUSE 2 é o fuse2).
+var pacotesFerramentasArch = []string{"github-cli", "tea", "nmap", "python-pipx", "ffmpeg", "btop", "fuse2"}
+
 // instalarFerramentas tenta tudo numa chamada só; se falhar (algum pacote
 // ausente na versão), instala um por um e só avisa dos que faltarem, sem
 // derrubar o módulo.
@@ -132,6 +136,20 @@ var ferramentas = Module{
 		c.Log.Successf("Ferramentas de terminal instaladas.")
 		return nil
 	},
+	// No Arch tudo vem dos repositórios oficiais, inclusive o gh
+	// (github-cli) e o tea.
+	Arch: &Variante{
+		Desc: "git, curl, jq, bat, gh, tea, nmap, pipx, ffmpeg, btop e FUSE 2 para AppImages, pelos repositórios oficiais",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando ferramentas de terminal...")
+			if err := c.install("git", "curl", "jq", "bat"); err != nil {
+				return err
+			}
+			instalarFerramentas(c, "gh, tea, nmap, pipx, ffmpeg, btop, FUSE 2", func(*Ctx) []string { return pacotesFerramentasArch })
+			c.Log.Successf("Ferramentas de terminal instaladas.")
+			return nil
+		},
+	},
 	Fedora: &Variante{
 		Desc: "git, curl, jq, bat, gh (repositório oficial), tea, nmap, pipx, ffmpeg (ffmpeg-free), btop e FUSE 2 para AppImages",
 		Run: func(c *Ctx) error {
@@ -167,6 +185,8 @@ var shell = Module{
 	Run: func(c *Ctx) error {
 		return configurarShell(c, "zsh", "git", "curl")
 	},
+	// O padrão do CachyOS é o fish; o módulo troca para o zsh como nas outras.
+	Arch: &Variante{},
 	// O chsh fica no util-linux, que já vem no Workstation.
 	Fedora: &Variante{
 		Run: func(c *Ctx) error {

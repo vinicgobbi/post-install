@@ -443,8 +443,10 @@ func TestDisponiveisCoerentes(t *testing.T) {
 		{Familia: sysinfo.Fedora},
 		{Familia: sysinfo.Ubuntu, ID: sysinfo.IDMint},
 		{Familia: sysinfo.Ubuntu, ID: sysinfo.IDZorin},
+		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.GNOME},
+		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE},
 	} {
-		f := string(sys.Familia) + "/" + sys.ID
+		f := string(sys.Familia) + "/" + sys.ID + "/" + string(sys.Desktop)
 		mods := Disponiveis(sys)
 		ids := map[string]bool{}
 		for _, m := range mods {
@@ -548,6 +550,60 @@ func TestModulosNoZorin(t *testing.T) {
 		if want := m.ID != "temas_yaru"; disp[m.ID] != want {
 			t.Errorf("%s disponível no Zorin = %v, esperado %v", m.ID, disp[m.ID], want)
 		}
+	}
+}
+
+// Todos os módulos existem no CachyOS: um módulo novo sem a variante do Arch
+// sumiria de lá sem aviso.
+func TestTodosNoArch(t *testing.T) {
+	disp := map[string]bool{}
+	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.GNOME}) {
+		disp[m.ID] = true
+	}
+	for _, m := range All() {
+		if !disp[m.ID] {
+			t.Errorf("%s não tem variante do Arch (campo Arch em %s)", m.ID, m.ID)
+		}
+	}
+}
+
+// No KDE, só as extensões do GNOME, os favoritos/pastas e o tema ficam de
+// fora; os outros módulos do grupo do desktop têm variante do KDE.
+func TestModulosNoKDE(t *testing.T) {
+	disp := map[string]bool{}
+	for _, m := range Disponiveis(&sysinfo.Info{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE}) {
+		disp[m.ID] = true
+	}
+	fora := []string{"extensoes_gnome", "apps_gnome", "temas_yaru"}
+	for _, m := range All() {
+		if want := !slices.Contains(fora, m.ID); disp[m.ID] != want {
+			t.Errorf("%s disponível no KDE = %v, esperado %v", m.ID, disp[m.ID], want)
+		}
+		if m.Grupo == GrupoGNOME && m.KDE == nil {
+			t.Errorf("%s (grupo %s) sem variante do KDE: rodaria os comandos do GNOME no Plasma", m.ID, GrupoGNOME)
+		}
+	}
+}
+
+// A variante do KDE fica por cima da do Arch, só no CachyOS com KDE.
+func TestParaSistemaKDE(t *testing.T) {
+	m := Module{ID: "x", Title: "X", Run: func(*Ctx) error { return nil },
+		Arch: &Variante{Title: "No Arch"}, KDE: &Variante{Title: "No KDE"}}
+	gnome := &sysinfo.Info{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.GNOME}
+	kde := &sysinfo.Info{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE}
+	if g, ok := m.ParaSistema(gnome); !ok || g.Title != "No Arch" {
+		t.Errorf("no GNOME deveria valer a variante do Arch: %+v", g)
+	}
+	if k, ok := m.ParaSistema(kde); !ok || k.Title != "No KDE" || k.Arch != nil || k.KDE != nil {
+		t.Errorf("no KDE deveria valer a variante do KDE: %+v", k)
+	}
+	m.KDE = nil
+	if k, _ := m.ParaSistema(kde); k.Title != "No Arch" {
+		t.Error("sem variante do KDE, deveria valer a do Arch")
+	}
+	m.Arch = nil
+	if _, ok := m.ParaSistema(gnome); ok {
+		t.Error("sem variante do Arch, o módulo não deveria estar disponível")
 	}
 }
 
