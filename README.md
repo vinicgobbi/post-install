@@ -1,7 +1,7 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Ubuntu, Fedora Workstation, Linux Mint (Cinnamon), Zorin OS (Core) ou CachyOS (KDE Plasma ou GNOME) recém-instalada: mirrors, atualização do sistema, Podman,
+workstation Ubuntu, Fedora (Workstation ou KDE Plasma), Linux Mint (Cinnamon), Zorin OS (Core) ou CachyOS (KDE Plasma ou GNOME) recém-instalada: mirrors, atualização do sistema, Podman,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
@@ -16,10 +16,11 @@ VSCode"/"Copiar caminho" no Nautilus.
 - **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o `gnome-shell`
   instalado), nas **LTS com suporte padrão** — hoje **22.04 (jammy), 24.04
   (noble) e 26.04 (resolute)**;
-- **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`), nas
+- **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`) e
+  **Fedora KDE Plasma** (`VARIANT_ID=kde` e o `plasmashell` instalado), nas
   **versões em manutenção** — hoje **43, 44 e 45**. Todos os módulos existem
-  nele, com os mesmos IDs; veja [No Fedora](#no-fedora) o que muda em cada
-  um;
+  no Workstation, com os mesmos IDs; veja [No Fedora](#no-fedora) o que muda
+  em cada um e [No KDE Plasma](#no-kde-plasma) o que muda no KDE;
 - **Linux Mint com Cinnamon** (`ID=linuxmint` e o `cinnamon` instalado) e
   **Zorin OS Core** (`ID=zorin` e o `gnome-shell` instalado), nas versões com
   **base** numa das LTS do Ubuntu da lista (pelo `UBUNTU_CODENAME`) — hoje o
@@ -97,12 +98,17 @@ nomes das instruções oficiais) e as chaves, conferidas pelo fingerprint, em
 | `php_sqlserver` | repositório da Microsoft para o **RHEL** (a Microsoft não publica para o Fedora; o módulo avisa), extensões em `/etc/php.d` |
 | `rust` / `ruby` | dependências de compilação do Fedora |
 | `tailscale` | repositório RPM oficial |
-| `firewall` | `firewall-config`, a interface do firewalld, que o Fedora já traz ativo (a zona padrão não muda) |
+| `firewall` | a interface do firewalld, que o Fedora já traz ativo: `firewall-config` no GNOME e `plasma-firewall` no KDE (a zona padrão não muda) |
 | `virt_manager` | libvirt com os daemons modulares (`virtqemud`...), o padrão do Fedora |
 | `temas_yaru` | só os **ícones** Yaru-dark; o tema é o **adw-gtk3-dark** (o visual do libadwaita nos apps GTK 3), também nos Flatpaks; e os botões de **minimizar e maximizar** voltam às janelas (`button-layout` `appmenu:minimize,maximize,close`) |
 | `extensoes_gnome` | no lugar da dock, do AppIndicator e do Tiling Assistant do Ubuntu, as equivalentes do extensions.gnome.org (veja [Extensões do GNOME](#extensões-do-gnome)) |
 | `nautilus` | `nautilus-python` e `python3-gobject` |
-| `go`, `node`, `claude_code`, `deploy_dev`, `ovpn`, `papel_parede`, `atalhos_gnome`, `apps_gnome` | iguais |
+| `ovpn` | `NetworkManager-openvpn-gnome`; no KDE, `NetworkManager-openvpn` e `plasma-nm-openvpn` (o diálogo do Plasma) |
+| `go`, `node`, `claude_code`, `deploy_dev`, `papel_parede`, `atalhos_gnome`, `apps_gnome` | iguais |
+
+No **Fedora KDE Plasma**, os módulos do desktop seguem a variante do KDE
+(veja [No KDE Plasma](#no-kde-plasma)) e o `temas_yaru` fica indisponível:
+o Plasma mantém o tema dele.
 
 ## No Linux Mint e no Zorin OS
 
@@ -178,7 +184,12 @@ O tema do CachyOS não muda.
 
 No **GNOME**, os outros módulos do desktop (papel de parede, extensões,
 atalhos, Nautilus, favoritos e pastas) funcionam como no Fedora. No **KDE
-Plasma**, eles têm uma variante do KDE, com os mesmos IDs:
+Plasma**, eles têm a variante do KDE (veja [No KDE Plasma](#no-kde-plasma)).
+
+## No KDE Plasma
+
+No CachyOS com KDE e no Fedora KDE, os módulos do desktop têm uma variante
+do KDE, com os mesmos IDs (e o tema da distribuição não muda):
 
 | ID | No KDE |
 |----|--------|
@@ -461,9 +472,11 @@ internal/
    OS. Um teste garante que todo módulo do grupo "GNOME e aparência" tem a
    variante do Mint.
 5. No CachyOS, o módulo precisa do campo `Arch` (como o `Fedora`: sem ele,
-   fica indisponível; um teste garante que todos têm). No KDE Plasma, o
-   campo `KDE` fica por cima do `Arch` — necessário nos módulos do grupo
-   "GNOME e aparência" (um teste confere).
+   fica indisponível; um teste garante que todos têm). No KDE Plasma
+   (CachyOS e Fedora KDE), o campo `KDE` fica por cima da variante da
+   família — necessário nos módulos do grupo "GNOME e aparência" (um teste
+   confere). Como vale nas duas famílias, ele só usa pacotes de mesmo nome
+   nas duas; o que muda por família fica na variante dela (com `c.kde()`).
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -490,7 +503,7 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 Toda consulta à máquina ou à rede passa pelo `Ctx` porque os **testes
 golden** trocam a máquina por uma falsa. `golden_test.go` descreve cenários
 (Ubuntu 22.04, 24.04 e 26.04 recém-instalados, um 26.04 já configurado,
-o Fedora 44, o Linux Mint 22, o Zorin OS 18 e o CachyOS com KDE e com GNOME),
+o Fedora 44 Workstation e KDE, o Linux Mint 22, o Zorin OS 18 e o CachyOS com KDE e com GNOME),
 roda todos os módulos em dry-run contra cada um e compara o resultado com
 `internal/modules/testdata/golden/<cenário>.txt`. Uma mudança em qualquer
 módulo, inclusive na lista de Flatpaks, aparece como diferença nesses
@@ -512,11 +525,11 @@ golden. Os arquivos de `GNOME/` usados nos testes são fixtures próprias, em
 `sysinfo.Detect` lê `/etc/os-release`, recusa o que não for suportado (veja
 [Sistemas suportados](#sistemas-suportados)) e preenche:
 
-- `Familia` — `ubuntu`, `fedora` (este só com `VARIANT_ID=workstation`) ou
+- `Familia` — `ubuntu`, `fedora` (com `VARIANT_ID=workstation` ou `kde`) ou
   `arch` (o CachyOS); o Linux Mint e o Zorin OS são da família `ubuntu`
-- `Desktop` — `Cinnamon` no Mint (confere o binário `cinnamon`), `KDE` ou
-  `GNOME` no CachyOS (`plasmashell` ou `gnome-shell`), `GNOME` nos outros
-  (confere o `gnome-shell`)
+- `Desktop` — `Cinnamon` no Mint (confere o binário `cinnamon`), `KDE` no
+  Fedora KDE (`plasmashell`), `KDE` ou `GNOME` no CachyOS (`plasmashell` ou
+  `gnome-shell`), `GNOME` nos outros (confere o `gnome-shell`)
 - `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`; no
   Mint e no Zorin, o da base), usado na URL do repositório do Tailscale e no
   teste de mirrors; vazio no Fedora
@@ -809,8 +822,8 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 
 ## Requisitos
 
-- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, Fedora Workstation 43, 44 ou
-  45 (ou mais novos, com confirmação), Linux Mint (Cinnamon) e Zorin OS
+- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, Fedora Workstation ou KDE Plasma
+  43, 44 ou 45 (ou mais novos, com confirmação), Linux Mint (Cinnamon) e Zorin OS
   (Core) com uma dessas bases Ubuntu, ou CachyOS com KDE Plasma ou GNOME — veja
   [Sistemas suportados](#sistemas-suportados).
 - Acesso root (`sudo`) — exceto em `--dry-run`.
