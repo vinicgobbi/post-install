@@ -94,7 +94,9 @@ PRETTY_NAME="Fedora Linux 44 (Workstation Edition)"`, familia: Fedora, msVersion
 		{name: "fedora fora de manutenção", osRelease: "ID=fedora\nVERSION_ID=40\nVARIANT_ID=workstation", wantErr: true},
 		{name: "fedora sem variante", osRelease: "ID=fedora\nVERSION_ID=44", wantErr: true},
 		{name: "fedora silverblue", osRelease: "ID=fedora\nVERSION_ID=44\nVARIANT_ID=silverblue", wantErr: true},
-		{name: "fedora kde", osRelease: "ID=fedora\nVERSION_ID=44\nVARIANT_ID=kde", wantErr: true},
+		{name: "fedora kde", osRelease: "ID=fedora\nVERSION_ID=44\nVARIANT_ID=kde", familia: Fedora, msVersion: "10"},
+		{name: "fedora kinoite", osRelease: "ID=fedora\nVERSION_ID=44\nVARIANT_ID=kinoite", wantErr: true},
+		{name: "fedora xfce", osRelease: "ID=fedora\nVERSION_ID=44\nVARIANT_ID=xfce", wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -119,6 +121,19 @@ PRETTY_NAME="Fedora Linux 44 (Workstation Edition)"`, familia: Fedora, msVersion
 	}
 }
 
+// A edição KDE do Fedora sai da leitura do os-release com o desktop esperado
+// (o conferirDesktop exige o Plasma); a Workstation, sem desktop definido.
+func TestFedoraKDE(t *testing.T) {
+	kde, err := fromRelease(kv("ID=fedora\nVERSION_ID=44\nVARIANT_ID=kde"))
+	if err != nil || kde.Desktop != KDE {
+		t.Errorf("Fedora KDE: Desktop = %q, erro %v", kde.Desktop, err)
+	}
+	ws, err := fromRelease(kv("ID=fedora\nVERSION_ID=44\nVARIANT_ID=workstation"))
+	if err != nil || ws.Desktop != "" {
+		t.Errorf("Fedora Workstation: Desktop = %q, erro %v", ws.Desktop, err)
+	}
+}
+
 // O Mint exige o Cinnamon; as outras, o GNOME Shell (o que recusa o Mint
 // MATE/Xfce e o Zorin Lite).
 func TestConferirDesktop(t *testing.T) {
@@ -136,6 +151,8 @@ func TestConferirDesktop(t *testing.T) {
 		{id: IDMint, bins: []string{"cinnamon", "gnome-shell"}, want: Cinnamon},
 		{id: IDMint, bins: []string{"mate-session"}, wantErr: true},
 		{id: "fedora", bins: []string{"gnome-shell"}, want: GNOME},
+		{id: "fedora-kde", bins: []string{"plasmashell"}, want: KDE},
+		{id: "fedora-kde", bins: []string{"gnome-shell"}, wantErr: true},
 		{id: IDCachyOS, bins: []string{"plasmashell"}, want: KDE},
 		{id: IDCachyOS, bins: []string{"gnome-shell"}, want: GNOME},
 		{id: IDCachyOS, bins: []string{"plasmashell", "gnome-shell"}, want: KDE},
@@ -143,8 +160,11 @@ func TestConferirDesktop(t *testing.T) {
 	}
 	for _, tt := range tests {
 		info := &Info{ID: tt.id, PrettyName: tt.id}
-		if tt.id == IDCachyOS {
+		switch tt.id {
+		case IDCachyOS:
 			info.Familia = Arch
+		case "fedora-kde":
+			info.Familia, info.Desktop = Fedora, KDE
 		}
 		err := conferirDesktop(info, func(bin string) bool { return slices.Contains(tt.bins, bin) })
 		if tt.wantErr {

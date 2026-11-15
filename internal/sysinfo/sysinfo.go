@@ -1,12 +1,13 @@
 // Package sysinfo detecta a distribuição e a versão e confere se o sistema
 // é suportado.
 //
-// São suportados de propósito só o Ubuntu (ID=ubuntu) e o Fedora
-// Workstation com GNOME, o Linux Mint com Cinnamon, o Zorin OS Core (com
-// GNOME) e o CachyOS com KDE Plasma ou GNOME. Outros derivados (Pop!_OS, elementary...), as outras edições do
-// Mint e do Zorin (MATE, Xfce, Lite, LMDE), os sabores e spins com outro
-// desktop (Kubuntu, Fedora KDE...) e as variantes atômicas do Fedora
-// (Silverblue, Kinoite) divergem em repositórios, pacotes e configurações do
+// São suportados de propósito só o Ubuntu (ID=ubuntu) com GNOME, o Fedora
+// Workstation (GNOME) e o Fedora KDE Plasma, o Linux Mint com Cinnamon, o
+// Zorin OS Core (com GNOME) e o CachyOS com KDE Plasma ou GNOME. Outros
+// derivados (Pop!_OS, elementary...), as outras edições do Mint e do Zorin
+// (MATE, Xfce, Lite, LMDE), os sabores e spins com outro desktop (Kubuntu,
+// Fedora Xfce...) e as variantes atômicas do Fedora (Silverblue, Kinoite)
+// divergem em repositórios, pacotes e configurações do
 // desktop, e "parecer" suportado não garante que os módulos funcionem sem
 // ajuste. As versões aceitas ficam em versoes.go; o Mint e o Zorin seguem as
 // da base Ubuntu (UBUNTU_CODENAME); o CachyOS é rolling, sem versões.
@@ -118,6 +119,13 @@ func Detect() (*Info, error) {
 // Cinnamon no Mint e o GNOME nas outras. O sudo costuma limpar
 // XDG_CURRENT_DESKTOP (env_reset), então confere pelo binário.
 func conferirDesktop(info *Info, tem func(bin string) bool) error {
+	if info.Familia == Fedora && info.Desktop == KDE {
+		// A edição KDE do Fedora (VARIANT_ID=kde, veja fromFedora).
+		if !tem("plasmashell") {
+			return fmt.Errorf("%s sem o KDE Plasma não é suportado", info.PrettyName)
+		}
+		return nil
+	}
 	if info.Familia == Arch {
 		// O CachyOS oferece vários desktops na instalação; só o KDE Plasma
 		// (o padrão) e o GNOME são suportados. Com os dois instalados, vale
@@ -235,9 +243,16 @@ func fromDerivado(info *Info) (*Info, error) {
 		info.PrettyName, info.Codename, juntar(info.Testadas))
 }
 
+// fromFedora aceita as duas edições desktop: a Workstation (GNOME) e a KDE
+// Plasma (VARIANT_ID=kde, cujo desktop esperado já fica em Desktop para o
+// conferirDesktop exigir o Plasma).
 func fromFedora(info *Info, rel map[string]string) (*Info, error) {
-	if rel["VARIANT_ID"] != "workstation" {
-		return nil, fmt.Errorf("%s não é suportado: só o Fedora Workstation (não as variantes atômicas como Silverblue e Kinoite, os spins nem o Server)", info.PrettyName)
+	switch rel["VARIANT_ID"] {
+	case "workstation":
+	case "kde":
+		info.Desktop = KDE
+	default:
+		return nil, fmt.Errorf("%s não é suportado: só o Fedora Workstation e o Fedora KDE Plasma (não as variantes atômicas como Silverblue e Kinoite, os outros spins nem o Server)", info.PrettyName)
 	}
 	for _, v := range fedoraSuportadas {
 		info.Testadas = append(info.Testadas, v.Versao)
