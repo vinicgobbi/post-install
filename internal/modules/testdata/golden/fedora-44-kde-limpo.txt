@@ -203,8 +203,8 @@
 == atalhos_gnome (Atalhos do KDE)
 [INFO] Configurando os atalhos do Spectacle...
 [INFO] [dry-run] dnf install -y spectacle
-[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RectangularRegionScreenShot "$(printf 'Meta+Shift+Print\tMeta+Shift+S')"; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RecordRegion "Meta+Shift+R"'
-[OK] Atalhos do KDE aplicados (Meta+Shift+S e Meta+Shift+R); valem a partir do próximo login.
+[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RectangularRegionScreenShot "$(printf 'Meta+Shift+Print\tMeta+Shift+S')"; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RecordRegion "Meta+Shift+R"; kwriteconfig6 --file plasmaparc --group General --key VolumeStep 2'
+[OK] Atalhos do KDE aplicados (Meta+Shift+S, Meta+Shift+R e volume de 2 em 2%); valem a partir do próximo login.
 
 == nautilus (Dolphin: VSCode, copiar caminho e Projetos)
 [INFO] Adicionando as ações do VSCode e de copiar caminho ao Dolphin...

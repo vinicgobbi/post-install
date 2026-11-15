@@ -16,10 +16,11 @@ var atalhosGnome = Module{
 	},
 	Arch: &Variante{},
 	// No KDE, o Print continua com o Spectacle; ele ganha os atalhos que o
-	// GNOME tem aqui: Meta+Shift+S (região) e Meta+Shift+R (gravação).
+	// GNOME tem aqui: Meta+Shift+S (região) e Meta+Shift+R (gravação). O
+	// volume muda de 2 em 2%, como o volume-step do atalhos.dconf.
 	KDE: &Variante{
 		Title: "Atalhos do KDE",
-		Desc:  "Meta+Shift+S captura uma região e Meta+Shift+R grava uma região com o Spectacle (o Print continua com o Spectacle)",
+		Desc:  "Meta+Shift+S captura uma região e Meta+Shift+R grava uma região com o Spectacle (o Print continua com o Spectacle) e volume de 2 em 2%",
 		Run:   aplicarAtalhosKDE,
 	},
 	Fedora: &Variante{},
@@ -75,6 +76,7 @@ func garantirFlatpak(c *Ctx, app, nome string) error {
 const scriptAtalhosKDE = `set -e
 kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RectangularRegionScreenShot "$(printf 'Meta+Shift+Print\tMeta+Shift+S')"
 kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RecordRegion "Meta+Shift+R"
+kwriteconfig6 --file plasmaparc --group General --key VolumeStep 2
 `
 
 func aplicarAtalhosKDE(c *Ctx) error {
@@ -85,6 +87,6 @@ func aplicarAtalhosKDE(c *Ctx) error {
 	); err != nil {
 		return err
 	}
-	c.Log.Successf("Atalhos do KDE aplicados (Meta+Shift+S e Meta+Shift+R); valem a partir do próximo login.")
+	c.Log.Successf("Atalhos do KDE aplicados (Meta+Shift+S, Meta+Shift+R e volume de 2 em 2%%); valem a partir do próximo login.")
 	return nil
 }

@@ -194,7 +194,7 @@ do KDE, com os mesmos IDs (e o tema da distribuição não muda):
 | ID | No KDE |
 |----|--------|
 | `papel_parede` | `plasma-apply-wallpaperimage` (precisa da sessão do Plasma aberta) |
-| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc` (valem a partir do próximo login) |
+| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc`, e o volume muda de 2 em 2% (`VolumeStep` no `plasmaparc`, como o `volume-step` do GNOME); valem a partir do próximo login |
 | `nautilus` | **Dolphin**: service menus (`~/.local/share/kio/servicemenus`) "Abrir com o VSCode" e "Copiar caminho", e a pasta Projetos (diretório XDG) |
 | `apps_gnome` | **Painel do Plasma**: apaga os painéis atuais e recria o painel pelo scripting do `plasmashell` (precisa da sessão do Plasma aberta; muda na hora): barra inferior flutuante de 46 px com controle de mídia, menu e apps fixados centralizados, bandeja do sistema (rede, volume, bateria e notificações visíveis; o resto no menu expandido), relógio e mostrar a área de trabalho. Os apps fixados são os de `GNOME/favoritos.txt` instalados (Configurações do sistema, Dolphin, Discover e Konsole nas alternativas do KDE) |
 | `extensoes_gnome` | **indisponível**: as extensões do GNOME não rodam no Plasma |
