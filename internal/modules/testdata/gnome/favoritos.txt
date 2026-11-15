@@ -1,5 +1,5 @@
 # Fixture dos testes golden.
-org.gnome.Nautilus.desktop | nemo.desktop
+org.gnome.Nautilus.desktop | nemo.desktop | org.kde.dolphin.desktop
 org.gnome.Ptyxis.desktop | org.gnome.Terminal.desktop
 firefox_firefox.desktop | firefox.desktop
 nao-instalado.desktop
