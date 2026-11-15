@@ -115,7 +115,12 @@ var extensoesGnome = Module{
 		c.Log.Successf("%d extensões ativadas e configuradas (as novas carregam no próximo login).", len(instaladas))
 		return nil
 	},
+	Arch:   &Variante{},
+	KDE:    &Variante{Indisponivel: true},
 	Fedora: &Variante{},
+	// As extensões do GNOME Shell não rodam no Cinnamon (que tem os próprios
+	// applets e extensões, sem equivalente na lista).
+	Mint: &Variante{Indisponivel: true},
 }
 
 // extGit é a origem de uma extensão instalada de um repositório git. Ref é o

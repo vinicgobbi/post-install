@@ -11,6 +11,6 @@ semcommit@exemplo.test https://git.exemplo.test/semcommit.git
 
 # Vem com o sistema (só ativada) ou equivalente baixada; só do sistema;
 # desativada
-ubuntu-dock@ubuntu.com | dash-to-dock@micxgx.gmail.com
+ubuntu-dock@ubuntu.com | zorin-taskbar@zorinos.com | dash-to-dock@micxgx.gmail.com
 snapd-prompting@canonical.com sistema
 -ding@rastersoft.com

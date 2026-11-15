@@ -25,7 +25,7 @@ Pin-Priority: 1000
 
 // usaFormatoDeb822 segue a instrução da Mozilla: arquivo .sources (deb822) do
 // Ubuntu 26.04 (Resolute) em diante; .list de uma linha no 24.04 (Noble) e
-// anteriores.
+// anteriores. No Mint e no Zorin, vale a versão da base Ubuntu.
 func usaFormatoDeb822(versao string) bool {
 	maior, menor, _ := strings.Cut(versao, ".")
 	ma, err1 := strconv.Atoi(maior)
@@ -47,7 +47,7 @@ func configurarRepoMozilla(c *Ctx) error {
 		"Suites: mozilla thunderbird-deb\n"+
 		"Components: main\n"+
 		"Signed-By: "+mozillaKeyring+"\n", mozillaList
-	if !usaFormatoDeb822(c.Sys.VersionID) {
+	if !usaFormatoDeb822(c.Sys.UbuntuVersion) {
 		arquivo, antigo = mozillaList, mozillaSources
 		conteudo = "deb [signed-by=" + mozillaKeyring + "] https://packages.mozilla.org/apt mozilla main\n" +
 			"deb [signed-by=" + mozillaKeyring + "] https://packages.mozilla.org/apt thunderbird-deb main\n"
@@ -125,6 +125,18 @@ var firefoxThunderbird = Module{
 		}
 		c.Log.Successf("Firefox e Thunderbird instalados pelos .deb da Mozilla.")
 		return nil
+	},
+	Arch: &Variante{
+		Title: "Firefox e Thunderbird",
+		Desc:  "Firefox e Thunderbird pelos pacotes dos repositórios oficiais",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o Firefox e o Thunderbird...")
+			if err := c.install("firefox", "thunderbird"); err != nil {
+				return err
+			}
+			c.Log.Successf("Firefox e Thunderbird instalados pelos repositórios oficiais.")
+			return nil
+		},
 	},
 	// No Fedora os dois já são RPM dos repositórios oficiais (sem snap): o
 	// Firefox vem no Workstation, e o Thunderbird só falta instalar.

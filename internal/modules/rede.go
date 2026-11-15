@@ -40,6 +40,12 @@ var tailscale = Module{
 	Run: func(c *Ctx) error {
 		return instalarTailscale(c, instalarTailscalePacote, (*Ctx).ensureFlathub)
 	},
+	Arch: &Variante{
+		Desc: "Tailscale (VPN mesh, pelo pacote dos repositórios oficiais) e o cliente gráfico Trayscale via Flatpak",
+		Run: func(c *Ctx) error {
+			return instalarTailscale(c, func(c *Ctx) error { return c.install("tailscale") }, (*Ctx).ensureFlathub)
+		},
+	},
 	Fedora: &Variante{
 		Run: func(c *Ctx) error {
 			return instalarTailscale(c, instalarTailscaleRPM, (*Ctx).ensureFlathubFedora)
@@ -92,18 +98,24 @@ var firewall = Module{
 		c.Log.Successf("ufw e gufw instalados.")
 		return nil
 	},
+	Arch: &Variante{},
 	// O Fedora usa o firewalld, que já vem ativo (o ufw conflitaria com ele);
-	// o equivalente ao gufw é o firewall-config. A zona padrão do
-	// Workstation fica como está, como no Ubuntu o módulo não cria regras.
+	// o equivalente ao gufw é o firewall-config no GNOME e o plasma-firewall
+	// (o módulo de firewall das Configurações do Plasma) no KDE. A zona
+	// padrão fica como está, como no Ubuntu o módulo não cria regras.
 	Fedora: &Variante{
-		Title: "Firewall (firewall-config)",
-		Desc:  "Instala o firewall-config, a interface gráfica do firewalld que já vem ativo no Fedora (não muda a zona nem cria regras)",
+		Title: "Firewall (firewalld)",
+		Desc:  "Instala a interface gráfica do firewalld que já vem ativo no Fedora: o firewall-config no GNOME e o plasma-firewall no KDE (não muda a zona nem cria regras)",
 		Run: func(c *Ctx) error {
-			c.Log.Infof("Instalando o firewall-config...")
-			if err := c.install("firewall-config"); err != nil {
+			gui := "firewall-config"
+			if c.kde() {
+				gui = "plasma-firewall"
+			}
+			c.Log.Infof("Instalando o %s...", gui)
+			if err := c.install(gui); err != nil {
 				return err
 			}
-			c.Log.Successf("firewall-config instalado; o firewalld segue com a configuração padrão do Fedora.")
+			c.Log.Successf("%s instalado; o firewalld segue com a configuração padrão do Fedora.", gui)
 			return nil
 		},
 	},
@@ -165,6 +177,7 @@ var ovpn = Module{
 		}
 		return nil
 	},
+	Arch:   &Variante{},
 	Fedora: &Variante{},
 }
 
@@ -207,13 +220,26 @@ func avisarPermissaoOVPN(c *Ctx, arquivo string) {
 	}
 }
 
-// O pacote "-gnome" traz o diálogo de autenticação GTK.
+// O pacote "-gnome" traz o diálogo de autenticação GTK; no Fedora KDE, o
+// plasma-nm-openvpn traz o do Plasma (no Arch, o networkmanager-openvpn
+// basta: o plasma-nm já inclui o OpenVPN).
 func instalarPluginOpenVPN(c *Ctx) error {
-	if c.fedora() {
-		if c.pacoteInstalado("NetworkManager-openvpn-gnome") {
+	if c.arch() {
+		if c.pacoteInstalado("networkmanager-openvpn") {
 			return nil
 		}
-		return c.install("NetworkManager-openvpn-gnome")
+		return c.install("networkmanager-openvpn")
+	}
+	if c.fedora() {
+		// No KDE, o diálogo é o do plasma-nm, não o GTK.
+		pkgs := []string{"NetworkManager-openvpn-gnome"}
+		if c.kde() {
+			pkgs = []string{"NetworkManager-openvpn", "plasma-nm-openvpn"}
+		}
+		if c.pacoteInstalado(pkgs[len(pkgs)-1]) {
+			return nil
+		}
+		return c.install(pkgs...)
 	}
 	if c.pacoteInstalado("network-manager-openvpn") {
 		return nil
@@ -243,28 +269,39 @@ var virtManager = Module{
 	Grupo: GrupoRede,
 	Title: "virt-manager (QEMU/KVM)",
 	Desc:  "QEMU/KVM, libvirt e a interface gráfica virt-manager para máquinas virtuais",
+	// "qemu-kvm" virou pacote virtual em versões recentes do Ubuntu;
+	// "qemu-system-x86" é o pacote real que o provê.
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando virt-manager (QEMU/KVM + libvirt)...")
-		avisarSemVirtualizacao(c)
-
-		// "qemu-kvm" virou pacote virtual em versões recentes do Ubuntu;
-		// "qemu-system-x86" é o pacote real que o provê.
-		pkgs := []string{"qemu-system-x86", "libvirt-daemon-system", "libvirt-clients", "bridge-utils", "virt-manager"}
-		err := step(
-			func() error { return c.install(pkgs...) },
-			func() error { return c.Run("systemctl", "enable", "--now", "libvirtd") },
-			func() error { return c.addUserToGroup("libvirt") },
-			func() error { return c.addUserToGroup("kvm") },
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("virt-manager instalado. '%s' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).", c.User)
-		return nil
+		return instalarVirtManagerLibvirtd(c, "qemu-system-x86", "libvirt-daemon-system", "libvirt-clients", "bridge-utils", "virt-manager")
+	},
+	// O libvirt do Arch usa o libvirtd monolítico (como o Ubuntu); o
+	// dnsmasq faz o DHCP da rede padrão.
+	Arch: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarVirtManagerLibvirtd(c, "virt-manager", "qemu-desktop", "libvirt", "dnsmasq")
+		},
 	},
 	Fedora: &Variante{
 		Run: instalarVirtManagerFedora,
 	},
+}
+
+// instalarVirtManagerLibvirtd instala os pacotes e ativa o libvirtd
+// monolítico (Ubuntu e Arch).
+func instalarVirtManagerLibvirtd(c *Ctx, pkgs ...string) error {
+	c.Log.Infof("Instalando virt-manager (QEMU/KVM + libvirt)...")
+	avisarSemVirtualizacao(c)
+	err := step(
+		func() error { return c.install(pkgs...) },
+		func() error { return c.Run("systemctl", "enable", "--now", "libvirtd") },
+		func() error { return c.addUserToGroup("libvirt") },
+		func() error { return c.addUserToGroup("kvm") },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("virt-manager instalado. '%s' foi adicionado aos grupos libvirt/kvm (é preciso reabrir a sessão para valer).", c.User)
+	return nil
 }
 
 // driversLibvirt são os daemons modulares que o virt-manager usa com o QEMU

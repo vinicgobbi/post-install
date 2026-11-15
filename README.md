@@ -1,7 +1,7 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Ubuntu ou Fedora Workstation recém-instalada: mirrors, atualização do sistema, Podman,
+workstation Ubuntu, Fedora (Workstation ou KDE Plasma), Linux Mint (Cinnamon), Zorin OS (Core) ou CachyOS (KDE Plasma ou GNOME) recém-instalada: mirrors, atualização do sistema, Podman,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
@@ -16,20 +16,33 @@ VSCode"/"Copiar caminho" no Nautilus.
 - **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o `gnome-shell`
   instalado), nas **LTS com suporte padrão** — hoje **22.04 (jammy), 24.04
   (noble) e 26.04 (resolute)**;
-- **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`), nas
+- **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`) e
+  **Fedora KDE Plasma** (`VARIANT_ID=kde` e o `plasmashell` instalado), nas
   **versões em manutenção** — hoje **43, 44 e 45**. Todos os módulos existem
-  nele, com os mesmos IDs; veja [No Fedora](#no-fedora) o que muda em cada
-  um.
+  no Workstation, com os mesmos IDs; veja [No Fedora](#no-fedora) o que muda
+  em cada um e [No KDE Plasma](#no-kde-plasma) o que muda no KDE;
+- **Linux Mint com Cinnamon** (`ID=linuxmint` e o `cinnamon` instalado) e
+  **Zorin OS Core** (`ID=zorin` e o `gnome-shell` instalado), nas versões com
+  **base** numa das LTS do Ubuntu da lista (pelo `UBUNTU_CODENAME`) — hoje o
+  Mint 21.x e 22.x e o Zorin OS 17 e 18. Veja
+  [No Linux Mint e no Zorin OS](#no-linux-mint-e-no-zorin-os);
+- **CachyOS com KDE Plasma ou GNOME** (`ID=cachyos` e o `plasmashell` ou o
+  `gnome-shell` instalado; com os dois, vale o KDE). É rolling, então não há
+  lista de versões. Veja [No CachyOS](#no-cachyos).
 
 A lista de versões fica em
 [`internal/sysinfo/versoes.go`](internal/sysinfo/versoes.go) e é mantida
 pelo workflow `versoes.yml` (veja [Versões suportadas](#versões-suportadas)).
 
 Qualquer outro sistema faz o programa parar com uma mensagem clara em vez de
-continuar em um estado incerto — inclusive derivados do Ubuntu (Linux Mint,
-Pop!_OS, Zorin...), sabores com outro desktop (Kubuntu, Xubuntu...), versões
-fora do suporte padrão ou interinas entre as LTS suportadas, e as variantes
-atômicas do Fedora (Silverblue, Kinoite).
+continuar em um estado incerto — inclusive outros derivados do Ubuntu
+(Pop!_OS, elementary...), as outras edições do Mint e do Zorin (MATE, Xfce,
+Lite e o LMDE, com base Debian), um Mint ou Zorin com base fora da lista,
+sabores com outro desktop (Kubuntu, Xubuntu...), versões
+fora do suporte padrão ou interinas entre as LTS suportadas, as variantes
+atômicas do Fedora (Silverblue, Kinoite), o Arch puro e outros derivados
+dele (Manjaro, EndeavourOS...) e o CachyOS com outros desktops (Hyprland,
+Cosmic...).
 
 **Versões mais novas que as da lista** (ex.: o Ubuntu 26.10, ou uma LTS que
 saiu depois da release do post-install) podem funcionar, mas não foram
@@ -85,12 +98,105 @@ nomes das instruções oficiais) e as chaves, conferidas pelo fingerprint, em
 | `php_sqlserver` | repositório da Microsoft para o **RHEL** (a Microsoft não publica para o Fedora; o módulo avisa), extensões em `/etc/php.d` |
 | `rust` / `ruby` | dependências de compilação do Fedora |
 | `tailscale` | repositório RPM oficial |
-| `firewall` | `firewall-config`, a interface do firewalld, que o Fedora já traz ativo (a zona padrão não muda) |
+| `firewall` | a interface do firewalld, que o Fedora já traz ativo: `firewall-config` no GNOME e `plasma-firewall` no KDE (a zona padrão não muda) |
 | `virt_manager` | libvirt com os daemons modulares (`virtqemud`...), o padrão do Fedora |
-| `temas_yaru` | só os **ícones** Yaru-dark; o tema é o **adw-gtk3-dark** (o visual do libadwaita nos apps GTK 3), também nos Flatpaks |
+| `temas_yaru` | só os **ícones** Yaru-dark; o tema é o **adw-gtk3-dark** (o visual do libadwaita nos apps GTK 3), também nos Flatpaks; e os botões de **minimizar e maximizar** voltam às janelas (`button-layout` `appmenu:minimize,maximize,close`) |
 | `extensoes_gnome` | no lugar da dock, do AppIndicator e do Tiling Assistant do Ubuntu, as equivalentes do extensions.gnome.org (veja [Extensões do GNOME](#extensões-do-gnome)) |
 | `nautilus` | `nautilus-python` e `python3-gobject` |
-| `go`, `node`, `claude_code`, `deploy_dev`, `ovpn`, `papel_parede`, `atalhos_gnome`, `apps_gnome` | iguais |
+| `ovpn` | `NetworkManager-openvpn-gnome`; no KDE, `NetworkManager-openvpn` e `plasma-nm-openvpn` (o diálogo do Plasma) |
+| `go`, `node`, `claude_code`, `deploy_dev`, `papel_parede`, `atalhos_gnome`, `apps_gnome` | iguais |
+
+No **Fedora KDE Plasma**, os módulos do desktop seguem a variante do KDE
+(veja [No KDE Plasma](#no-kde-plasma)) e o `temas_yaru` fica indisponível:
+o Plasma mantém o tema dele.
+
+## No Linux Mint e no Zorin OS
+
+Os dois usam o `apt` e os repositórios da base Ubuntu, então os módulos
+funcionam como no Ubuntu da base (ex.: o Mint 22 e o Zorin OS 18 como o
+Ubuntu 24.04): o codinome, o repositório da Microsoft, o formato do
+repositório da Mozilla e a origem do mise seguem a base. A TUI mostra, por
+exemplo, `Linux Mint 22.2 (base Ubuntu 24.04, noble)`.
+
+Nos dois:
+
+| ID | No Mint e no Zorin |
+|----|--------------------|
+| `mirrors` | só os repositórios da base Ubuntu mudam (no Mint, em `/etc/apt/sources.list.d/official-package-repositories.list`); o do Mint ou do Zorin fica como está |
+| `firefox_thunderbird` | também pelo repositório da Mozilla (prioridade 1000), no lugar dos `.deb` da distribuição; sem snaps, a remoção deles não faz nada |
+| `mise` | com base anterior à 26.04, pelo repositório APT oficial (`mise.jdx.dev/deb`, chave conferida), já que o `extrepo` não reconhece a distribuição |
+| `temas_yaru` | **indisponível**: o tema e os ícones da distribuição (Mint-Y, temas do Zorin) ficam como estão |
+
+No **Zorin OS** (GNOME), o resto é igual ao Ubuntu; o `extensoes_gnome`
+ativa a barra de tarefas e o AppIndicator que vêm com o Zorin no lugar da
+dock e do AppIndicator do Ubuntu, sem baixar o Dash to Dock por cima da
+barra (veja [Extensões do GNOME](#extensões-do-gnome)).
+
+No **Linux Mint** (Cinnamon), os módulos do desktop têm uma variante do
+Cinnamon, com os mesmos IDs:
+
+| ID | No Mint |
+|----|---------|
+| `flatpaks` | só o Flathub e a lista de apps (o Mint já traz o Flatpak, e a loja dele mostra os Flatpaks); sem o GNOME Software com o plugin snap, que puxaria o snapd que o Mint bloqueia |
+| `papel_parede` | `org.cinnamon.desktop.background` |
+| `atalhos_gnome` | **Atalhos do Cinnamon**: `GNOME/atalhos-cinnamon.dconf` carregado em `/org/cinnamon/` (Print e Shift+Super+S abrem o Gradia; Shift+Print e Alt+Print continuam com o Cinnamon) |
+| `nautilus` | **Nemo**: ações do Nemo (`~/.local/share/nemo/actions`) "Abrir com o VSCode" (na seleção ou no fundo da pasta) e "Copiar caminho", e a pasta Projetos |
+| `apps_gnome` | só os **favoritos do menu** (`org.cinnamon favorite-apps`), com as alternativas do Mint em `favoritos.txt`; o menu do Cinnamon não tem pastas |
+| `extensoes_gnome` | **indisponível** (as extensões do GNOME Shell não rodam no Cinnamon) |
+
+## No CachyOS
+
+O CachyOS é da família Arch: os módulos usam o `pacman` (`-S --needed
+--noconfirm`) e os repositórios oficiais (do Arch e do CachyOS). O que só
+existe no **AUR** é instalado com o `paru`, que o CachyOS traz, **como o
+usuário alvo** (o `makepkg` não roda como root): Google Chrome
+(`google-chrome`), o VSCode da Microsoft (`visual-studio-code-bin`) e, no
+`php_sqlserver`, o `msodbcsql`, o `mssql-tools` e o `php-sqlsrv`. O `paru`
+chama o `sudo pacman` no fim, então, só durante cada instalação do AUR, um
+arquivo em `/etc/sudoers.d/90-post-install-aur` libera **só o
+`/usr/bin/pacman`** sem senha para esse usuário: a regra é validada com
+`visudo -cf` antes de entrar no lugar e removida no fim, mesmo se a
+instalação falhar. O `--skipreview` pula a revisão interativa dos
+PKGBUILDs — os pacotes do AUR não têm a mesma revisão dos repositórios
+oficiais.
+
+O padrão do CachyOS é o fish; o módulo `shell` troca para o Zsh como nas
+outras distribuições, e os scripts como o usuário rodam sempre no bash (veja
+`c.AsUser` em [Adicionando ou editando um módulo](#adicionando-ou-editando-um-módulo)).
+O tema do CachyOS não muda.
+
+| ID | No CachyOS |
+|----|------------|
+| `mirrors` | `cachyos-rate-mirrors`, que mede e reordena os mirrors do Arch e do CachyOS |
+| `atualizacao` / `limpeza` | `pacman -Syu` / remove os órfãos (`pacman -Qdtq`, se houver) e `pacman -Sc` |
+| `ferramentas` | `github-cli`, `tea`, `nmap`, `python-pipx`, `ffmpeg`, `btop` e `fuse2`, todos dos repositórios oficiais |
+| `firefox_thunderbird` / `bitwarden` / `solaar` / `podman` / `go` / `mise` / `tailscale` | pacotes dos repositórios oficiais (o Trayscale continua pelo Flatpak) |
+| `chrome` / `vscode` | AUR (`google-chrome`, `visual-studio-code-bin`) |
+| `remover_libreoffice` | `pacman -Rns`, só se houver algum pacote `libreoffice*` |
+| `flatpaks` | só o Flatpak, o Flathub e a lista de apps (o Discover e o GNOME Software já mostram os Flatpaks) |
+| `git_gcm` | o `.tar.gz` da release, como no Fedora |
+| `php_sqlserver` | PHP e Composer dos repositórios; `msodbcsql`, `mssql-tools` e `php-sqlsrv` do AUR; as extensões entram em `/etc/php/conf.d` só se o PHP ainda não as carregar |
+| `rust` / `ruby` | dependências de compilação do Arch (`base-devel`...) |
+| `firewall` | `ufw` + `gufw` (não ativa nem cria regras) |
+| `ovpn` | `networkmanager-openvpn` |
+| `virt_manager` | `virt-manager`, `qemu-desktop`, `libvirt` e `dnsmasq`, com o `libvirtd` |
+| `temas_yaru` | no GNOME, **só os botões** de minimizar e maximizar, se ainda não estiverem; no KDE, **indisponível** |
+
+No **GNOME**, os outros módulos do desktop (papel de parede, extensões,
+atalhos, Nautilus, favoritos e pastas) funcionam como no Fedora. No **KDE
+Plasma**, eles têm a variante do KDE (veja [No KDE Plasma](#no-kde-plasma)).
+
+## No KDE Plasma
+
+No CachyOS com KDE e no Fedora KDE, os módulos do desktop têm uma variante
+do KDE, com os mesmos IDs (e o tema da distribuição não muda):
+
+| ID | No KDE |
+|----|--------|
+| `papel_parede` | `plasma-apply-wallpaperimage` (precisa da sessão do Plasma aberta) |
+| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc` (valem a partir do próximo login) |
+| `nautilus` | **Dolphin**: service menus (`~/.local/share/kio/servicemenus`) "Abrir com o VSCode" e "Copiar caminho", e a pasta Projetos (diretório XDG) |
+| `extensoes_gnome` / `apps_gnome` | **indisponíveis**: as extensões do GNOME não rodam no Plasma, e os favoritos e ícones fixados do Plasma ficam em configurações internas dele |
 
 ## Módulos
 
@@ -359,6 +465,18 @@ internal/
    ```
    `Disponiveis(sys)` devolve a lista já adaptada à distribuição detectada;
    no Ubuntu, é a própria `All()`.
+4. O Zorin OS usa o `Run` do Ubuntu. No Linux Mint também, a menos que o
+   campo `Mint` tenha uma `Variante` — necessária nos módulos que mexem no
+   desktop (o Mint usa o Cinnamon). `Mint: &Variante{Indisponivel: true}`
+   tira o módulo do Mint. O campo `Zorin` funciona do mesmo jeito no Zorin
+   OS. Um teste garante que todo módulo do grupo "GNOME e aparência" tem a
+   variante do Mint.
+5. No CachyOS, o módulo precisa do campo `Arch` (como o `Fedora`: sem ele,
+   fica indisponível; um teste garante que todos têm). No KDE Plasma
+   (CachyOS e Fedora KDE), o campo `KDE` fica por cima da variante da
+   família — necessário nos módulos do grupo "GNOME e aparência" (um teste
+   confere). Como vale nas duas famílias, ele só usa pacotes de mesmo nome
+   nas duas; o que muda por família fica na variante dela (com `c.kde()`).
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -366,11 +484,13 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 - `c.Run(...)`/`c.RunEnv(...)` — comando que altera o sistema (falha = erro)
 - `c.Try(...)` — comando que altera o sistema, silencioso, devolve `bool`
 - `c.Probe(...)`/`c.Output(...)` — consultas somente-leitura (rodam mesmo no dry-run)
-- `c.AsUser(script)` — shell como o usuário alvo (`su - usuario -c`)
+- `c.AsUser(script)` — shell como o usuário alvo (`su -s /bin/bash - usuario -c`: sempre no bash, mesmo que o shell de login dele seja outro, como o fish)
 - `c.install(...)`, `c.garantir(comando, pacote)`, `c.flatpakInstall(...)`
-- `c.install(...)` usa o `apt` no Ubuntu e o `dnf` no Fedora (os nomes de
-  pacote são os da distribuição); `c.pacoteInstalado(pkg)` consulta o `dpkg`
-  ou o `rpm`
+- `c.install(...)` usa o `apt` no Ubuntu, o `dnf` no Fedora e o `pacman` no
+  CachyOS (os nomes de pacote são os da distribuição);
+  `c.pacoteInstalado(pkg)` consulta o `dpkg`, o `rpm` ou o `pacman`
+- `c.instalarAUR(...)` — pacotes do AUR pelo `paru`, como o usuário alvo,
+  com o `pacman` liberado no sudoers só durante a instalação (CachyOS)
 - `instalarChaveAPT(c, url, destino, fingerprints...)` — chave de repositório conferida
 - `instalarChaveRPM(c, url, nome, fingerprints...)` e `repoRPM(c, nome, título, baseurl, chave)` —
   chave conferida em `/etc/pki/rpm-gpg` (com `rpm --import`) e `.repo` em
@@ -382,7 +502,8 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 
 Toda consulta à máquina ou à rede passa pelo `Ctx` porque os **testes
 golden** trocam a máquina por uma falsa. `golden_test.go` descreve cenários
-(Ubuntu 22.04, 24.04 e 26.04 recém-instalados e um 26.04 já configurado),
+(Ubuntu 22.04, 24.04 e 26.04 recém-instalados, um 26.04 já configurado,
+o Fedora 44 Workstation e KDE, o Linux Mint 22, o Zorin OS 18 e o CachyOS com KDE e com GNOME),
 roda todos os módulos em dry-run contra cada um e compara o resultado com
 `internal/modules/testdata/golden/<cenário>.txt`. Uma mudança em qualquer
 módulo, inclusive na lista de Flatpaks, aparece como diferença nesses
@@ -404,9 +525,16 @@ golden. Os arquivos de `GNOME/` usados nos testes são fixtures próprias, em
 `sysinfo.Detect` lê `/etc/os-release`, recusa o que não for suportado (veja
 [Sistemas suportados](#sistemas-suportados)) e preenche:
 
-- `Familia` — `ubuntu` ou `fedora` (este só com `VARIANT_ID=workstation`)
-- `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`), usado
-  na URL do repositório do Tailscale e no teste de mirrors; vazio no Fedora
+- `Familia` — `ubuntu`, `fedora` (com `VARIANT_ID=workstation` ou `kde`) ou
+  `arch` (o CachyOS); o Linux Mint e o Zorin OS são da família `ubuntu`
+- `Desktop` — `Cinnamon` no Mint (confere o binário `cinnamon`), `KDE` no
+  Fedora KDE (`plasmashell`), `KDE` ou `GNOME` no CachyOS (`plasmashell` ou
+  `gnome-shell`), `GNOME` nos outros (confere o `gnome-shell`)
+- `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`; no
+  Mint e no Zorin, o da base), usado na URL do repositório do Tailscale e no
+  teste de mirrors; vazio no Fedora
+- `UbuntuVersion` — a versão do Ubuntu (no Mint e no Zorin, a da base,
+  tirada de `versoes.go` pelo codinome); vazio no Fedora
 - `MSRepoVersion` — a versão nas URLs do repositório da Microsoft
   (msodbcsql/mssql-tools), tirada de `versoes.go`: no Ubuntu, a da própria LTS
   (ou a da última da lista, nas mais novas); no Fedora, a do RHEL
@@ -447,7 +575,7 @@ recompilar. O módulo `papel_parede`, como o usuário alvo:
 2. aplica com `gsettings` (`picture-uri`, `picture-uri-dark` e
    `picture-options 'zoom'`).
 
-Os scripts que rodam como o usuário (`su - usuario`) usam a sessão D-Bus dele
+Os scripts que rodam como o usuário (`su -s /bin/bash - usuario`) usam a sessão D-Bus dele
 quando há uma sessão gráfica aberta; sem isso o `gsettings` descarta as
 alterações sem erro.
 
@@ -464,14 +592,16 @@ A pasta `GNOME/` define as extensões (editável sem recompilar):
   A mesma lista serve às duas distribuições, com duas marcações:
   - `a | b` — equivalentes: a primeira que vier com o sistema é ativada; se
     nenhuma vier, a **última** da linha é baixada do extensions.gnome.org
-    (ex.: `ubuntu-dock@ubuntu.com | dash-to-dock@micxgx.gmail.com` — no
-    Ubuntu, a dock dele; no Fedora, o Dash to Dock, que usa as mesmas
-    preferências de `extensoes.dconf`);
+    (ex.: `ubuntu-dock@ubuntu.com | zorin-taskbar@zorinos.com | dash-to-dock@micxgx.gmail.com`
+    — no Ubuntu, a dock dele; no Zorin, a barra de tarefas dele; no Fedora,
+    o Dash to Dock, que usa as mesmas preferências de `extensoes.dconf`);
   - `uuid sistema` — só é ativada se vier com o sistema, nunca é baixada
     (ex.: as do snapd, que só existem no Ubuntu);
 - `extensoes.dconf` — as preferências delas, no formato do `dconf dump`;
 - `atalhos.dconf` — os atalhos de teclado, aplicados pelo módulo
-  `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome)).
+  `atalhos_gnome` (veja [Atalhos do GNOME](#atalhos-do-gnome));
+- `atalhos-cinnamon.dconf` — os atalhos no Linux Mint (Cinnamon), no formato
+  do Cinnamon (o `binding` é uma lista).
 
 O módulo `extensoes_gnome`, como o usuário alvo:
 
@@ -692,8 +822,9 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 
 ## Requisitos
 
-- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, ou Fedora Workstation 43, 44 ou
-  45 (ou mais novos, com confirmação) — veja
+- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, Fedora Workstation ou KDE Plasma
+  43, 44 ou 45 (ou mais novos, com confirmação), Linux Mint (Cinnamon) e Zorin OS
+  (Core) com uma dessas bases Ubuntu, ou CachyOS com KDE Plasma ou GNOME — veja
   [Sistemas suportados](#sistemas-suportados).
 - Acesso root (`sudo`) — exceto em `--dry-run`.
 - Terminal interativo para a TUI (sem ele, o modo texto é usado).

@@ -1,0 +1,21 @@
+# Atalhos do Cinnamon (Linux Mint), carregados pelo módulo "atalhos_gnome" com:
+#   dconf load /org/cinnamon/ < atalhos-cinnamon.dconf
+# Print e Shift+Super+S abrem a captura do Gradia (Flatpak); a captura nativa
+# sai do Print (Shift+Print e Alt+Print continuam com o Cinnamon).
+# "__dummy__" é o valor padrão do custom-list no Cinnamon.
+
+[desktop/keybindings]
+custom-list=['__dummy__', 'custom0', 'custom1']
+
+[desktop/keybindings/custom-keybindings/custom0]
+binding=['Print']
+command='flatpak run be.alexandervanhee.gradia --screenshot=INTERACTIVE'
+name='Gradia'
+
+[desktop/keybindings/custom-keybindings/custom1]
+binding=['<Shift><Super>s']
+command='flatpak run be.alexandervanhee.gradia --screenshot=INTERACTIVE'
+name='Gradia Like Windows'
+
+[desktop/keybindings/media-keys]
+screenshot=@as []

@@ -2,6 +2,7 @@ package modules
 
 import (
 	_ "embed"
+	"strings"
 )
 
 // O Flatpak não expõe o /usr do host, então os apps Flatpak só enxergam os
@@ -42,40 +43,78 @@ var temasYaru = Module{
 	Grupo: GrupoGNOME,
 	Title: "Temas Yaru (com Flatpak)",
 	Desc:  "Temas e ícones Yaru (ícones em Yaru-dark) e um hook do APT que sincroniza todas as variantes do tema com os apps Flatpak",
-	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando os temas e ícones Yaru...")
-		err := step(
-			func() error { return c.install("yaru-theme-gtk", "yaru-theme-icon", "flatpak") },
-			func() error { return c.WriteFile(yaruFlatpakScript, yaruFlatpakSync, 0o755) },
-			func() error { return c.WriteFile(yaruFlatpakHook, yaruFlatpakHookConf, 0o644) },
-			func() error { return c.Run(yaruFlatpakScript, "--force") },
-			func() error {
-				return c.Run("flatpak", "override", "--system",
-					"--filesystem=xdg-data/themes:ro", "--filesystem="+yaruFlatpakDir+":ro")
-			},
-			func() error { return c.AsUser(scriptLinksYaru) },
-		)
-		if err != nil {
-			return err
-		}
-		c.Log.Successf("Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.")
-		return nil
+	Run:   instalarYaru,
+	// O CachyOS mantém o tema dele (nada de Yaru nem adw-gtk3). No GNOME, só
+	// os botões de minimizar e maximizar, se ainda não estiverem; no KDE, o
+	// Plasma já os mostra.
+	Arch: &Variante{
+		Title: "Botões das janelas",
+		Desc:  "Ativa os botões de minimizar e maximizar nas janelas do GNOME, se ainda não estiverem (o tema do CachyOS não muda)",
+		Run:   ativarBotoesJanela,
 	},
+	KDE: &Variante{Indisponivel: true},
 	// No Fedora, só os ícones são do Yaru; o tema segue o libadwaita, com o
 	// adw-gtk3 (o visual do libadwaita para os apps GTK 3) no sistema e nos
 	// Flatpaks, pelo Flathub. Os ícones do sistema os Flatpaks já enxergam.
+	// O GNOME puro também só mostra o botão de fechar nas janelas: os de
+	// minimizar e maximizar voltam, como no Ubuntu.
 	Fedora: &Variante{
-		Title: "Ícones Yaru e tema adw-gtk3",
-		Desc:  "Ícones Yaru (Yaru-dark) e o tema adw-gtk3-dark (o visual do libadwaita nos apps GTK 3), também nos apps Flatpak",
+		Title: "Ícones Yaru, tema adw-gtk3 e botões das janelas",
+		Desc:  "Ícones Yaru (Yaru-dark) e o tema adw-gtk3-dark (o visual do libadwaita nos apps GTK 3), também nos apps Flatpak, e os botões de minimizar e maximizar nas janelas",
 		Run:   aplicarYaruAdwGtk3,
 	},
+	// O Mint e o Zorin têm a identidade visual deles (Mint-Y e os temas do
+	// Zorin): o post-install não mexe no tema nem nos ícones.
+	Mint:  &Variante{Indisponivel: true},
+	Zorin: &Variante{Indisponivel: true},
+}
+
+// instalarYaru instala os temas Yaru e os sincroniza com os Flatpaks.
+func instalarYaru(c *Ctx) error {
+	c.Log.Infof("Instalando os temas e ícones Yaru...")
+	err := step(
+		func() error { return c.install("yaru-theme-gtk", "yaru-theme-icon", "flatpak") },
+		func() error { return c.WriteFile(yaruFlatpakScript, yaruFlatpakSync, 0o755) },
+		func() error { return c.WriteFile(yaruFlatpakHook, yaruFlatpakHookConf, 0o644) },
+		func() error { return c.Run(yaruFlatpakScript, "--force") },
+		func() error {
+			return c.Run("flatpak", "override", "--system",
+				"--filesystem=xdg-data/themes:ro", "--filesystem="+yaruFlatpakDir+":ro")
+		},
+		func() error { return c.AsUser(scriptLinksYaru) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Temas e ícones Yaru instalados; as variantes do tema passam a valer nos apps Flatpak (GTK 3) a partir da próxima abertura de cada app.")
+	return nil
 }
 
 // scriptIconesAdwGtk3 aplica os ícones Yaru-dark e o adw-gtk3-dark (escuro,
-// combinando com os ícones) como o usuário.
+// combinando com os ícones) como o usuário, e põe os botões de minimizar e
+// maximizar ao lado do de fechar (o padrão do Fedora é "appmenu:close").
 const scriptIconesAdwGtk3 = `gsettings set org.gnome.desktop.interface icon-theme "Yaru-dark"
 gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"
+gsettings set org.gnome.desktop.wm.preferences button-layout "` + layoutBotoes + `"
 `
+
+// layoutBotoes põe os botões de minimizar e maximizar ao lado do de fechar.
+const layoutBotoes = "appmenu:minimize,maximize,close"
+
+// ativarBotoesJanela só mexe no button-layout se ele ainda não tiver os dois
+// botões (o usuário pode ter um layout próprio).
+func ativarBotoesJanela(c *Ctx) error {
+	atual, _ := c.OutputAsUser("gsettings get org.gnome.desktop.wm.preferences button-layout")
+	if strings.Contains(atual, "minimize") && strings.Contains(atual, "maximize") {
+		c.Log.Infof("Os botões de minimizar e maximizar já estão ativos.")
+		return nil
+	}
+	if err := c.AsUser("gsettings set org.gnome.desktop.wm.preferences button-layout " + shQuote(layoutBotoes)); err != nil {
+		return err
+	}
+	c.Log.Successf("Botões de minimizar e maximizar ativados.")
+	return nil
+}
 
 func aplicarYaruAdwGtk3(c *Ctx) error {
 	c.Log.Infof("Instalando os ícones Yaru e o tema adw-gtk3...")
@@ -89,7 +128,7 @@ func aplicarYaruAdwGtk3(c *Ctx) error {
 	if err != nil {
 		return err
 	}
-	c.Log.Successf("Ícones Yaru-dark e tema adw-gtk3-dark aplicados (nos apps Flatpak, a partir da próxima abertura de cada app).")
+	c.Log.Successf("Ícones Yaru-dark, tema adw-gtk3-dark (nos apps Flatpak, a partir da próxima abertura de cada app) e botões de minimizar e maximizar aplicados.")
 	return nil
 }
 
@@ -115,11 +154,96 @@ var nautilus = Module{
 	Run: func(c *Ctx) error {
 		return instalarNautilus(c, "python3-nautilus", "python3-gi", "wl-clipboard", "xclip", "git")
 	},
+	Arch: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarNautilus(c, "python-nautilus", "python-gobject", "wl-clipboard", "xclip", "git")
+		},
+	},
+	// O gerenciador de arquivos do KDE é o Dolphin: as mesmas opções viram
+	// service menus.
+	KDE: &Variante{
+		Title: "Dolphin: VSCode, copiar caminho e Projetos",
+		Desc:  "Adiciona 'Abrir com o VSCode' e 'Copiar caminho' ao menu de contexto do Dolphin (service menus) e cria a pasta Projetos (diretório XDG)",
+		Run:   instalarServiceMenusDolphin,
+	},
 	Fedora: &Variante{
 		Run: func(c *Ctx) error {
 			return instalarNautilus(c, "nautilus-python", "python3-gobject", "wl-clipboard", "xclip", "git")
 		},
 	},
+	// O gerenciador de arquivos do Mint é o Nemo, que não carrega as
+	// extensões em Python do Nautilus: as mesmas opções viram ações do Nemo
+	// (arquivos .nemo_action do usuário).
+	Mint: &Variante{
+		Title: "Nemo: VSCode, copiar caminho e Projetos",
+		Desc:  "Adiciona 'Abrir com o VSCode' e 'Copiar caminho' ao menu de contexto do Nemo (ações do Nemo) e cria a pasta Projetos (diretório XDG e favorito na barra lateral)",
+		Run:   instalarAcoesNemo,
+	},
+}
+
+// scriptAcoesNemo grava as ações do usuário em ~/.local/share/nemo/actions:
+// abrir a seleção (ou, clicando no fundo, a pasta atual) no VSCode e copiar
+// os caminhos da seleção, um por linha, com o wl-copy no Wayland ou o xclip
+// no X11. Quote=double: o Nemo põe cada caminho entre aspas no Exec.
+const scriptAcoesNemo = `set -e
+dir="$HOME/.local/share/nemo/actions"
+mkdir -p "$dir"
+cat > "$dir/post-install-vscode.nemo_action" <<'ACAO'
+[Nemo Action]
+Name=Abrir com o VSCode
+Comment=Abre os itens selecionados no Visual Studio Code
+Exec=code %F
+Icon-Name=vscode
+Selection=notnone
+Extensions=any;
+Quote=double
+Dependencies=code;
+ACAO
+cat > "$dir/post-install-vscode-pasta.nemo_action" <<'ACAO'
+[Nemo Action]
+Name=Abrir com o VSCode
+Comment=Abre a pasta atual no Visual Studio Code
+Exec=code %P
+Icon-Name=vscode
+Selection=none
+Extensions=any;
+Quote=double
+Dependencies=code;
+ACAO
+cat > "$dir/post-install-copiar-caminho.sh" <<'ACAO'
+#!/bin/sh
+# Copia os caminhos recebidos, um por linha (ação do Nemo do post-install).
+if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null 2>&1; then
+    printf '%s\n' "$@" | head -c -1 | wl-copy
+else
+    printf '%s\n' "$@" | head -c -1 | xclip -selection clipboard
+fi
+ACAO
+chmod 0755 "$dir/post-install-copiar-caminho.sh"
+cat > "$dir/post-install-copiar-caminho.nemo_action" <<ACAO
+[Nemo Action]
+Name=Copiar caminho
+Comment=Copia o caminho dos itens selecionados
+Exec=$dir/post-install-copiar-caminho.sh %F
+Icon-Name=edit-copy
+Selection=notnone
+Extensions=any;
+Quote=double
+ACAO
+`
+
+func instalarAcoesNemo(c *Ctx) error {
+	c.Log.Infof("Adicionando as ações do VSCode e de copiar caminho ao Nemo...")
+	err := step(
+		func() error { return c.install("wl-clipboard", "xclip") },
+		func() error { return c.AsUser(scriptAcoesNemo) },
+		func() error { return c.AsUser(scriptPastaProjetos) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Ações do Nemo instaladas e pasta de projetos criada.")
+	return nil
 }
 
 func instalarNautilus(c *Ctx, deps ...string) error {
@@ -139,5 +263,62 @@ func instalarNautilus(c *Ctx, deps ...string) error {
 		return err
 	}
 	c.Log.Successf("Extensões do Nautilus instaladas e pasta de projetos criada.")
+	return nil
+}
+
+// scriptServiceMenusDolphin grava os service menus do usuário em
+// ~/.local/share/kio/servicemenus (o Plasma 6 só carrega os executáveis):
+// abrir no VSCode e copiar os caminhos, um por linha, com o wl-copy no
+// Wayland ou o xclip no X11 (por um script auxiliar, como no Nemo).
+const scriptServiceMenusDolphin = `set -e
+menus="$HOME/.local/share/kio/servicemenus"
+aux="$HOME/.local/share/post-install"
+mkdir -p "$menus" "$aux"
+cat > "$aux/copiar-caminho.sh" <<'ACAO'
+#!/bin/sh
+# Copia os caminhos recebidos, um por linha (service menu do post-install).
+if [ -n "${WAYLAND_DISPLAY:-}" ] && command -v wl-copy >/dev/null 2>&1; then
+    printf '%s\n' "$@" | head -c -1 | wl-copy
+else
+    printf '%s\n' "$@" | head -c -1 | xclip -selection clipboard
+fi
+ACAO
+chmod 0755 "$aux/copiar-caminho.sh"
+cat > "$menus/post-install-vscode.desktop" <<'ACAO'
+[Desktop Entry]
+Type=Service
+MimeType=all/all;
+Actions=abrirVSCode
+
+[Desktop Action abrirVSCode]
+Name=Abrir com o VSCode
+Icon=visual-studio-code
+Exec=code %F
+ACAO
+cat > "$menus/post-install-copiar-caminho.desktop" <<ACAO
+[Desktop Entry]
+Type=Service
+MimeType=all/all;
+Actions=copiarCaminho
+
+[Desktop Action copiarCaminho]
+Name=Copiar caminho
+Icon=edit-copy
+Exec=$aux/copiar-caminho.sh %F
+ACAO
+chmod 0755 "$menus/post-install-vscode.desktop" "$menus/post-install-copiar-caminho.desktop"
+`
+
+func instalarServiceMenusDolphin(c *Ctx) error {
+	c.Log.Infof("Adicionando as ações do VSCode e de copiar caminho ao Dolphin...")
+	err := step(
+		func() error { return c.install("wl-clipboard", "xclip") },
+		func() error { return c.AsUser(scriptServiceMenusDolphin) },
+		func() error { return c.AsUser(scriptPastaProjetos) },
+	)
+	if err != nil {
+		return err
+	}
+	c.Log.Successf("Service menus do Dolphin instalados e pasta de projetos criada.")
 	return nil
 }

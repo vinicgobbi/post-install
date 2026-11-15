@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,11 @@ var rust = Module{
 	// OpenSSL.
 	Run: func(c *Ctx) error {
 		return instalarRust(c, "build-essential", "cmake", "pkg-config", "libssl-dev")
+	},
+	Arch: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarRust(c, "base-devel", "cmake", "pkgconf", "openssl")
+		},
 	},
 	Fedora: &Variante{
 		Run: func(c *Ctx) error {
@@ -72,6 +78,9 @@ var gitGCM = Module{
 		}
 		c.Log.Successf("Git Credential Manager instalado e configurado para %s.", c.User)
 		return nil
+	},
+	Arch: &Variante{
+		Run: instalarGCMTarball,
 	},
 	Fedora: &Variante{
 		Run: instalarGCMTarball,
@@ -124,6 +133,12 @@ var podman = Module{
 	Desc:  "Podman e podman-compose pelos repositórios do Ubuntu (sem daemon e sem root); o usuário recebe faixas de subuid/subgid se ainda não tiver, e imagens sem registry (ex.: \"nginx\") vêm do Docker Hub",
 	Run: func(c *Ctx) error {
 		return instalarPodman(c, "podman", "podman-compose", "uidmap")
+	},
+	Arch: &Variante{
+		Desc: "Podman e podman-compose pelos repositórios oficiais (sem daemon e sem root); o usuário recebe faixas de subuid/subgid se ainda não tiver, e imagens sem registry (ex.: \"nginx\") vêm do Docker Hub",
+		Run: func(c *Ctx) error {
+			return instalarPodman(c, "podman", "podman-compose")
+		},
 	},
 	// O newuidmap/newgidmap do Fedora já vêm no shadow-utils.
 	Fedora: &Variante{
@@ -231,6 +246,19 @@ var vscode = Module{
 		c.Log.Successf("VSCode instalado.")
 		return nil
 	},
+	// O VSCode da Microsoft (com o marketplace oficial) só está no AUR; o
+	// "code" dos repositórios do Arch é o Code - OSS.
+	Arch: &Variante{
+		Desc: "VSCode da Microsoft pelo AUR (visual-studio-code-bin, com o paru)",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o VSCode pelo AUR...")
+			if err := c.instalarAUR("visual-studio-code-bin"); err != nil {
+				return err
+			}
+			c.Log.Successf("VSCode instalado.")
+			return nil
+		},
+	},
 	// https://code.visualstudio.com/docs/setup/linux (RHEL/Fedora): a mesma
 	// chave da Microsoft do Ubuntu, conferida antes.
 	Fedora: &Variante{
@@ -268,6 +296,17 @@ var golang = Module{
 		c.Log.Successf("Go instalado.")
 		return nil
 	},
+	Arch: &Variante{
+		Desc: "Go pelo pacote go dos repositórios oficiais",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o Go...")
+			if err := c.install("go"); err != nil {
+				return err
+			}
+			c.Log.Successf("Go instalado.")
+			return nil
+		},
+	},
 	Fedora: &Variante{Desc: "Go pelo pacote golang do Fedora"},
 }
 
@@ -298,6 +337,7 @@ var node = Module{
 		c.Log.Successf("Node LTS e pnpm instalados pelo mise para %s.", c.User)
 		return nil
 	},
+	Arch:   &Variante{},
 	Fedora: &Variante{},
 }
 
@@ -351,6 +391,10 @@ var phpSQLServer = Module{
 		c.Log.Successf("PHP, Composer, ferramentas e extensões do SQL Server instalados.")
 		return nil
 	},
+	Arch: &Variante{
+		Desc: "PHP e Composer pelos repositórios oficiais e, pelo AUR, as ferramentas do SQL Server (msodbcsql e mssql-tools) e as extensões sqlsrv/pdo_sqlsrv (php-sqlsrv)",
+		Run:  instalarPHPSQLServerArch,
+	},
 	Fedora: &Variante{
 		Desc: "PHP, Composer, as ferramentas do SQL Server (msodbcsql18 e mssql-tools18, pelo repositório da Microsoft para o RHEL) e as extensões sqlsrv/pdo_sqlsrv via PECL",
 		Run:  instalarPHPSQLServerFedora,
@@ -401,6 +445,46 @@ func instalarPHPSQLServerFedora(c *Ctx) error {
 	return nil
 }
 
+// perfilMssqlTools põe as ferramentas do SQL Server no PATH. O mssql-tools
+// do AUR instala em /opt/mssql-tools (a 17) ou /opt/mssql-tools18.
+const perfilMssqlTools = `for d in /opt/mssql-tools18/bin /opt/mssql-tools/bin; do
+    [ -d "$d" ] && PATH="$PATH:$d"
+done
+export PATH
+`
+
+// instalarPHPSQLServerArch: o PHP e o Composer vêm dos repositórios
+// oficiais; o driver ODBC, as ferramentas e as extensões (php-sqlsrv, que
+// compila a sqlsrv e a pdo_sqlsrv) só existem no AUR. As extensões são
+// ativadas em /etc/php/conf.d só se o PHP ainda não as carregar (o pacote do
+// AUR pode já trazer o .ini).
+func instalarPHPSQLServerArch(c *Ctx) error {
+	c.Log.Infof("Instalando PHP, Composer e as ferramentas do SQL Server...")
+	err := step(
+		func() error { return c.install("php", "composer", "unixodbc") },
+		func() error { return c.instalarAUR("msodbcsql", "mssql-tools", "php-sqlsrv") },
+		func() error { return c.WriteFile("/etc/profile.d/mssql-tools.sh", perfilMssqlTools, 0o644) },
+	)
+	if err != nil {
+		return err
+	}
+	out, _ := c.Output("php", "-m")
+	carregadas := strings.Fields(out)
+	for _, ext := range []struct{ nome, ini string }{
+		{"sqlsrv", "/etc/php/conf.d/20-sqlsrv.ini"},
+		{"pdo_sqlsrv", "/etc/php/conf.d/30-pdo_sqlsrv.ini"},
+	} {
+		if slices.Contains(carregadas, ext.nome) {
+			continue
+		}
+		if err := c.WriteFile(ext.ini, "extension="+ext.nome+".so\n", 0o644); err != nil {
+			return err
+		}
+	}
+	c.Log.Successf("PHP, Composer, ferramentas e extensões do SQL Server instalados.")
+	return nil
+}
+
 // scriptRuby instala o Ruby pelo mise e o Bundler e o Jekyll como gems dele.
 // O ~/.default-gems faz o mise reinstalá-las em cada Ruby novo. Tira dos rc o
 // GEM_HOME que versões anteriores escreviam: ele desviaria as gems do Ruby do
@@ -435,6 +519,12 @@ var ruby = Module{
 		return instalarRuby(c, "build-essential", "autoconf", "patch", "libssl-dev", "libyaml-dev", "libreadline-dev",
 			"zlib1g-dev", "libgmp-dev", "libncurses-dev", "libffi-dev", "libgdbm-dev", "uuid-dev")
 	},
+	// A lista da wiki do ruby-build para o Arch.
+	Arch: &Variante{
+		Run: func(c *Ctx) error {
+			return instalarRuby(c, "base-devel", "rust", "libffi", "libyaml", "openssl", "zlib")
+		},
+	},
 	// A lista da wiki do ruby-build para o Fedora (zlib-ng-compat-devel do 40
 	// em diante), mais gmp e uuid como no Ubuntu.
 	Fedora: &Variante{
@@ -465,7 +555,10 @@ func instalarRuby(c *Ctx, pkgs ...string) error {
 
 // O mise vem do repositório oficial dele: pelo extrepo no Ubuntu 22.04 e
 // 24.04, e pela PPA jdxcode/mise do 26.04 em diante, como manda a
-// documentação (https://mise.jdx.dev/installing-mise.html).
+// documentação (https://mise.jdx.dev/installing-mise.html). No Mint e no
+// Zorin com base anterior à 26.04, o extrepo não reconhece a distribuição
+// (ele procura os dados pelo ID do os-release), então o repositório APT
+// entra direto, como a mesma documentação mostra para o apt.
 var mise = Module{
 	ID:    "mise",
 	Grupo: GrupoDesenvolvimento,
@@ -473,13 +566,25 @@ var mise = Module{
 	Desc:  "Gerenciador de versões de ferramentas (Node, pnpm, Ruby, Rust...) pelo repositório oficial, ativado no .zshrc e no .bashrc",
 	Run: func(c *Ctx) error {
 		var repo []func() error
-		if misePelaPPA(c.Sys.VersionID) {
+		switch {
+		case misePelaPPA(c.Sys.UbuntuVersion):
 			c.Log.Infof("Instalando o mise pela PPA jdxcode/mise...")
 			repo = []func() error{
 				func() error { return c.garantir("add-apt-repository", "software-properties-common") },
 				func() error { return c.Run("add-apt-repository", "-y", "ppa:jdxcode/mise") },
 			}
-		} else {
+		case c.Sys.Derivado():
+			c.Log.Infof("Instalando o mise pelo repositório APT oficial...")
+			repo = []func() error{
+				func() error {
+					return instalarChaveAPT(c, "https://mise.jdx.dev/gpg-key.pub", miseKeyring, fprMise)
+				},
+				func() error {
+					return c.WriteFile("/etc/apt/sources.list.d/mise.list",
+						"deb [signed-by="+miseKeyring+" arch="+c.Sys.Arch+"] https://mise.jdx.dev/deb stable main\n", 0o644)
+				},
+			}
+		default:
 			c.Log.Infof("Instalando o mise pelo extrepo...")
 			repo = []func() error{
 				func() error { return c.install("extrepo") },
@@ -496,6 +601,21 @@ var mise = Module{
 		}
 		c.Log.Successf("mise instalado e ativado no shell de %s.", c.User)
 		return nil
+	},
+	Arch: &Variante{
+		Desc: "Gerenciador de versões de ferramentas (Node, pnpm, Ruby, Rust...) pelo pacote dos repositórios oficiais, ativado no .zshrc e no .bashrc",
+		Run: func(c *Ctx) error {
+			c.Log.Infof("Instalando o mise pelos repositórios oficiais...")
+			err := step(
+				func() error { return c.install("mise") },
+				func() error { return c.AsUser(scriptMise) },
+			)
+			if err != nil {
+				return err
+			}
+			c.Log.Successf("mise instalado e ativado no shell de %s.", c.User)
+			return nil
+		},
 	},
 	// https://mise.jdx.dev/installing-mise.html: o repositório RPM oficial
 	// (mise.jdx.dev/rpm/mise.repo), com a chave conferida antes.
@@ -522,6 +642,9 @@ var mise = Module{
 	},
 }
 
+// miseKeyring é a chave do repositório APT do mise (no Mint e no Zorin).
+const miseKeyring = "/etc/apt/keyrings/mise-archive-keyring.asc"
+
 // scriptMise ativa o mise no .zshrc e no .bashrc (uma vez só). Roda depois
 // do módulo shell, porque o instalador do Oh My Zsh troca o ~/.zshrc.
 const scriptMise = `for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
@@ -532,7 +655,8 @@ done
 `
 
 // misePelaPPA: a documentação do mise indica a PPA do Ubuntu 26.04 em diante
-// e o extrepo antes dele.
+// e o extrepo antes dele (a versão é a do Ubuntu, ou a da base no Mint e no
+// Zorin).
 func misePelaPPA(versao string) bool {
 	maior, menor, _ := strings.Cut(versao, ".")
 	ma, err1 := strconv.Atoi(maior)
@@ -559,6 +683,7 @@ var claudeCode = Module{
 		c.Log.Successf("Claude Code instalado para %s.", c.User)
 		return nil
 	},
+	Arch:   &Variante{},
 	Fedora: &Variante{},
 }
 
@@ -602,6 +727,7 @@ install -m 0755 ` + shQuote(dest) + ` "$dir/deploy-dev"
 		c.Log.Successf("deploy-dev instalado em ~/.local/bin para %s.", c.User)
 		return nil
 	},
+	Arch:   &Variante{},
 	Fedora: &Variante{},
 }
 

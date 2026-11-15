@@ -1,4 +1,5 @@
-// post-install configura uma workstation Ubuntu ou Fedora Workstation
+// post-install configura uma workstation Ubuntu, Fedora (Workstation ou KDE), Linux
+// Mint (Cinnamon), Zorin OS (Core) ou CachyOS (KDE Plasma ou GNOME)
 // recém-instalada: mirrors,
 // atualização, repositórios, Podman/VSCode/PHP/SQL Server, Flatpaks,
 // Tailscale, Chrome, Bitwarden, temas, ambiente do usuário, mise (Node, pnpm,
