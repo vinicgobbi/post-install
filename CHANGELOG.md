@@ -1,3 +1,9 @@
+## v3.4.1 (2026-11-16)
+
+### Fix
+
+- **modules**: evita ficar sem painéis quando a parada do plasma falha
+
 ## v3.4.0 (2026-11-16)
 
 ### Feat
