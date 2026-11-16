@@ -1,12 +1,13 @@
 // Package sysinfo detecta a distribuição e a versão e confere se o sistema
 // é suportado.
 //
-// São suportados de propósito só o Ubuntu (ID=ubuntu) com GNOME, o Fedora
-// Workstation (GNOME) e o Fedora KDE Plasma, o Linux Mint com Cinnamon, o
-// Zorin OS Core (com GNOME) e o CachyOS com KDE Plasma ou GNOME. Outros
-// derivados (Pop!_OS, elementary...), as outras edições do Mint e do Zorin
-// (MATE, Xfce, Lite, LMDE), os sabores e spins com outro desktop (Kubuntu,
-// Fedora Xfce...) e as variantes atômicas do Fedora (Silverblue, Kinoite)
+// São suportados de propósito só o Ubuntu (ID=ubuntu) com GNOME e o Kubuntu
+// (o mesmo ID, com KDE Plasma), o Fedora Workstation (GNOME) e o Fedora KDE
+// Plasma, o Linux Mint com Cinnamon, o Zorin OS Core (com GNOME) e o CachyOS
+// com KDE Plasma ou GNOME. Outros derivados (Pop!_OS, elementary...), as
+// outras edições do Mint e do Zorin (MATE, Xfce, Lite, LMDE), os outros
+// sabores e spins (Xubuntu, Fedora Xfce...) e as variantes atômicas do
+// Fedora (Silverblue, Kinoite)
 // divergem em repositórios, pacotes e configurações do
 // desktop, e "parecer" suportado não garante que os módulos funcionem sem
 // ajuste. As versões aceitas ficam em versoes.go; o Mint e o Zorin seguem as
@@ -66,7 +67,8 @@ type Info struct {
 	// UbuntuVersion é a versão do Ubuntu (no Mint e no Zorin, a da base:
 	// o Mint 22.2 é "24.04"). Vazio no Fedora.
 	UbuntuVersion string
-	// Desktop é o ambiente gráfico: Cinnamon no Mint, GNOME nas outras.
+	// Desktop é o ambiente gráfico: Cinnamon no Mint, KDE no Kubuntu, no
+	// Fedora KDE e no CachyOS com Plasma, GNOME nas outras.
 	Desktop       Desktop
 	MSRepoVersion string // versão nas URLs do repositório da Microsoft (Ubuntu: 26.04...; Fedora: a do RHEL)
 
@@ -116,7 +118,8 @@ func Detect() (*Info, error) {
 }
 
 // conferirDesktop exige o ambiente gráfico suportado na distribuição: o
-// Cinnamon no Mint e o GNOME nas outras. O sudo costuma limpar
+// Cinnamon no Mint, o GNOME ou o KDE Plasma no Ubuntu (Kubuntu) e no CachyOS
+// e o GNOME no Zorin. O sudo costuma limpar
 // XDG_CURRENT_DESKTOP (env_reset), então confere pelo binário.
 func conferirDesktop(info *Info, tem func(bin string) bool) error {
 	if info.Familia == Fedora && info.Desktop == KDE {
@@ -147,11 +150,17 @@ func conferirDesktop(info *Info, tem func(bin string) bool) error {
 		info.Desktop = Cinnamon
 		return nil
 	}
+	if info.ID == "ubuntu" && !tem("gnome-shell") && tem("plasmashell") {
+		// O Kubuntu declara o mesmo os-release do Ubuntu: só o desktop
+		// instalado o distingue. Com os dois, vale o GNOME (o do Ubuntu).
+		info.Desktop = KDE
+		return nil
+	}
 	if !tem("gnome-shell") {
 		if info.ID == IDZorin {
 			return fmt.Errorf("%s sem o GNOME Shell não é suportado (só o Zorin OS Core, não o Lite)", info.PrettyName)
 		}
-		return fmt.Errorf("%s sem o GNOME Shell não é suportado (só com GNOME)", info.PrettyName)
+		return fmt.Errorf("%s sem o GNOME Shell nem o KDE Plasma não é suportado (só o Ubuntu com GNOME e o Kubuntu)", info.PrettyName)
 	}
 	info.Desktop = GNOME
 	return nil
@@ -188,7 +197,7 @@ func fromRelease(rel map[string]string) (*Info, error) {
 		info.Familia = Arch
 		return info, nil
 	}
-	return nil, fmt.Errorf("distribuição não suportada: %s (só o Ubuntu, o Fedora Workstation, o Linux Mint Cinnamon, o Zorin OS Core e o CachyOS)", info.PrettyName)
+	return nil, fmt.Errorf("distribuição não suportada: %s (só o Ubuntu, o Kubuntu, o Fedora Workstation e KDE, o Linux Mint Cinnamon, o Zorin OS Core e o CachyOS)", info.PrettyName)
 }
 
 func fromUbuntu(info *Info, rel map[string]string) (*Info, error) {
@@ -321,6 +330,10 @@ func (i *Info) Summary() string {
 	}
 	if i.Codename == "" {
 		return i.PrettyName
+	}
+	if i.ID == "ubuntu" && i.Desktop == KDE {
+		// O PRETTY_NAME do Kubuntu é o do Ubuntu.
+		return fmt.Sprintf("Kubuntu (%s, %s)", i.PrettyName, i.Codename)
 	}
 	return fmt.Sprintf("%s (%s)", i.PrettyName, i.Codename)
 }

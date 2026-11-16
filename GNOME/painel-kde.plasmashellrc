@@ -1,0 +1,18 @@
+# Painéis do Plasma aplicados pelo módulo "apps_gnome" do post-install no
+# KDE. Gerado por scripts/exportar-painel-kde.sh (não edite à mão: configure
+# o painel no Plasma e exporte de novo). Os IDs são renumerados na
+# aplicação se colidirem com os da máquina.
+
+[PlasmaViews][Panel 2]
+floating=1
+shell=org.kde.plasma.desktop
+
+[PlasmaViews][Panel 2][Defaults]
+thickness=46
+
+[PlasmaViews][Panel 39]
+floating=1
+shell=org.kde.plasma.desktop
+
+[PlasmaViews][Panel 39][Defaults]
+thickness=46

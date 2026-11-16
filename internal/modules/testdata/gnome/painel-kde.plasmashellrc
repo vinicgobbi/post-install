@@ -1,0 +1,6 @@
+# Fixture dos testes golden.
+[PlasmaViews][Panel 2][Defaults]
+thickness=46
+
+[PlasmaViews][Panel 4][Defaults]
+thickness=46

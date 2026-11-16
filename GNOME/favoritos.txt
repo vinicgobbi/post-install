@@ -1,6 +1,5 @@
-# Apps fixados na barra de favoritos (dash/dock; no KDE, os apps fixados do
-# painel do Plasma), aplicados pelo módulo "apps_gnome" do post-install, na
-# ordem abaixo.
+# Apps fixados na barra de favoritos (dash/dock), aplicados pelo módulo
+# "apps_gnome" do post-install, na ordem abaixo.
 #
 # Um app por linha (ID do .desktop). Alternativas separadas por "|": entra o
 # primeiro que estiver instalado (o terminal e a loja mudam de uma distro para
@@ -8,13 +7,11 @@
 #
 # Para atualizar a partir de uma máquina já configurada:
 #   gsettings get org.gnome.shell favorite-apps   (no Mint: org.cinnamon favorite-apps)
-#   (no KDE: launchers= do org.kde.plasma.icontasks em
-#   ~/.config/plasma-org.kde.plasma.desktop-appletsrc)
 
-org.gnome.Settings.desktop | cinnamon-settings.desktop | systemsettings.desktop
-org.gnome.Nautilus.desktop | nemo.desktop | org.kde.dolphin.desktop
-org.gnome.Software.desktop | snap-store_snap-store.desktop | mintinstall.desktop | org.kde.discover.desktop
-org.gnome.Ptyxis.desktop | org.gnome.Terminal.desktop | org.gnome.Console.desktop | org.kde.konsole.desktop
+org.gnome.Settings.desktop | cinnamon-settings.desktop
+org.gnome.Nautilus.desktop | nemo.desktop
+org.gnome.Software.desktop | snap-store_snap-store.desktop | mintinstall.desktop
+org.gnome.Ptyxis.desktop | org.gnome.Terminal.desktop | org.gnome.Console.desktop
 google-chrome.desktop
 dev.vencord.Vesktop.desktop
 org.telegram.desktop.desktop

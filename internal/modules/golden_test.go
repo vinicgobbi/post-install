@@ -130,7 +130,7 @@ var ubuntus = map[string]sysinfo.Info{
 var gnomeShell = map[string]string{"22.04": "42", "24.04": "46", "26.04": "50"}
 
 // fixturesGNOME são os arquivos de testdata/gnome copiados para GNOME/.
-var fixturesGNOME = []string{"extensoes.txt", "extensoes.dconf", "atalhos.dconf", "atalhos-cinnamon.dconf", "favoritos.txt", "pastas.txt"}
+var fixturesGNOME = []string{"extensoes.txt", "extensoes.dconf", "atalhos.dconf", "atalhos-cinnamon.dconf", "favoritos.txt", "pastas.txt", "painel-kde.appletsrc", "painel-kde.plasmashellrc"}
 
 func arq(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s), Mode: 0o644} }
 
@@ -399,12 +399,33 @@ func fedoraKDELimpo(t *testing.T) cenario {
 	return c
 }
 
+// kubuntuLimpo é um Kubuntu recém-instalado: o os-release do Ubuntu, o
+// Plasma no lugar do GNOME, o Dolphin e o Konsole, sem o Flatpak.
+func kubuntuLimpo(t *testing.T) cenario {
+	c := ubuntuLimpo(t, "26.04")
+	c.nome = "kubuntu-26.04-limpo"
+	c.sys.Desktop = sysinfo.KDE
+	h := c.host
+	delete(h.binarios, "gnome-shell")
+	delete(h.binarios, "gnome-extensions")
+	h.binarios["plasmashell"] = true
+	for nome := range h.arquivos {
+		if strings.HasPrefix(nome, "usr/share/applications/org.gnome.") {
+			delete(h.arquivos, nome)
+		}
+	}
+	h.arquivos["usr/share/applications/org.kde.dolphin.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;FileManager;\n")
+	h.arquivos["usr/share/applications/org.kde.konsole.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;TerminalEmulator;\n")
+	return c
+}
+
 func cenarios(t *testing.T) []cenario {
 	return []cenario{
 		ubuntuLimpo(t, "22.04"),
 		ubuntuLimpo(t, "24.04"),
 		ubuntuLimpo(t, "26.04"),
 		ubuntuConfigurado(t),
+		kubuntuLimpo(t),
 		fedoraLimpo(t, "44"),
 		fedoraKDELimpo(t),
 		mintLimpo(t),

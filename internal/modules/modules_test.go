@@ -446,6 +446,7 @@ func TestDisponiveisCoerentes(t *testing.T) {
 		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.GNOME},
 		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE},
 		{Familia: sysinfo.Fedora, ID: "fedora", Desktop: sysinfo.KDE},
+		{Familia: sysinfo.Ubuntu, ID: "ubuntu", Desktop: sysinfo.KDE},
 	} {
 		f := string(sys.Familia) + "/" + sys.ID + "/" + string(sys.Desktop)
 		mods := Disponiveis(sys)
@@ -568,13 +569,14 @@ func TestTodosNoArch(t *testing.T) {
 	}
 }
 
-// No KDE (CachyOS e Fedora KDE), só as extensões do GNOME e o tema ficam de
+// No KDE (CachyOS, Fedora KDE e Kubuntu), só as extensões do GNOME e o tema ficam de
 // fora (os favoritos viram o painel do Plasma); os outros módulos do grupo do
 // desktop têm variante do KDE.
 func TestModulosNoKDE(t *testing.T) {
 	for _, sys := range []*sysinfo.Info{
 		{Familia: sysinfo.Arch, ID: sysinfo.IDCachyOS, Desktop: sysinfo.KDE},
 		{Familia: sysinfo.Fedora, ID: "fedora", Desktop: sysinfo.KDE},
+		{Familia: sysinfo.Ubuntu, ID: "ubuntu", Desktop: sysinfo.KDE},
 	} {
 		disp := map[string]bool{}
 		for _, m := range Disponiveis(sys) {

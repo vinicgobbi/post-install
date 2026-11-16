@@ -1,0 +1,24 @@
+# Fixture dos testes golden: dois painéis (um por monitor).
+[Containments][2]
+formfactor=2
+lastScreen=0
+location=4
+plugin=org.kde.panel
+
+[Containments][2][Applets][3]
+plugin=org.kde.plasma.kickoff
+
+[Containments][2][General]
+AppletOrder=3
+
+[Containments][4]
+formfactor=2
+lastScreen=1
+location=4
+plugin=org.kde.panel
+
+[Containments][4][Applets][5]
+plugin=org.kde.plasma.kickoff
+
+[Containments][4][General]
+AppletOrder=5

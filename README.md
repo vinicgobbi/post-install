@@ -1,7 +1,7 @@
 # POST — Pós-instalação com TUI
 
 Binário em Go, com interface interativa no terminal (TUI), para configurar uma
-workstation Ubuntu, Fedora (Workstation ou KDE Plasma), Linux Mint (Cinnamon), Zorin OS (Core) ou CachyOS (KDE Plasma ou GNOME) recém-instalada: mirrors, atualização do sistema, Podman,
+workstation Ubuntu, Kubuntu, Fedora (Workstation ou KDE Plasma), Linux Mint (Cinnamon), Zorin OS (Core) ou CachyOS (KDE Plasma ou GNOME) recém-instalada: mirrors, atualização do sistema, Podman,
 VSCode, Go, PHP + SQL Server, ferramentas de terminal (gh, tea, nmap, pipx, ffmpeg,
 bashtop, FUSE 2 para AppImages), Flatpaks (incluindo jogos — Steam, Heroic,
 ProtonPlus, PrismLauncher), Tailscale + Trayscale, Chrome, Bitwarden,
@@ -16,6 +16,10 @@ VSCode"/"Copiar caminho" no Nautilus.
 - **Ubuntu com GNOME** (`ID=ubuntu` no `/etc/os-release` e o `gnome-shell`
   instalado), nas **LTS com suporte padrão** — hoje **22.04 (jammy), 24.04
   (noble) e 26.04 (resolute)**;
+- **Kubuntu** (o mesmo `ID=ubuntu`, com o `plasmashell` instalado e sem o
+  `gnome-shell`; com os dois, vale o GNOME), nas mesmas LTS. Os módulos são
+  os do Ubuntu, com a variante do KDE no desktop (veja
+  [No KDE Plasma](#no-kde-plasma));
 - **Fedora Workstation** (`ID=fedora` e `VARIANT_ID=workstation`) e
   **Fedora KDE Plasma** (`VARIANT_ID=kde` e o `plasmashell` instalado), nas
   **versões em manutenção** — hoje **43, 44 e 45**. Todos os módulos existem
@@ -38,7 +42,7 @@ Qualquer outro sistema faz o programa parar com uma mensagem clara em vez de
 continuar em um estado incerto — inclusive outros derivados do Ubuntu
 (Pop!_OS, elementary...), as outras edições do Mint e do Zorin (MATE, Xfce,
 Lite e o LMDE, com base Debian), um Mint ou Zorin com base fora da lista,
-sabores com outro desktop (Kubuntu, Xubuntu...), versões
+os outros sabores (Xubuntu, Lubuntu...), versões
 fora do suporte padrão ou interinas entre as LTS suportadas, as variantes
 atômicas do Fedora (Silverblue, Kinoite), o Arch puro e outros derivados
 dele (Manjaro, EndeavourOS...) e o CachyOS com outros desktops (Hyprland,
@@ -188,16 +192,42 @@ Plasma**, eles têm a variante do KDE (veja [No KDE Plasma](#no-kde-plasma)).
 
 ## No KDE Plasma
 
-No CachyOS com KDE e no Fedora KDE, os módulos do desktop têm uma variante
-do KDE, com os mesmos IDs (e o tema da distribuição não muda):
+No Kubuntu, no CachyOS com KDE e no Fedora KDE, os módulos do desktop têm
+uma variante do KDE, com os mesmos IDs (e o tema da distribuição não muda):
 
 | ID | No KDE |
 |----|--------|
 | `papel_parede` | `plasma-apply-wallpaperimage` (precisa da sessão do Plasma aberta) |
-| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc` (valem a partir do próximo login) |
+| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc`, e o volume muda de 2 em 2% (`VolumeStep` no `plasmaparc`, como o `volume-step` do GNOME); valem a partir do próximo login |
 | `nautilus` | **Dolphin**: service menus (`~/.local/share/kio/servicemenus`) "Abrir com o VSCode" e "Copiar caminho", e a pasta Projetos (diretório XDG) |
-| `apps_gnome` | **Painel do Plasma**: apaga os painéis atuais e recria o painel pelo scripting do `plasmashell` (precisa da sessão do Plasma aberta; muda na hora): barra inferior flutuante de 46 px com controle de mídia, menu e apps fixados centralizados, bandeja do sistema (rede, volume, bateria e notificações visíveis; o resto no menu expandido), relógio e mostrar a área de trabalho. Os apps fixados são os de `GNOME/favoritos.txt` instalados (Configurações do sistema, Dolphin, Discover e Konsole nas alternativas do KDE) |
+| `apps_gnome` | **Painéis do Plasma**: troca os painéis da máquina pelos de `GNOME/painel-kde.appletsrc` e `GNOME/painel-kde.plasmashellrc`, exatamente como na máquina de referência (veja abaixo) |
 | `extensoes_gnome` | **indisponível**: as extensões do GNOME não rodam no Plasma |
+
+No Kubuntu, o que muda fora do desktop: o `flatpaks` instala o backend de
+Flatpak do Discover (`plasma-discover-backend-flatpak`) no lugar do GNOME
+Software, o `firewall` usa o `plasma-firewall` (das Configurações do
+Plasma, que usa o ufw) no lugar do gufw, o `ovpn` só instala o
+`network-manager-openvpn` (o `plasma-nm` já traz o diálogo do OpenVPN) e
+o Spectacle é o pacote `kde-spectacle`.
+
+### Painéis do Plasma
+
+O modelo guarda todas as seções dos painéis da máquina de referência, sem
+mudar nada: os widgets e a ordem deles, os apps fixados, a bandeja do
+sistema (o que fica visível e o que fica no menu expandido), a configuração
+de cada widget e as views (espessura, flutuante...). São dois painéis
+iguais, um por monitor: o do segundo monitor aparece quando ele for
+conectado, mesmo que não esteja na hora da instalação (o scripting do
+`plasmashell` não cria painel em monitor ausente, por isso os arquivos são
+gravados direto). O módulo para o `plasmashell`, tira os painéis atuais (e
+as views deles) do `~/.config/plasma-org.kde.plasma.desktop-appletsrc` e do
+`~/.config/plasmashellrc`, acrescenta os do modelo (a área de trabalho e o
+papel de parede ficam) e o inicia de novo, se a sessão estiver aberta (senão,
+os painéis aparecem no próximo login). Se algum ID do modelo já estiver em
+uso na máquina, os IDs do modelo são renumerados.
+
+Para atualizar o modelo, configure os painéis no Plasma e rode, da raiz do
+repositório, `scripts/exportar-painel-kde.sh`.
 
 ## Módulos
 
@@ -231,7 +261,7 @@ desmarcado sozinho.
 | | `claude_code` | Claude Code |
 | | `deploy_dev` | deploy-dev |
 | Rede e virtualização | `tailscale` | Tailscale (repositório oficial) + Trayscale |
-| | `firewall` | ufw + gufw (não ativa o firewall) |
+| | `firewall` | ufw + gufw (no Kubuntu, plasma-firewall; não ativa o firewall) |
 | | `ovpn` | importa os `.ovpn` de `OVPN/` no NetworkManager |
 | | `virt_manager` | QEMU/KVM, libvirt e virt-manager |
 | GNOME e aparência | `temas_yaru` | temas e ícones Yaru, sincronizados com os apps Flatpak |
@@ -278,7 +308,7 @@ post-install-linux-amd64.tar.gz
     ├── post-install      # binário
     ├── OVPN/README.md    # coloque aqui os .ovpn a importar
     ├── Wallpapers/       # papéis de parede oferecidos na TUI
-    ├── GNOME/            # extensões, atalhos, favoritos e pastas do GNOME
+    ├── GNOME/            # extensões, atalhos, favoritos e pastas do GNOME e o painel do KDE
     ├── logs/             # logs de cada execução
     └── README.md
 ```
@@ -421,6 +451,7 @@ internal/
     gnome_extensoes.go      #   extensões do GNOME (extensions.gnome.org ou git + gsettings + dconf)
     gnome_atalhos.go        #   atalhos do GNOME (dconf)
     gnome_apps.go           #   favoritos e pastas do menu de apps (por categoria)
+    kde_painel.go           #   painéis do Plasma (modelo de GNOME/painel-kde.*)
     golden_test.go          #   testes golden do dry-run (cenários em testdata/golden/)
   config/flatpaks.go        # listas de Flatpaks (apps e jogos)
   update/                   # verificação e aplicação de versão nova (release do GitHub)
@@ -474,10 +505,11 @@ internal/
    variante do Mint.
 5. No CachyOS, o módulo precisa do campo `Arch` (como o `Fedora`: sem ele,
    fica indisponível; um teste garante que todos têm). No KDE Plasma
-   (CachyOS e Fedora KDE), o campo `KDE` fica por cima da variante da
-   família — necessário nos módulos do grupo "GNOME e aparência" (um teste
-   confere). Como vale nas duas famílias, ele só usa pacotes de mesmo nome
-   nas duas; o que muda por família fica na variante dela (com `c.kde()`).
+   (Kubuntu, CachyOS e Fedora KDE), o campo `KDE` fica por cima da variante
+   da família — necessário nos módulos do grupo "GNOME e aparência" (um
+   teste confere). Como vale nas três famílias, o que muda de pacote entre
+   elas fica num `c.fedora()`/`c.arch()` dentro dele, e o que muda no KDE
+   fora do desktop fica na variante da família (com `c.kde()`).
 
 Dentro de `Run`, use os helpers do `Ctx` em vez de `os/exec` direto, para a
 saída ir para a TUI/logs e o `--dry-run` funcionar:
@@ -503,8 +535,8 @@ saída ir para a TUI/logs e o `--dry-run` funcionar:
 
 Toda consulta à máquina ou à rede passa pelo `Ctx` porque os **testes
 golden** trocam a máquina por uma falsa. `golden_test.go` descreve cenários
-(Ubuntu 22.04, 24.04 e 26.04 recém-instalados, um 26.04 já configurado,
-o Fedora 44 Workstation e KDE, o Linux Mint 22, o Zorin OS 18 e o CachyOS com KDE e com GNOME),
+(Ubuntu 22.04, 24.04 e 26.04 recém-instalados, um 26.04 já configurado, o
+Kubuntu 26.04, o Fedora 44 Workstation e KDE, o Linux Mint 22, o Zorin OS 18 e o CachyOS com KDE e com GNOME),
 roda todos os módulos em dry-run contra cada um e compara o resultado com
 `internal/modules/testdata/golden/<cenário>.txt`. Uma mudança em qualquer
 módulo, inclusive na lista de Flatpaks, aparece como diferença nesses
@@ -530,6 +562,7 @@ golden. Os arquivos de `GNOME/` usados nos testes são fixtures próprias, em
   `arch` (o CachyOS); o Linux Mint e o Zorin OS são da família `ubuntu`
 - `Desktop` — `Cinnamon` no Mint (confere o binário `cinnamon`), `KDE` no
   Fedora KDE (`plasmashell`), `KDE` ou `GNOME` no CachyOS (`plasmashell` ou
+  `gnome-shell`) e no Ubuntu (`KDE` é o Kubuntu: `plasmashell` sem o
   `gnome-shell`), `GNOME` nos outros (confere o `gnome-shell`)
 - `Codename` — `jammy`, `noble`, `resolute`... (de `UBUNTU_CODENAME`; no
   Mint e no Zorin, o da base), usado na URL do repositório do Tailscale e no
@@ -823,7 +856,7 @@ O script também roda localmente: `bash scripts/atualizar-pins.sh`.
 
 ## Requisitos
 
-- Ubuntu 22.04, 24.04 ou 26.04 com GNOME, Fedora Workstation ou KDE Plasma
+- Ubuntu 22.04, 24.04 ou 26.04 com GNOME ou Kubuntu, Fedora Workstation ou KDE Plasma
   43, 44 ou 45 (ou mais novos, com confirmação), Linux Mint (Cinnamon) e Zorin OS
   (Core) com uma dessas bases Ubuntu, ou CachyOS com KDE Plasma ou GNOME — veja
   [Sistemas suportados](#sistemas-suportados).

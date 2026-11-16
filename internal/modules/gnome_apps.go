@@ -75,8 +75,8 @@ var appsGnome = Module{
 		return nil
 	},
 	Arch: &Variante{},
-	// No Plasma, os favoritos viram os apps fixados do painel, que é recriado
-	// inteiro (veja kde_painel.go).
+	// No Plasma, os painéis inteiros (com os apps fixados) vêm de um modelo
+	// exportado da máquina de referência (veja kde_painel.go).
 	KDE:    painelKDE,
 	Fedora: &Variante{},
 	// O menu do Cinnamon já separa os apps pelas categorias e não tem pastas
@@ -216,11 +216,8 @@ func dirsAplicativos(home string) []string {
 
 // desktopsAtuais são os nomes que o desktop usa em OnlyShowIn/NotShowIn (o
 // Ubuntu acrescenta "ubuntu", como em XDG_CURRENT_DESKTOP=ubuntu:GNOME, e o
-// Zorin, "zorin"; o Cinnamon é "X-Cinnamon" e o Plasma, "KDE").
+// Zorin, "zorin"; o Cinnamon é "X-Cinnamon").
 func desktopsAtuais(c *Ctx) []string {
-	if c.kde() {
-		return []string{"KDE"}
-	}
 	if c.mint() {
 		return []string{"X-Cinnamon"}
 	}
