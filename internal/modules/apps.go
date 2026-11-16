@@ -224,13 +224,17 @@ var flatpaks = Module{
 	ID:    "flatpaks",
 	Grupo: GrupoAplicativos,
 	Title: "Flatpaks",
-	Desc:  "Flathub, GNOME Software com suporte a Flatpak e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
+	Desc:  "Flathub, a loja de apps com suporte a Flatpak (GNOME Software; no Kubuntu, o Discover) e a lista de aplicativos (Postman, Spotify, Obsidian, etc.)",
 	Run: func(c *Ctx) error {
 		c.Log.Infof("Configurando Flatpak e instalando apps...")
+		// No Kubuntu, a loja é o Discover, que só precisa do backend do
+		// Flatpak.
+		loja := []string{"gnome-software", "gnome-software-plugin-flatpak", "gnome-software-plugin-snap"}
+		if c.kde() {
+			loja = []string{"plasma-discover-backend-flatpak"}
+		}
 		if err := step(
-			func() error {
-				return c.install("flatpak", "gnome-software", "gnome-software-plugin-flatpak", "gnome-software-plugin-snap")
-			},
+			func() error { return c.install(append([]string{"flatpak"}, loja...)...) },
 			c.ensureFlathub, func() error { return c.flatpakInstall(config.Flatpaks...) }); err != nil {
 			return err
 		}

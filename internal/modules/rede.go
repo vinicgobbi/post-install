@@ -88,14 +88,20 @@ func instalarTailscale(c *Ctx, pacote, flathub func(*Ctx) error) error {
 var firewall = Module{
 	ID:    "firewall",
 	Grupo: GrupoRede,
-	Title: "Firewall (ufw + gufw)",
-	Desc:  "Instala o ufw e a interface gráfica gufw (não ativa o firewall nem cria regras)",
+	Title: "Firewall (ufw)",
+	Desc:  "Instala o ufw e uma interface gráfica: o gufw (no Kubuntu, o plasma-firewall, das Configurações do Plasma); não ativa o firewall nem cria regras",
 	Run: func(c *Ctx) error {
-		c.Log.Infof("Instalando o ufw e o gufw...")
-		if err := c.install("ufw", "gufw"); err != nil {
+		// O plasma-firewall do Kubuntu usa o ufw. No CachyOS com KDE, segue
+		// o gufw.
+		gui := "gufw"
+		if c.kde() && !c.arch() {
+			gui = "plasma-firewall"
+		}
+		c.Log.Infof("Instalando o ufw e o %s...", gui)
+		if err := c.install("ufw", gui); err != nil {
 			return err
 		}
-		c.Log.Successf("ufw e gufw instalados.")
+		c.Log.Successf("ufw e %s instalados.", gui)
 		return nil
 	},
 	Arch: &Variante{},
@@ -221,8 +227,8 @@ func avisarPermissaoOVPN(c *Ctx, arquivo string) {
 }
 
 // O pacote "-gnome" traz o diálogo de autenticação GTK; no Fedora KDE, o
-// plasma-nm-openvpn traz o do Plasma (no Arch, o networkmanager-openvpn
-// basta: o plasma-nm já inclui o OpenVPN).
+// plasma-nm-openvpn traz o do Plasma (no Arch e no Kubuntu, o plugin do
+// NetworkManager basta: o plasma-nm já inclui o OpenVPN).
 func instalarPluginOpenVPN(c *Ctx) error {
 	if c.arch() {
 		if c.pacoteInstalado("networkmanager-openvpn") {
@@ -243,6 +249,9 @@ func instalarPluginOpenVPN(c *Ctx) error {
 	}
 	if c.pacoteInstalado("network-manager-openvpn") {
 		return nil
+	}
+	if c.kde() {
+		return c.install("network-manager-openvpn")
 	}
 	return c.install("network-manager-openvpn", "network-manager-openvpn-gnome")
 }

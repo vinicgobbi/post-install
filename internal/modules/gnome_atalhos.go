@@ -81,8 +81,13 @@ kwriteconfig6 --file plasmaparc --group General --key VolumeStep 2
 
 func aplicarAtalhosKDE(c *Ctx) error {
 	c.Log.Infof("Configurando os atalhos do Spectacle...")
+	// No Ubuntu (Kubuntu), o pacote do Spectacle é o kde-spectacle.
+	pkg := "spectacle"
+	if !c.fedora() && !c.arch() {
+		pkg = "kde-spectacle"
+	}
 	if err := step(
-		func() error { return c.install("spectacle") },
+		func() error { return c.install(pkg) },
 		func() error { return c.AsUser(scriptAtalhosKDE) },
 	); err != nil {
 		return err

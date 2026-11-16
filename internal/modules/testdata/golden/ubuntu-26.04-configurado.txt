@@ -188,7 +188,7 @@
 [INFO] [dry-run] tailscale set --operator=ana
 [OK] Tailscale instalado e 'ana' definido como operator.
 
-== firewall (Firewall (ufw + gufw))
+== firewall (Firewall (ufw))
 [INFO] Instalando o ufw e o gufw...
 [INFO] [dry-run] apt install -y ufw gufw
 [OK] ufw e gufw instalados.

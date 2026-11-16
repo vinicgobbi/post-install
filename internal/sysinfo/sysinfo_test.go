@@ -145,6 +145,9 @@ func TestConferirDesktop(t *testing.T) {
 	}{
 		{id: "ubuntu", bins: []string{"gnome-shell"}, want: GNOME},
 		{id: "ubuntu", bins: []string{"cinnamon"}, wantErr: true},
+		{id: "ubuntu", bins: []string{"plasmashell"}, want: KDE},
+		{id: "ubuntu", bins: []string{"plasmashell", "gnome-shell"}, want: GNOME},
+		{id: IDZorin, bins: []string{"plasmashell"}, wantErr: true},
 		{id: IDZorin, bins: []string{"gnome-shell"}, want: GNOME},
 		{id: IDZorin, bins: []string{"xfce4-session"}, wantErr: true},
 		{id: IDMint, bins: []string{"cinnamon"}, want: Cinnamon},
@@ -219,6 +222,10 @@ func TestSummary(t *testing.T) {
 	cachy := &Info{Familia: Arch, ID: IDCachyOS, PrettyName: "CachyOS", Desktop: KDE}
 	if s := cachy.Summary(); s != "CachyOS (KDE Plasma)" {
 		t.Errorf("Summary do CachyOS = %q", s)
+	}
+	kubuntu := &Info{Familia: Ubuntu, ID: "ubuntu", PrettyName: "Ubuntu 26.04 LTS", Codename: "resolute", Desktop: KDE}
+	if s := kubuntu.Summary(); s != "Kubuntu (Ubuntu 26.04 LTS, resolute)" {
+		t.Errorf("Summary do Kubuntu = %q", s)
 	}
 	mint := &Info{ID: IDMint, PrettyName: "Linux Mint 22.2", Codename: "noble", UbuntuVersion: "24.04"}
 	if s := mint.Summary(); s != "Linux Mint 22.2 (base Ubuntu 24.04, noble)" {
