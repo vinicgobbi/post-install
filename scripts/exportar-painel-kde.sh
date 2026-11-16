@@ -55,4 +55,4 @@ EOF
 { cabecalho; extrair "$applets" "[Containments][" "]"; } >"$destino/painel-kde.appletsrc"
 { cabecalho; extrair "$shellrc" "[PlasmaViews][Panel " "]"; } >"$destino/painel-kde.plasmashellrc"
 
-echo "Painéis exportados ($(echo $ids)) para $destino/painel-kde.appletsrc e $destino/painel-kde.plasmashellrc."
+echo "Painéis exportados (${ids//$'\n'/ }) para $destino/painel-kde.appletsrc e $destino/painel-kde.plasmashellrc."
