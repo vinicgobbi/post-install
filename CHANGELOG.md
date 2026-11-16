@@ -1,3 +1,14 @@
+## v3.4.0 (2026-11-16)
+
+### Feat
+
+- **sysinfo**: adiciona o suporte ao kubuntu
+- **modules**: volume de 2 em 2% no kde
+
+### Fix
+
+- **scripts**: corrige o aviso do shellcheck no exportar-painel-kde
+
 ## v3.3.0 (2026-11-15)
 
 ### Feat
