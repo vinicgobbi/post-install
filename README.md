@@ -198,7 +198,7 @@ uma variante do KDE, com os mesmos IDs (e o tema da distribuição não muda):
 | ID | No KDE |
 |----|--------|
 | `papel_parede` | `plasma-apply-wallpaperimage` (precisa da sessão do Plasma aberta) |
-| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc`, e o volume muda de 2 em 2% (`VolumeStep` no `plasmaparc`, como o `volume-step` do GNOME); valem a partir do próximo login |
+| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc`, e o volume muda de 2 em 2% (`VolumeStep` no `plasmaparc`, como o `volume-step` do GNOME); Meta+. abre o seletor de emojis (`plasma-emojier`) e as bordas da tela ficam desativadas (o canto superior esquerdo deixa de abrir a Visão geral: `BorderActivate=9` no `kwinrc`); valem a partir do próximo login |
 | `nautilus` | **Dolphin**: service menus (`~/.local/share/kio/servicemenus`) "Abrir com o VSCode" e "Copiar caminho", e a pasta Projetos (diretório XDG) |
 | `apps_gnome` | **Painéis do Plasma**: troca os painéis da máquina pelos de `GNOME/painel-kde.appletsrc` e `GNOME/painel-kde.plasmashellrc`, exatamente como na máquina de referência (veja abaixo) |
 | `extensoes_gnome` | **indisponível**: as extensões do GNOME não rodam no Plasma |
