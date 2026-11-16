@@ -29,10 +29,11 @@ const (
 
 // scriptPararPlasma para o plasmashell (pelo systemd, como no Plasma 6, ou
 // pelo kquitapp6) e espera ele sair: ao sair, ele grava a configuração em
-// memória por cima dos arquivos.
-const scriptPararPlasma = `set -e
-if systemctl --user is-active -q plasma-plasmashell.service 2>/dev/null; then
-	systemctl --user stop plasma-plasmashell.service
+// memória por cima dos arquivos. Sem set -e: o que vale é o plasmashell ter
+// saído, conferido no fim; um "systemctl stop" que sai com erro (já visto no
+// Kubuntu 26.04, rodando pelo su) cai no kquitapp6 em vez de abortar.
+const scriptPararPlasma = `if systemctl --user is-active -q plasma-plasmashell.service 2>/dev/null; then
+	systemctl --user stop plasma-plasmashell.service || echo "systemctl --user stop saiu com $?; tentando o kquitapp6" >&2
 fi
 if pgrep -u "$(id -u)" -x plasmashell >/dev/null; then
 	kquitapp6 plasmashell 2>/dev/null || true
@@ -77,6 +78,9 @@ func aplicarPainelKDE(c *Ctx) error {
 
 	c.Log.Infof("Parando o plasmashell para trocar os painéis...")
 	if err := c.AsUser(scriptPararPlasma); err != nil {
+		// A parada pode ter derrubado o plasmashell no meio do caminho: sem
+		// isto, o usuário fica sem painéis até o próximo login.
+		_ = c.AsUser(scriptIniciarPlasma)
 		return err
 	}
 	// Lidos depois de parar o plasmashell, já com o que ele gravou ao sair.
