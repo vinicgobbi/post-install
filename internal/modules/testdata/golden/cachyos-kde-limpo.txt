@@ -180,8 +180,13 @@
 
 == papel_parede (Papel de parede)
 [INFO] Aplicando o papel de parede 'paisagem.jpg'...
-[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; install -D -m 0644 '/opt/post-install/Wallpapers/paisagem.jpg' '/home/ana/.local/share/backgrounds/paisagem.jpg'; plasma-apply-wallpaperimage '/home/ana/.local/share/backgrounds/paisagem.jpg''
+[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; install -D -m 0644 '/opt/post-install/Wallpapers/paisagem.jpg' '/home/ana/.local/share/backgrounds/paisagem.jpg'; plasma-apply-wallpaperimage '/home/ana/.local/share/backgrounds/paisagem.jpg'; kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image; kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image 'file:///home/ana/.local/share/backgrounds/paisagem.jpg'; kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key PreviewImage 'file:///home/ana/.local/share/backgrounds/paisagem.jpg''
 [OK] Papel de parede aplicado: /home/ana/.local/share/backgrounds/paisagem.jpg
+[INFO] Aplicando o papel de parede na tela de login (SDDM, tema 'breeze')...
+[INFO] [dry-run] install -D -m 0644 /opt/post-install/Wallpapers/paisagem.jpg /usr/local/share/backgrounds/paisagem.jpg
+[INFO] [dry-run] kwriteconfig6 --file /usr/share/sddm/themes/breeze/theme.conf.user --group General --key type image
+[INFO] [dry-run] kwriteconfig6 --file /usr/share/sddm/themes/breeze/theme.conf.user --group General --key background /usr/local/share/backgrounds/paisagem.jpg
+[OK] Tela de login (SDDM) com o papel de parede: /usr/local/share/backgrounds/paisagem.jpg
 
 == atalhos_gnome (Atalhos do KDE)
 [INFO] Configurando os atalhos do Spectacle...
