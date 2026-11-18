@@ -1,3 +1,10 @@
+## v3.5.0 (2026-11-18)
+
+### Feat
+
+- **modules**: aplica o papel de parede na tela de bloqueio e de login do kde
+- **modules**: atalho de emojis e bordas da tela desativadas no kde
+
 ## v3.4.1 (2026-11-16)
 
 ### Fix
