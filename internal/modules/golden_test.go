@@ -372,6 +372,7 @@ func cachyosLimpo(t *testing.T, desktop sysinfo.Desktop) cenario {
 		h.binarios["plasmashell"] = true
 		delete(h.arquivos, "usr/share/applications/org.gnome.Nautilus.desktop")
 		h.arquivos["usr/share/applications/org.kde.dolphin.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;FileManager;\n")
+		comSDDM(h, "etc/sddm.conf.d/kde_settings.conf")
 		return c
 	}
 	h.binarios["gnome-shell"] = true
@@ -396,6 +397,9 @@ func fedoraKDELimpo(t *testing.T) cenario {
 	delete(h.arquivos, "usr/share/applications/org.gnome.Nautilus.desktop")
 	delete(h.arquivos, "usr/share/applications/org.gnome.Ptyxis.desktop")
 	h.arquivos["usr/share/applications/org.kde.dolphin.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;FileManager;\n")
+	// O Fedora 44 KDE troca o SDDM pelo Plasma Login Manager.
+	h.binarios["plasmalogin"] = true
+	h.comandos["getent passwd plasmalogin"] = "plasmalogin:x:961:961:PLASMALOGIN Greeter Account:/var/lib/plasmalogin:/usr/sbin/nologin\n"
 	return c
 }
 
@@ -416,7 +420,15 @@ func kubuntuLimpo(t *testing.T) cenario {
 	}
 	h.arquivos["usr/share/applications/org.kde.dolphin.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;FileManager;\n")
 	h.arquivos["usr/share/applications/org.kde.konsole.desktop"] = arq("[Desktop Entry]\nType=Application\nCategories=Qt;KDE;System;TerminalEmulator;\n")
+	comSDDM(h, "etc/sddm.conf")
 	return c
+}
+
+// comSDDM põe o SDDM na máquina, com o tema Breeze escolhido em conf.
+func comSDDM(h *hostFalso, conf string) {
+	h.binarios["sddm"] = true
+	h.arquivos[conf] = arq("[Theme]\nCurrent=breeze\n")
+	h.arquivos["usr/share/sddm/themes/breeze/theme.conf"] = arq("[General]\nbackground=/usr/share/wallpapers/Next/contents/images/5120x2880.png\n")
 }
 
 func cenarios(t *testing.T) []cenario {

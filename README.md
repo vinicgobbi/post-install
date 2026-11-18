@@ -197,8 +197,8 @@ uma variante do KDE, com os mesmos IDs (e o tema da distribuição não muda):
 
 | ID | No KDE |
 |----|--------|
-| `papel_parede` | `plasma-apply-wallpaperimage` (precisa da sessão do Plasma aberta) |
-| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc`, e o volume muda de 2 em 2% (`VolumeStep` no `plasmaparc`, como o `volume-step` do GNOME); valem a partir do próximo login |
+| `papel_parede` | `plasma-apply-wallpaperimage` (precisa da sessão do Plasma aberta), e a mesma imagem na tela de bloqueio e na tela de login (Plasma Login ou SDDM; veja [Papel de parede](#papel-de-parede)) |
+| `atalhos_gnome` | **Atalhos do KDE**: o Print continua com o Spectacle; Meta+Shift+S captura uma região (junto do padrão Meta+Shift+Print) e Meta+Shift+R grava uma região, no `kglobalshortcutsrc`, e o volume muda de 2 em 2% (`VolumeStep` no `plasmaparc`, como o `volume-step` do GNOME); Meta+. abre o seletor de emojis (`plasma-emojier`) e as bordas da tela ficam desativadas (o canto superior esquerdo deixa de abrir a Visão geral: `BorderActivate=9` no `kwinrc`); valem a partir do próximo login |
 | `nautilus` | **Dolphin**: service menus (`~/.local/share/kio/servicemenus`) "Abrir com o VSCode" e "Copiar caminho", e a pasta Projetos (diretório XDG) |
 | `apps_gnome` | **Painéis do Plasma**: troca os painéis da máquina pelos de `GNOME/painel-kde.appletsrc` e `GNOME/painel-kde.plasmashellrc`, exatamente como na máquina de referência (veja abaixo) |
 | `extensoes_gnome` | **indisponível**: as extensões do GNOME não rodam no Plasma |
@@ -608,6 +608,21 @@ recompilar. O módulo `papel_parede`, como o usuário alvo:
    fundo);
 2. aplica com `gsettings` (`picture-uri`, `picture-uri-dark` e
    `picture-options 'zoom'`).
+
+No KDE, o passo 2 é o `plasma-apply-wallpaperimage`, e a mesma imagem vai
+também para:
+
+- a **tela de bloqueio**: `[Greeter][Wallpaper][org.kde.image][General]` do
+  `~/.config/kscreenlockerrc`, como o usuário;
+- a **tela de login**, como root, conforme o que estiver instalado:
+  - **Plasma Login Manager** (Fedora 44 KDE em diante): como o KCM dele, copia
+    a imagem para `/var/lib/plasmalogin/wallpapers/` (a home do usuário
+    `plasmalogin`, dono da cópia) e grava a URI em
+    `[Greeter][Wallpaper][org.kde.image][General]` do `/etc/plasmalogin.conf`;
+  - **SDDM**: copia a imagem para `/usr/local/share/backgrounds/` (a home do
+    usuário não é legível pelo greeter) e grava `background` e `type=image`
+    no `theme.conf.user` do tema atual (`[Theme] Current` da configuração
+    do SDDM, ou o Breeze), que o Breeze e os temas derivados leem.
 
 Os scripts que rodam como o usuário (`su -s /bin/bash - usuario`) usam a sessão D-Bus dele
 quando há uma sessão gráfica aberta; sem isso o `gsettings` descarta as

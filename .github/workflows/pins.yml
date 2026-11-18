@@ -40,7 +40,7 @@ jobs:
             echo
             echo "Revise os links de comparação antes de mergear: esse código roda nas instalações."
           } > "$RUNNER_TEMP/pr.md"
-      - uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # v8.1.2
+      - uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           branch: pins/atualizacao
           base: development

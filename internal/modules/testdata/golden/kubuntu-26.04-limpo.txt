@@ -209,14 +209,19 @@
 
 == papel_parede (Papel de parede)
 [INFO] Aplicando o papel de parede 'paisagem.jpg'...
-[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; install -D -m 0644 '/opt/post-install/Wallpapers/paisagem.jpg' '/home/ana/.local/share/backgrounds/paisagem.jpg'; plasma-apply-wallpaperimage '/home/ana/.local/share/backgrounds/paisagem.jpg''
+[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; install -D -m 0644 '/opt/post-install/Wallpapers/paisagem.jpg' '/home/ana/.local/share/backgrounds/paisagem.jpg'; plasma-apply-wallpaperimage '/home/ana/.local/share/backgrounds/paisagem.jpg'; kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.image; kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image 'file:///home/ana/.local/share/backgrounds/paisagem.jpg'; kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key PreviewImage 'file:///home/ana/.local/share/backgrounds/paisagem.jpg''
 [OK] Papel de parede aplicado: /home/ana/.local/share/backgrounds/paisagem.jpg
+[INFO] Aplicando o papel de parede na tela de login (SDDM, tema 'breeze')...
+[INFO] [dry-run] install -D -m 0644 /opt/post-install/Wallpapers/paisagem.jpg /usr/local/share/backgrounds/paisagem.jpg
+[INFO] [dry-run] kwriteconfig6 --file /usr/share/sddm/themes/breeze/theme.conf.user --group General --key type image
+[INFO] [dry-run] kwriteconfig6 --file /usr/share/sddm/themes/breeze/theme.conf.user --group General --key background /usr/local/share/backgrounds/paisagem.jpg
+[OK] Tela de login (SDDM) com o papel de parede: /usr/local/share/backgrounds/paisagem.jpg
 
 == atalhos_gnome (Atalhos do KDE)
 [INFO] Configurando os atalhos do Spectacle...
 [INFO] [dry-run] apt install -y kde-spectacle
-[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RectangularRegionScreenShot "$(printf 'Meta+Shift+Print\tMeta+Shift+S')"; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RecordRegion "Meta+Shift+R"; kwriteconfig6 --file plasmaparc --group General --key VolumeStep 2'
-[OK] Atalhos do KDE aplicados (Meta+Shift+S, Meta+Shift+R e volume de 2 em 2%); valem a partir do próximo login.
+[INFO] [dry-run] su -s /bin/bash - ana -c 'if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "/run/user/$(id -u)/bus" ]; then; export XDG_RUNTIME_DIR="/run/user/$(id -u)"; export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"; fi; set -e; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RectangularRegionScreenShot "$(printf 'Meta+Shift+Print\tMeta+Shift+S')"; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.spectacle.desktop --key RecordRegion "Meta+Shift+R"; kwriteconfig6 --file kglobalshortcutsrc --group services --group org.kde.plasma.emojier.desktop --key _launch "$(printf 'Meta+.\tMeta+Ctrl+Alt+Shift+Space')"; kwriteconfig6 --file plasmaparc --group General --key VolumeStep 2; kwriteconfig6 --file kwinrc --group Effect-overview --key BorderActivate 9; kwriteconfig6 --file kwinrc --group Effect-overview --key TouchBorderActivate 9; for canto in Top TopRight Right BottomRight Bottom BottomLeft Left TopLeft; do; kwriteconfig6 --file kwinrc --group ElectricBorders --key "$canto" None; done; dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure 2>/dev/null || true'
+[OK] Atalhos do KDE aplicados (Meta+Shift+S, Meta+Shift+R, Meta+. para emojis, volume de 2 em 2% e bordas da tela desativadas); valem a partir do próximo login.
 
 == nautilus (Dolphin: VSCode, copiar caminho e Projetos)
 [INFO] Adicionando as ações do VSCode e de copiar caminho ao Dolphin...
